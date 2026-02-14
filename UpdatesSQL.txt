@@ -1,0 +1,1127 @@
+ALTER TABLE puntos_venta
+ADD correlativo_alquiler BIGINT UNSIGNED NULL DEFAULT NULL AFTER correlativo_factura,
+ADD correlativo_servicios_basicos BIGINT UNSIGNED NULL DEFAULT NULL AFTER correlativo_alquiler,
+ADD correlativo_nota_debcred BIGINT UNSIGNED NULL DEFAULT NULL AFTER correlativo_servicios_basicos;
+
+ALTER TABLE `returns` ADD `customer_sale_id` INT NULL AFTER `id`;
+
+ALTER TABLE `returns`
+ADD `cuf` VARCHAR(200) NULL AFTER `customer_sale_id`;
+-- 23/01/2023 new column add in return and return products --
+ALTER TABLE `returns`
+ADD `is_active` BOOLEAN NOT NULL DEFAULT TRUE AFTER `staff_note`;
+
+ALTER TABLE `product_returns`
+ADD `is_active` BOOLEAN NOT NULL DEFAULT TRUE AFTER `total`;
+
+-- 28/01/2023 new column add in punto venta for state ---
+ALTER TABLE `puntos_venta`
+ADD `descripcion` VARCHAR(200) NULL AFTER `nombre_punto_venta`;
+
+ALTER TABLE `puntos_venta`
+ADD `is_active` BOOLEAN NOT NULL DEFAULT TRUE AFTER `modo_contingencia`;
+-- 30/01/2023 new column add in products for type service special
+ALTER TABLE `products`
+ADD `is_basicservice` BOOLEAN NOT NULL DEFAULT FALSE AFTER `is_pricelist`;
+
+ALTER TABLE `customers`
+ADD `is_tasadignidad` BOOLEAN NOT NULL DEFAULT FALSE AFTER `razon_social`,
+ADD `is_ley1886` BOOLEAN NOT NULL DEFAULT FALSE AFTER `is_tasadignidad`,
+ADD `porcentaje_tasadignidad` DOUBLE NOT NULL DEFAULT '0.0' AFTER `is_ley1886`,
+ADD `porcentaje_ley1886` DOUBLE NOT NULL DEFAULT '0.0' AFTER `porcentaje_tasadignidad`;
+-- 28/03/2023 new column add in Factura Masiva for control by users
+ALTER TABLE `factura_masiva`
+ADD `created_by` INT NOT NULL AFTER `codigo_documento_sector`;
+-- 29/03/2023 new columns add in Customer for data additional --
+ALTER TABLE `customers`
+ADD `codigofijo` VARCHAR(11) NULL AFTER `porcentaje_ley1886`,
+ADD `nro_medidor` VARCHAR(11) NULL AFTER `codigofijo`;
+-- 30/30/2023 new columns add in pos setting for use services --
+ALTER TABLE `pos_setting`
+ADD `url_optimo` VARCHAR(50) NULL AFTER `url_operaciones`,
+ADD `url_cobranza` VARCHAR(50) NULL AFTER `url_optimo`;
+
+ALTER TABLE product_sales
+ADD COLUMN description VARCHAR(50) NULL DEFAULT NULL AFTER updated_at;
+
+-- 11/04/2023 new column add in customer for filter by sucursal (optional)
+ALTER TABLE `customers`
+ADD `sucursal_id` INT NULL AFTER `nro_medidor`;
+-- 13/04/2023 new column add in customer_sales for customize codigofijo --
+ALTER TABLE `customer_sales`
+ADD `codigofijo` VARCHAR(50) NULL DEFAULT NULL AFTER `customer_id`;
+-- 14/04/2023 created new table for save temp data excel imports ---
+--
+-- Estructura de tabla para la tabla `sales_import_temp`
+--
+DROP TABLE IF EXISTS `sales_import_temp`;
+
+CREATE TABLE IF NOT EXISTS `sales_import_temp` (
+    `id` int(11) NOT NULL AUTO_INCREMENT, `facturamasiva_id` int(11) NOT NULL, `NRO_FACT` int(11) NOT NULL, `codigoSucursal` int(11) NOT NULL, `nombreRazonSocial` varchar(255) NOT NULL, `codigoTipoDocumentoIdentidad` int(11) NOT NULL, `numeroDocumento` varchar(100) NOT NULL, `complemento` varchar(50) DEFAULT NULL, `codigoCliente` varchar(50) NOT NULL, `mes` varchar(50) NOT NULL, `gestion` int(11) NOT NULL, `ciudad` varchar(250) NOT NULL, `zona` varchar(250) NOT NULL, `numero_medidor` varchar(100) NOT NULL, `domicilio_cliente` varchar(255) DEFAULT NULL, `codigoMetodoPago` int(11) NOT NULL, `numeroTarjeta` varchar(100) NOT NULL, `montoTotal` double NOT NULL, `montoTotalSujetoIva` double NOT NULL, `consumoPeriodo` int(11) NOT NULL, `beneficiarioLey1886` int(11) NOT NULL, `montoDescuentoLey1886` double NOT NULL, `montoDescuentoTarifaDignidad` double NOT NULL, `tasaAseo` double NOT NULL, `tasaAlumbrado` double NOT NULL, `otrasTasas` double NOT NULL, `ajusteNoSujetoIva` double NOT NULL, `detalleAjusteNoSujetoIva` varchar(255) DEFAULT NULL, `ajusteSujetoIva` double NOT NULL, `detalleAjusteSujetoIva` varchar(255) DEFAULT NULL, `otrosPagosNoSujetoIva` double NOT NULL, `descuentoAdicional` double NOT NULL, `codigoExcepcion` int(11) NOT NULL, `cafc` varchar(255) DEFAULT NULL, `usuario` varchar(100) NOT NULL, `codigoProducto` int(11) NOT NULL, `descripcion` varchar(255) NOT NULL, `cantidad` double NOT NULL, `precioUnitario` double NOT NULL, `montoDescuento` double NOT NULL, `subTotal` double NOT NULL, `categoria` varchar(100) NOT NULL, `email` varchar(100) DEFAULT NULL, `lectant` varchar(100) DEFAULT NULL, `f_lectAnt` varchar(100) DEFAULT NULL, `lectact` varchar(100) DEFAULT NULL, `f_lectAct` varchar(100) DEFAULT NULL, `created_at` datetime DEFAULT NULL, `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`id`), KEY `facturamasiva_id` (`facturamasiva_id`)
+) ENGINE = MyISAM DEFAULT CHARSET = utf8;
+
+-- 17-04/2023 optimizaciones laravel ---
+php artisan package:discover --ansi     
+composer remove srmklive/paypal  
+composer remove razorpay/razorpay  
+composer install --optimize-autoloader --no-dev
+composer install --prefer-dist --no-dev -o
+
+-- 22-04-2023 correcciones tabla temporal de importacion factura masiva ---
+ALTER TABLE `sales_import_temp`
+CHANGE `numeroTarjeta` `numeroTarjeta` VARCHAR(100) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NULL;
+
+ALTER TABLE `sales_import_temp`
+CHANGE `beneficiarioLey1886` `beneficiarioLey1886` INT NULL;
+-- 16-06-2023 add new column in Customer for alert in AttentionShip
+ALTER TABLE `customers`
+ADD `date_birh` DATE NULL DEFAULT NULL AFTER `razon_social`;
+
+ALTER TABLE `quotations`
+ADD `valid_date` DATE NULL DEFAULT NULL AFTER `note`;
+-- 20-06-2023 migracion de laravel 7 a 8 aplicar actualizacion requiere php >= 7.3 ---
+ 
+
+
+php artisan config:clear
+composer update
+composer dump-autoload
+php artisan config:cache (only mode production)
+php artisan --version (verify version laravel)
+
+
+after
+update laravel,
+update file AuthenticatesUsers locate in vendor / laravel / ui / auth - backend,
+change line 153 'email' to 'name'
+-- 15-07-2023 add new table for biller has multiple warehouse (optional)
+CREATE TABLE `biller_warehouses` (
+    `id` INT NOT NULL AUTO_INCREMENT, `biller_id` INT NOT NULL, `warehouse_id` INT NOT NULL, `created_at` DATETIME NULL, `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`id`)
+) ENGINE = InnoDB;
+
+-- 17-07-2023 add new table for customer additional data company
+CREATE TABLE `customer_company` (
+    `id` INT NOT NULL AUTO_INCREMENT, `customer_id` INT NOT NULL, `fullname` VARCHAR(255) NOT NULL, `company_name` VARCHAR(100) NULL, `phone` VARCHAR(20) NULL, `telephone` VARCHAR(20) NULL, `address` VARCHAR(255) NULL, `lat` VARCHAR(100) NULL, `lon` VARCHAR(100) NULL, `description` VARCHAR(255) NULL, `url_custom` VARCHAR(255) NULL, `is_active` BOOLEAN NOT NULL DEFAULT TRUE, `created_at` DATETIME NULL DEFAULT NULL, `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`id`), INDEX `customer` (`customer_id`)
+) ENGINE = InnoDB;
+-- 21-07-2023 add new column for keep printer quotations
+ALTER TABLE `pos_setting`
+ADD `quotation_printer` INT NULL AFTER `cant_max_masiva`;
+-- 26-07-2023 add new columns and update table punto venta
+ALTER TABLE `puntos_venta`
+CHANGE `tipo_punto_venta` `tipo_punto_venta` VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL;
+
+ALTER TABLE `puntos_venta`
+ADD `fecha_inicio` DATE NULL AFTER `modo_contingencia`,
+ADD `fecha_fin` DATE NULL AFTER `fecha_inicio`,
+ADD `nit_comisionista` VARCHAR(50) NULL AFTER `fecha_fin`,
+ADD `numero_contrato` VARCHAR(200) NULL AFTER `nit_comisionista`;
+
+ALTER TABLE `puntos_venta`
+ADD `is_siat` BOOLEAN NOT NULL DEFAULT TRUE AFTER `numero_contrato`;
+
+INSERT INTO
+    `permissions` (
+        `id`, `name`, `guard_name`, `created_at`, `updated_at`
+    )
+VALUES (
+        NULL, 'cafc_siat', 'web', '2023-07-26 22:14:02', '2023-07-26 22:14:02'
+    )
+INSERT INTO
+    `permissions` (
+        `id`, `name`, `guard_name`, `created_at`, `updated_at`
+    )
+VALUES (
+        NULL, 'balance-sheet-account', 'web', '2023-07-26 22:14:02', '2023-07-26 22:14:02'
+    );
+
+INSERT INTO
+    `permissions` (
+        `id`, `name`, `guard_name`, `created_at`, `updated_at`
+    )
+VALUES (
+        NULL, 'close-balance-account', 'web', '2023-08-03 18:12:54', '2023-08-03 18:12:54'
+    );
+-- 29-07-2023 add new column for control filter by sucursal in POS for customers
+ALTER TABLE `pos_setting`
+ADD `customer_sucursal` BOOLEAN NOT NULL DEFAULT FALSE AFTER `quotation_printer`;
+-- 22-08-2023 update recaptcha Google v3 -
+ 
+
+
+
+Run:
+  php artisan config:clear
+  composer remove anhskohbo/no-captcha
+  composer require josiasmontag/laravel-recaptchav3
+  php artisan vendor:publish --provider="Lunaweb\RecaptchaV3\Providers\RecaptchaV3ServiceProvider"
+  
+add variable .env
+  RECAPTCHAV3_SITEKEY=
+  RECAPTCHAV3_SECRET=
+
+
+-- 16-09-2023 add new column for save cost product in product_sale, the value will use new report ---
+ALTER TABLE product_sales ADD cost DOUBLE DEFAULT 0 NULL AFTER qty;
+
+INSERT INTO
+    `permissions` (
+        `id`, `name`, `guard_name`, `created_at`, `updated_at`
+    )
+VALUES (
+        NULL, 'sale-renueve-report', 'web', '2023-09-26 21:44:29', '2023-09-26 21:44:29'
+    )
+
+--
+Add record table: 
+
+It tracks sales - related changes,
+storing sales.reference_no,
+product
+and warehouse quantities before
+and after updates.
+--
+CREATE TABLE Record (
+    id INT AUTO_INCREMENT PRIMARY KEY, sales_reference_no VARCHAR(50), product_id INT, product_qty_before INT, product_qty_after INT, warehouse_id INT, warehouse_qty_before INT, warehouse_qty_after INT, action_taken_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--
+02/12/2023 Add trigger after_product_sale_trigger: 
+
+This trigger, after_product_sale_trigger, responds to new entries in product_sales. It captures the associated sales.
+reference_no and warehouse_id, then adjusts products.qty and product_warehouse.qty based on the sale quantity. It records these changes in the Record table, ensuring real-time updates and tracking of product and warehouse quantities after each sale.
+--
+
+
+DROP TRIGGER IF EXISTS after_product_sale_trigger;
+
+DELIMITER / /
+
+CREATE TRIGGER after_product_sale_trigger AFTER INSERT 
+ON product_sales FOR EACH ROW 
+BEGIN 
+DECLARE
+	trans_id INT;
+DECLARE
+	warehouse_id_val INT;
+DECLARE
+	product_qty_before INT;
+DECLARE
+	warehouse_qty_before INT;
+DECLARE
+	sales_ref_no VARCHAR(50);
+DECLARE
+	product_type VARCHAR(50);
+	-- Obtener el warehouse_id, reference_no y variant_id de la tabla sales
+	SELECT
+	    id,
+	    warehouse_id,
+	    reference_no INTO trans_id,
+	    warehouse_id_val,
+	    sales_ref_no
+	FROM sales
+	WHERE
+	    id = NEW.sale_id FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla sales
+	-- Obtener la cantidad de productos antes de la actualización y el tipo de producto
+	SELECT
+	    qty,
+	    type INTO product_qty_before,
+	    product_type
+	FROM products
+	WHERE
+	    id = NEW.product_id FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla products
+	-- Si variant_id es diferente de NULL, obtener la cantidad de product_variants y actualizar
+	IF NEW.variant_id IS NOT NULL THEN
+	SELECT qty INTO product_qty_before
+	FROM product_variants
+	WHERE
+	    id = NEW.variant_id FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla product_variants
+	-- Verificar si el producto es de tipo digital
+	IF product_type NOT IN('digital', 'combo') THEN
+	-- Actualizar la cantidad en product_variants
+	UPDATE product_variants
+	SET
+	    qty = qty - NEW.qty
+	WHERE
+	    id = NEW.variant_id;
+END
+	IF;
+	ELSE
+	-- Verificar si el producto es de tipo digital
+	IF product_type NOT IN('digital', 'combo') THEN
+	-- Actualizar qty en products
+	UPDATE products
+	SET
+	    qty = qty - NEW.qty
+	WHERE
+	    id = NEW.product_id;
+END
+	IF;
+END
+	IF;
+	-- Obtener la cantidad en el almacén antes de la actualización
+	SELECT qty INTO warehouse_qty_before
+	FROM product_warehouse
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_val FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla product_warehouse
+	-- Actualizar la cantidad en la tabla product_warehouse si no es un producto digital
+	IF product_type NOT IN('digital', 'combo') THEN
+	UPDATE product_warehouse
+	SET
+	    qty = qty - NEW.qty
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_val;
+END
+	IF;
+	-- Registrar los cambios en la tabla Record
+	IF product_type IN ('digital', 'combo') THEN
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, sales_ref_no, 1, product_qty_before, product_qty_before, warehouse_qty_before, warehouse_qty_before
+	    );
+	ELSE
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, sales_ref_no, 1, product_qty_before, (product_qty_before - NEW.qty), warehouse_qty_before, (
+	            warehouse_qty_before - NEW.qty
+	        )
+	    );
+END
+	IF;
+END; 
+
+/ /
+
+-- 18/12/2023 alter record table
+
+ALTER TABLE `servergisul_poslatejona`.`record`
+ADD COLUMN `transaction_id` INT UNSIGNED NOT NULL AFTER `id`,
+ADD COLUMN `transaction_type` SMALLINT(2) NOT NULL AFTER `product_id`,
+ADD COLUMN ` cb_cost` DECIMAL NULL DEFAULT 0 AFTER `warehouse_qty_after`;
+CHANGE COLUMN `warehouse_id` `warehouse_id` INT NULL DEFAULT NULL AFTER `transaction_id`,
+CHANGE COLUMN `product_id` `product_id` INT NULL DEFAULT NULL AFTER `warehouse_id`,
+CHANGE COLUMN `sales_reference_no` `reference_no` VARCHAR(50) NULL DEFAULT NULL;
+
+/* 18/12/2023 Add trigger after_product_purchases_trigger: 
+This trigger, after_product_purchases_trigger, responds to new entries in product_purchases. It captures the associated sales.
+reference_no and warehouse_id, then adjusts products.qty and product_warehouse.qty based on the sale quantity. It records these changes in the Record table, ensuring real-time updates and tracking of product and warehouse quantities after each purchase.
+*/
+-- updated 14/01/2024
+DROP TRIGGER IF EXISTS after_product_purchases_trigger;
+
+DELIMITER / /
+
+CREATE TRIGGER AFTER_PRODUCT_PURCHASES_TRIGGER AFTER 
+INSERT ON PRODUCT_PURCHASES FOR EACH ROW 
+BEGIN 
+DECLARE
+	trans_id INT;
+DECLARE
+	warehouse_id_val INT;
+DECLARE
+	product_qty_before INT;
+DECLARE
+	warehouse_qty_before INT;
+DECLARE
+	purchase_ref_no VARCHAR(50);
+DECLARE
+	product_type VARCHAR(50);
+DECLARE
+	p_status INT;
+	-- Obtener el warehouse_id y el reference_no de la tabla sales
+	SELECT
+	    id,
+	    warehouse_id,
+	    reference_no,
+	    status INTO trans_id,
+	    warehouse_id_val,
+	    purchase_ref_no,
+	    p_status
+	FROM purchases
+	WHERE
+	    id = NEW.purchase_id FOR
+	UPDATE;
+	--add product_warehouse if not exists
+	Select id INTO prod_warehouse_id
+	FROM product_warehouse
+	WHERE
+	    product_warehouse.product_id = NEW.product_id
+	    AND product_warehouse.warehouse_id = warehouse_id_val;
+	IF prod_warehouse_id IS NULL THEN
+	INSERT INTO
+	    product_warehouse (product_id, warehouse_id, qty)
+	VALUES (
+	        NEW.product_id, warehouse_id_val, 0
+	    );
+END
+	IF;
+	-- validar  purchase status
+	IF p_status = 1
+	OR p_status = 2 THEN
+	-- Obtener la cantidad de productos antes de la actualización y el tipo de producto
+	SELECT
+	    qty,
+	    type INTO product_qty_before,
+	    product_type
+	FROM products
+	WHERE
+	    id = NEW.product_id FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla products
+	-- Obtener la cantidad en el almacén antes de la actualización
+	SELECT qty INTO warehouse_qty_before
+	FROM product_warehouse
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_val FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla product_warehouse
+	IF NEW.variant_id IS NOT NULL THEN
+	SELECT qty INTO product_qty_before
+	FROM product_variants
+	WHERE
+	    id = NEW.variant_id FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla product_variants
+	-- Verificar si el producto es de tipo digital
+	IF product_type <> 'digital' THEN
+	-- Actualizar la cantidad en product_variants
+	UPDATE product_variants
+	SET
+	    qty = qty + NEW.recieved
+	WHERE
+	    id = NEW.variant_id;
+END
+	IF;
+	ELSE
+	-- Verificar si el tipo de producto es diferente de 'digital' para actualizar inventario
+	IF product_type <> 'digital' THEN
+	-- Actualizar la cantidad en la tabla products
+	UPDATE products
+	SET
+	    qty = qty + NEW.recieved
+	WHERE
+	    id = NEW.product_id;
+END
+	IF;
+	-- Actualizar la cantidad en la tabla product_warehouse
+	UPDATE product_warehouse
+	SET
+	    qty = qty + NEW.recieved
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_val;
+END
+	IF;
+	-- Registrar los cambios en la tabla Record
+	IF product_type = 'digital' THEN
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 2, product_qty_before, product_qty_before, warehouse_qty_before, warehouse_qty_before
+	    );
+	ELSE
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 2, product_qty_before, (
+	            product_qty_before + NEW.recieved
+	        ), warehouse_qty_before, (
+	            warehouse_qty_before + NEW.recieved
+	        )
+	    );
+END
+	IF;
+END
+	IF;
+END; 
+
+/ /
+
+--Create Kardex SQLView
+--updated 04/05/2024
+Drop view if exists kardex;
+
+CREATE VIEW `kardex` AS
+ SELECT
+    `record`.`transaction_id` AS `transaction_id`,
+    `record`.`product_id` AS `product_id`,
+    `products`.`name` AS `product`,
+    CASE
+        WHEN `record`.`transaction_type` = 0 THEN 'INIT'
+        WHEN `record`.`transaction_type` = 1 THEN 'VENTA'
+        WHEN `record`.`transaction_type` = 2 THEN 'COMPRA'
+        WHEN `record`.`transaction_type` = 3 THEN 'RETURN'
+        WHEN `record`.`transaction_type` = 4 THEN 'TRANSFER'
+        WHEN `record`.`transaction_type` = 5 THEN 'AJUSTE'
+        WHEN `record`.`transaction_type` = 6 THEN 'COMPRA RETURN'
+        ELSE 'Otro'
+    END AS `transaction_type`,
+    `warehouses`.`id` AS `warehouse_id`,
+    `warehouses`.`name` AS `warehouse`,
+    `record`.`warehouse_qty_before` AS `warehouse_qty_before`,
+    `record`.`warehouse_qty_after` AS `warehouse_qty_after`,
+	CASE
+        WHEN  `record`.`warehouse_qty_after` - `record`.`warehouse_qty_before`  > 0 THEN `record`.`warehouse_qty_after` - `record`.`warehouse_qty_before`
+        ELSE 0
+    END AS `entrada`,
+	CASE
+        WHEN `record`.`warehouse_qty_before` - `record`.`warehouse_qty_after`  > 0 THEN `record`.`warehouse_qty_before` - `record`.`warehouse_qty_after`
+        ELSE 0
+    END AS `salida`,
+    CASE
+        WHEN `record`.`transaction_type` = 0 THEN `record`.`warehouse_qty_after`
+        WHEN `record`.`transaction_type` = 1 THEN `product_sales`.`qty`
+        WHEN `record`.`transaction_type` = 2 THEN `product_purchases`.`qty`
+        WHEN `record`.`transaction_type` = 3 THEN `product_returns`.`qty`
+        WHEN `record`.`transaction_type` = 4 THEN `product_transfer`.`qty`
+        WHEN `record`.`transaction_type` = 5 THEN `product_adjustments`.`qty`
+        WHEN `record`.`transaction_type` = 6 THEN `purchase_product_return`.`qty`
+        ELSE NULL
+    END AS `qty`,
+    CASE
+        WHEN `record`.`transaction_type` = 0 THEN `products`.`cost`
+        WHEN `record`.`transaction_type` = 1 THEN  IF(`record`.`cb_cost` > 0, `record`.`cb_cost`, `product_sales`.`cost`)
+        WHEN `record`.`transaction_type` = 2 THEN `product_purchases`.`net_unit_cost`
+        WHEN `record`.`transaction_type` = 3 THEN `products`.`cost`
+        WHEN `record`.`transaction_type` = 4 THEN `product_transfer`.`net_unit_cost`
+        WHEN `record`.`transaction_type` = 5 THEN `products`.`cost`
+        WHEN `record`.`transaction_type` = 6 THEN `purchase_product_return`.`net_unit_cost`
+        ELSE NULL
+    END AS `cost`,
+    CASE
+        WHEN `record`.`transaction_type` = 0 THEN format(
+            `record`.`warehouse_qty_after` * `products`.`cost`, 2
+        )
+        WHEN `record`.`transaction_type` = 1 THEN format(
+            `product_sales`.`qty` * `product_sales`.`cost`, 2
+        )
+        WHEN `record`.`transaction_type` = 2 THEN format(
+            `product_purchases`.`qty` * `product_purchases`.`net_unit_cost`, 2
+        )
+        WHEN `record`.`transaction_type` = 3 THEN format(
+            `products`.`cost` * `product_returns`.`qty`, 2
+        )
+        WHEN `record`.`transaction_type` = 4 THEN format(
+            `product_transfer`.`qty` * `product_transfer`.`net_unit_cost`, 2
+        )
+        WHEN `record`.`transaction_type` = 5 THEN format(
+            `products`.`cost` * `product_adjustments`.`qty`, 2
+        )
+        WHEN `record`.`transaction_type` = 6 THEN format(
+            `purchase_product_return`.`qty` * `purchase_product_return`.`net_unit_cost`, 2
+        )
+        ELSE NULL
+    END AS `total_cost`,
+    CASE
+        WHEN `record`.`transaction_type` = 4
+        AND `record`.`warehouse_qty_before` < `record`.`warehouse_qty_after` THEN `transfers`.`from_warehouse_id`
+        WHEN `record`.`transaction_type` = 4
+        AND `record`.`warehouse_qty_before` > `record`.`warehouse_qty_after` THEN `transfers`.`to_warehouse_id`
+        ELSE NULL
+    END AS `from_to`,
+    `record`.`action_taken_at` AS `date`
+FROM
+    `record`
+    JOIN `products` ON `products`.`id` = `record`.`product_id`
+    JOIN `warehouses` ON `warehouses`.`id` = `record`.`warehouse_id`
+    LEFT JOIN `product_sales` ON `record`.`transaction_type` = 1
+    AND `record`.`transaction_id` = `product_sales`.`sale_id`
+    AND `record`.`product_id` = `product_sales`.`product_id`
+    LEFT JOIN `product_purchases` ON `record`.`transaction_type` = 2
+    AND `record`.`transaction_id` = `product_purchases`.`purchase_id`
+    AND `record`.`product_id` = `product_purchases`.`product_id`
+    LEFT JOIN `product_returns` ON `record`.`transaction_type` = 3
+    AND `record`.`product_id` = `product_returns`.`product_id`
+    AND `record`.`transaction_id` = `product_returns`.`return_id`
+    LEFT JOIN `product_transfer` ON `record`.`transaction_type` = 4
+    AND `record`.`transaction_id` = `product_transfer`.`transfer_id`
+	AND `record`.`product_id` = `product_transfer`.`product_id`
+    LEFT JOIN `product_adjustments` ON `record`.`transaction_type` = 5
+    AND `record`.`transaction_id` = `product_adjustments`.`adjustment_id`
+    AND `record`.`product_id` = `product_adjustments`.`product_id`
+    LEFT JOIN `purchase_product_return` ON `record`.`transaction_type` = 6
+    AND `record`.`transaction_id` = `purchase_product_return`.`return_id`
+    AND `record`.`product_id` = `purchase_product_return`.`product_id`
+    LEFT JOIN `sales` ON `record`.`transaction_type` = 1
+    AND `record`.`transaction_id` = `sales`.`id`
+    LEFT JOIN `purchases` ON `record`.`transaction_type` = 2
+    AND `record`.`transaction_id` = `purchases`.`id`
+    LEFT JOIN `returns` ON `record`.`transaction_type` = 3
+    AND `record`.`transaction_id` = `returns`.`id`
+    LEFT JOIN `transfers` ON `record`.`transaction_type` = 4
+    AND `record`.`transaction_id` = `transfers`.`id`
+    LEFT JOIN `adjustments` ON `record`.`transaction_type` = 5
+    AND `record`.`transaction_id` = `adjustments`.`id`
+    LEFT JOIN `return_purchases` ON `record`.`transaction_type` = 6
+    AND `record`.`transaction_id` = `return_purchases`.`id`
+--
+
+/*  
+15/01/2024 Add trigger before_product_returns_trigger: 
+This trigger, before_product_returns_trigger, responds to new entries in product_returns. It captures the associated returns.
+creating a new record  on record table
+*/
+DROP TRIGGER IF EXISTS before_product_returns_trigger;
+
+DELIMITER / /
+
+CREATE TRIGGER BEFORE_PRODUCT_RETURNS_TRIGGER BEFORE 
+INSERT ON PRODUCT_RETURNS FOR EACH ROW 
+BEGIN 
+DECLARE
+	trans_id INT;
+DECLARE
+	warehouse_id_val INT;
+DECLARE
+	product_qty_before INT;
+DECLARE
+	warehouse_qty_before INT;
+DECLARE
+	purchase_ref_no VARCHAR(50);
+DECLARE
+	product_type VARCHAR(50);
+	-- Obtener el warehouse_id y el reference_no de la tabla sales
+	SELECT
+	    id,
+	    warehouse_id,
+	    reference_no INTO trans_id,
+	    warehouse_id_val,
+	    purchase_ref_no
+	FROM returns
+	WHERE
+	    id = NEW.return_id;
+	-- FOR UPDATE;
+	-- Bloquear la fila en la tabla return
+	-- Obtener la cantidad de productos antes de la actualización y el tipo de producto
+	SELECT
+	    qty,
+	    type INTO product_qty_before,
+	    product_type
+	FROM products
+	WHERE
+	    id = NEW.product_id;
+	-- FOR UPDATE Bloquear la fila en la tabla products
+	-- Obtener la cantidad en el almacén antes de la actualización
+	SELECT qty INTO warehouse_qty_before
+	FROM product_warehouse
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_val;
+	-- FOR UPDATE; -- Bloquear la fila en la tabla product_warehouse
+	IF NEW.variant_id IS NOT NULL THEN
+	SELECT qty INTO product_qty_before
+	FROM product_variants
+	WHERE
+	    id = NEW.variant_id;
+	-- FOR UPDATE; -- Bloquear la fila en la tabla product_variants
+END
+	IF;
+	-- Registrar los cambios en la tabla Record
+	IF product_type = 'digital' THEN
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 3, product_qty_before, product_qty_before, warehouse_qty_before, warehouse_qty_before
+	    );
+	ELSE
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 3, (product_qty_before - NEW.qty), product_qty_before, (
+	            warehouse_qty_before - NEW.qty
+	        ), warehouse_qty_before
+	    );
+END
+	IF;
+END; 
+
+/ /
+/*  
+16/01/2024 Add trigger after_product_transfer_trigger: 
+This trigger, after_product_transfer_trigger, responds to new entries in product_transfers. It captures the associated transfers.
+creating two new records  on record table.
+*/
+DROP TRIGGER IF EXISTS after_product_transfer_trigger;
+
+DELIMITER / /
+
+CREATE TRIGGER AFTER_PRODUCT_TRANSFER_TRIGGER AFTER 
+INSERT ON product_transfer FOR EACH ROW 
+BEGIN 
+DECLARE
+	trans_id INT;
+DECLARE
+	warehouse_id_f INT;
+DECLARE
+	warehouse_id_t INT;
+DECLARE
+	product_qty_before INT;
+DECLARE
+	warehouse_qty_before_f INT;
+DECLARE
+	warehouse_qty_before_t INT;
+DECLARE
+	reference_no_v VARCHAR(50);
+DECLARE
+	product_type VARCHAR(50);
+	-- Obtener el warehouse_id y el reference_no de la tabla sales
+	SELECT
+	    id,
+	    from_warehouse_id,
+	    to_warehouse_id,
+	    reference_no INTO trans_id,
+	    warehouse_id_f,
+	    warehouse_id_t,
+	    reference_no_v
+	FROM transfers
+	WHERE
+	    id = NEW.transfer_id;
+	-- FOR UPDATE;
+	-- Bloquear la fila en la tabla return
+	-- Obtener la cantidad de productos antes de la actualización y el tipo de producto
+	SELECT
+	    qty,
+	    type INTO product_qty_before,
+	    product_type
+	FROM products
+	WHERE
+	    id = NEW.product_id;
+	-- FOR UPDATE Bloquear la fila en la tabla products
+	-- Obtener la cantidad en el almacén antes de la actualización
+	SELECT qty INTO warehouse_qty_before_f
+	FROM product_warehouse
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_f;
+	-- FOR UPDATE; -- Bloquear la fila en la tabla product_warehouse
+	SELECT qty INTO warehouse_qty_before_t
+	FROM product_warehouse
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_t;
+	-- FOR UPDATE; -- Bloquear la fila en la tabla product_warehouse
+	IF NEW.variant_id IS NOT NULL THEN
+	SELECT qty INTO product_qty_before
+	FROM product_variants
+	WHERE
+	    id = NEW.variant_id;
+	-- FOR UPDATE; -- Bloquear la fila en la tabla product_variants
+END
+	IF;
+	-- Registrar los cambios en la tabla Record
+	IF product_type = 'digital' THEN
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 4, product_qty_before, product_qty_before, warehouse_qty_before, warehouse_qty_before
+	    );
+	ELSE
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_f, NEW.product_id, reference_no_v, 4, product_qty_before, product_qty_before, (
+	            warehouse_qty_before_f + NEW.qty
+	        ), warehouse_qty_before_f
+	    ),
+	    (
+	        trans_id, warehouse_id_t, NEW.product_id, reference_no_v, 4, product_qty_before, product_qty_before, (
+	            warehouse_qty_before_t - NEW.qty
+	        ), warehouse_qty_before_t
+	    );
+END
+	IF;
+END; 
+
+/ /
+
+/*  
+20/01/2024 Add trigger fter_product_purchases_update_trigger: 
+This trigger, fter_product_purchases_update_trigger, responds to updates in PRODUCT_PURCHASES. It captures the associated PRODUCT_PURCHASES.
+updating the stock and creatin new records on record table.
+*/
+DROP TRIGGER IF EXISTS after_product_purchases_update_trigger;
+
+DELIMITER / /
+
+CREATE TRIGGER AFTER_PRODUCT_PURCHASES_UPDATE_TRIGGER 
+AFTER UPDATE ON PRODUCT_PURCHASES FOR EACH ROW 
+BEGIN 
+DECLARE
+	trans_id INT;
+DECLARE
+	warehouse_id_val INT;
+DECLARE
+	product_qty_before INT;
+DECLARE
+	warehouse_qty_before INT;
+DECLARE
+	purchase_ref_no VARCHAR(50);
+DECLARE
+	product_type VARCHAR(50);
+DECLARE
+	p_status INT;
+	-- Obtener el warehouse_id y el reference_no de la tabla sales
+	SELECT
+	    id,
+	    warehouse_id,
+	    reference_no,
+	    status INTO trans_id,
+	    warehouse_id_val,
+	    purchase_ref_no,
+	    p_status
+	FROM purchases
+	WHERE
+	    id = NEW.purchase_id FOR
+	UPDATE;
+	-- add product if not exists on product_warehose
+	Select id INTO prod_warehouse_id
+	FROM product_warehouse
+	WHERE
+	    product_warehouse.product_id = NEW.product_id
+	    AND product_warehouse.warehouse_id = warehouse_id_val;
+	IF prod_warehouse_id IS NULL THEN
+	INSERT INTO
+	    product_warehouse (product_id, warehouse_id, qty)
+	VALUES (
+	        NEW.product_id, warehouse_id_val, 0
+	    );
+END
+	IF;
+	-- validar  purchase status
+	IF ABS(NEW.recieved - OLD.recieved) > 0 THEN
+	-- Obtener la cantidad de productos antes de la actualización y el tipo de producto
+	SELECT
+	    qty,
+	    type INTO product_qty_before,
+	    product_type
+	FROM products
+	WHERE
+	    id = NEW.product_id FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla products
+	-- Obtener la cantidad en el almacén antes de la actualización
+	SELECT qty INTO warehouse_qty_before
+	FROM product_warehouse
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_val FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla product_warehouse
+	IF NEW.variant_id IS NOT NULL THEN
+	SELECT qty INTO product_qty_before
+	FROM product_variants
+	WHERE
+	    id = NEW.variant_id FOR
+	UPDATE;
+	-- Bloquear la fila en la tabla product_variants
+	-- Verificar si el producto es de tipo digital
+	IF product_type <> 'digital' THEN
+	-- Actualizar la cantidad en product_variants
+	UPDATE product_variants
+	SET
+	    qty = qty + ABS(NEW.recieved - OLD.recieved)
+	WHERE
+	    id = NEW.variant_id;
+END
+	IF;
+	ELSE
+	-- Verificar si el tipo de producto es diferente de 'digital' para actualizar inventario
+	IF product_type <> 'digital' THEN
+	-- Actualizar la cantidad en la tabla products
+	UPDATE products
+	SET
+	    qty = qty + ABS(NEW.recieved - OLD.recieved)
+	WHERE
+	    id = NEW.product_id;
+END
+	IF;
+	-- Actualizar la cantidad en la tabla product_warehouse
+	UPDATE product_warehouse
+	SET
+	    qty = qty + ABS(NEW.recieved - OLD.recieved)
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_val;
+END
+	IF;
+	-- Registrar los cambios en la tabla Record
+	IF product_type = 'digital' THEN
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 2, product_qty_before, product_qty_before, warehouse_qty_before, warehouse_qty_before
+	    );
+	ELSE
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 2, product_qty_before, (
+	            product_qty_before + ABS(NEW.recieved - OLD.recieved)
+	        ), warehouse_qty_before, (
+	            warehouse_qty_before + ABS(NEW.recieved - OLD.recieved)
+	        )
+	    );
+END
+	IF;
+END
+	IF;
+END; 
+
+/ /
+
+/*  
+11/02/2024 Add trigger after_product_adjustments_trigger: 
+This trigger, fter_product_purchases_update_trigger, responds to updates in product_adjustments. It captures the associated product_adjustments. creating new records on record table.
+*/
+
+DROP TRIGGER IF EXISTS after_product_adjustments_trigger;
+DELIMITER / /
+CREATE TRIGGER after_product_adjustments_trigger BEFORE 
+INSERT ON product_adjustments FOR EACH ROW 
+BEGIN 
+DECLARE
+	trans_id INT;
+DECLARE
+	warehouse_id_val INT;
+DECLARE
+	product_qty_before INT;
+DECLARE
+	warehouse_qty_before INT;
+DECLARE
+	purchase_ref_no VARCHAR(50);
+DECLARE
+	product_type VARCHAR(50);
+	-- Obtener el warehouse_id y el reference_no de la tabla sales
+	SELECT
+	    id,
+	    warehouse_id,
+	    reference_no INTO trans_id,
+	    warehouse_id_val,
+	    purchase_ref_no
+	FROM adjustments
+	WHERE
+	    id = NEW.adjustment_id;
+	-- FOR UPDATE;
+	-- Bloquear la fila en la tabla return
+	-- Obtener la cantidad de productos antes de la actualización y el tipo de producto
+	SELECT
+	    qty,
+	    type INTO product_qty_before,
+	    product_type
+	FROM products
+	WHERE
+	    id = NEW.product_id;
+	-- FOR UPDATE Bloquear la fila en la tabla products
+	-- Obtener la cantidad en el almacén antes de la actualización
+	SELECT qty INTO warehouse_qty_before
+	FROM product_warehouse
+	WHERE
+	    product_id = NEW.product_id
+	    AND warehouse_id = warehouse_id_val;
+	-- Registrar los cambios en la tabla Record
+	IF NEW.action = "+" THEN
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 5, (product_qty_before - NEW.qty), product_qty_before, warehouse_qty_before - NEW.qty, warehouse_qty_before
+	    );
+	ELSE
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 5, (product_qty_before + NEW.qty), product_qty_before, (
+	            warehouse_qty_before + NEW.qty
+	        ), warehouse_qty_before
+	    );
+END
+	IF;
+END; 
+
+/ /
+
+/*  
+	11/02/2024 Add trigger before_purchase_product_return_trigger: 
+	This trigger, before_purchase_product_return_trigger, responds to updates in purchase_product_return. It captures the associated purchase_product_return. creating new records on record table.
+	updated 25/02/2024
+*/
+
+DROP TRIGGER IF EXISTS before_purchase_product_return_trigger;
+
+DELIMITER / /
+
+CREATE TRIGGER BEFORE_purchase_product_return_TRIGGER 
+BEFORE INSERT ON purchase_product_return FOR EACH ROW 
+BEGIN 
+	DECLARE
+		trans_id INT;
+	DECLARE
+		warehouse_id_val INT;
+	DECLARE
+		product_qty_before INT;
+	DECLARE
+		warehouse_qty_before INT;
+	DECLARE
+		r_purchase_ref_no VARCHAR(50);
+	DECLARE
+		product_type VARCHAR(50);
+		-- Obtener el warehouse_id y el reference_no de la tabla
+		SELECT
+	    id,
+	    warehouse_id,
+	    reference_no INTO trans_id,
+	    warehouse_id_val,
+	    r_purchase_ref_no
+	FROM return_purchases
+	WHERE
+	    id = NEW.return_id;
+	-- FOR UPDATE;
+	-- Bloquear la fila en la tabla return
+	-- Obtener la cantidad de productos antes de la actualización y el tipo de producto
+	SELECT
+	    qty,
+	    type INTO product_qty_before,
+	    product_type
+	 FROM products
+	 WHERE id = NEW.product_id;
+		-- FOR UPDATE Bloquear la fila en la tabla products
+		-- Obtener la cantidad en el almacén antes de la actualización
+	 SELECT qty INTO warehouse_qty_before
+		FROM product_warehouse
+		WHERE
+			product_id = NEW.product_id
+			AND warehouse_id = warehouse_id_val;
+		-- FOR UPDATE; -- Bloquear la fila en la tabla product_warehouse
+		IF NEW.variant_id IS NOT NULL THEN
+		SELECT qty INTO product_qty_before
+		FROM product_variants
+		WHERE
+			id = NEW.variant_id;
+	-- FOR UPDATE; -- Bloquear la fila en la tabla product_variants
+END
+	IF;
+	-- Registrar los cambios en la tabla Record
+	INSERT INTO
+	    Record (
+	        transaction_id, warehouse_id, 
+            product_id, reference_no, 
+            transaction_type, 
+            product_qty_before, 
+            product_qty_after, 
+            warehouse_qty_before, 
+            warehouse_qty_after
+	    )
+	VALUES (
+	        trans_id, warehouse_id_val, 
+            NEW.product_id, r_purchase_ref_no, 
+            6,  (product_qty_before + NEW.qty),
+            product_qty_before, 
+            (warehouse_qty_before + NEW.qty), 
+            warehouse_qty_before
+	    );
+END; 
+
+/ /
+
+/* 
+  	Get product start amount 
+	25/02/2024 
+	deprecated 05/03/2024
+*/	
+
+ INSERT INTO
+    record (
+        transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after
+    ) (
+        SELECT
+            0 AS transaction_id, warehouse_id, product_id, 0 AS reference_no, 0 AS transaction_type, 0 AS product_qty_before, products.qty AS product_qty_after, 0 AS warehouse_qty_before, product_warehouse.qty AS warehouse_qty_after
+        FROM product_warehouse
+            LEFT JOIN products on product_warehouse.product_id = products.id
+    )  
+
+	/* mejora Opcional */
+	-- where  product_id  in  (--id de los productos separados por coma) and warehouse_id in (--id de los almacenes separados por coma)
+
+
+	-- add new method payment
+	INSERT INTO `method_payments` (`id`, `name`, `description`, `apply`, `used`, `cbx`, `codigo_clasificador_siat`, `created_at`, `updated_at`) 
+	VALUES (NULL, 'QR-Efectivo', 'QR-Efectivo', '1', '1', '1', '14', '2024-09-18 23:46:11', '2024-09-18 23:46:11');
+
+	INSERT INTO `account_method_pay` (`id`, `account_id`, `methodpay_id`, `is_active`, `created_at`, `updated_at`) 
+	VALUES (NULL, '13', '11', '1', '2024-09-18 23:46:52', '2024-09-18 23:46:52');
+
+	-- add new permissions
+	INSERT INTO `permissions` (`id`, `name`, `guard_name`, `created_at`, `updated_at`) 
+	VALUES (NULL, 'pos_payment_qrcash', 'web', '2024-09-18 23:55:43', '2024-09-18 23:55:43'), 
+	(NULL, 'qty_adjustment-index', 'web', '2024-10-08 19:39:59', '2024-10-08 19:39:59'), 
+	(NULL, 'qty_adjustment-add', 'web', '2024-10-08 19:39:59', '2024-10-08 19:39:59'), 
+	(NULL, 'qty_adjustment-edit', 'web', '2024-10-08 19:39:59', '2024-10-08 19:39:59'), 
+	(NULL, 'qty_adjustment-delete', 'web', '2024-10-08 19:39:59', '2024-10-08 19:39:59');
+
+	-- 22-10-2024 add new column for pos setting for control filter products by users
+	ALTER TABLE pos_setting ADD user_category tinyint(1) DEFAULT 0 NOT NULL;
+
+
+CREATE TABLE `user_category` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `category_id` int NOT NULL,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- 30-12-2024 add new stored procedure for check year pv for reset invoice count
+
+DELIMITER / /
+CREATE PROCEDURE check_year_resetcount_pv()
+BEGIN
+	UPDATE puntos_venta
+	SET correlativo_factura = 1,
+	    correlativo_alquiler = 1,
+	    correlativo_servicios_basicos = 1,
+	    correlativo_nota_debcred = 1,
+	    updated_at = TIMESTAMP(current_timestamp())
+    WHERE is_active = true
+	and YEAR(updated_at) != year(CURRENT_DATE());
+END
+/ /
+
+-- 24-04-2025 add new field for products and account
+ALTER TABLE products ADD account_id INT NULL;
+ALTER TABLE accounts ADD `type` int DEFAULT 1 NULL COMMENT '1 = compra/venta, 2=productos';

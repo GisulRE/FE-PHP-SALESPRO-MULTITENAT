@@ -1,0 +1,12 @@
+
+PRE-ORDEN
+Fecha: 16/02/2022 18:24
+Producto: Cerveza
+Cantidad: 1.00
+
+Nro Venta: NRV-00000090
+Vendedor: Rebeca
+
+Nota: 
+
+

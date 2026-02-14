@@ -1,0 +1,303 @@
+###
+# Ejemplos de uso de endpoints de mensajería WhatsApp
+# Usar REST Client extension de VS Code para ejecutar estas requests
+###
+
+# CONFIGURACIÓN
+# Ajusta estos valores según tu entorno
+@baseUrl = http://localhost:8000/api/v1
+@sessionId = session_921783aa2a847205
+@phoneNumber = 59165258002
+
+### ============================================
+### INFORMACIÓN
+### ============================================
+# 
+# IMPORTANTE:
+# 1. El número de teléfono debe estar en formato internacional sin + ni espacios
+#    Ejemplo: 5491123456789 para Argentina
+#            59176543210 para Bolivia
+# 
+# 2. Si dejas @sessionId vacío, se usará el sessionId guardado en la BD (pos_setting)
+# 
+# 3. Para usar estos endpoints, primero debes:
+#    - Iniciar el servicio: GET /api/whatsapp/start-client
+#    - Escanear el QR: GET /api/whatsapp/qr
+#    - Verificar status: GET /api/whatsapp/status
+#
+# 4. El sessionId se obtiene y guarda automáticamente al iniciar el servicio
+#
+### ============================================
+
+
+### ============================================
+### GESTIÓN DE SESIÓN
+### ============================================
+
+### Iniciar servicio de WhatsApp (crear/obtener sesión)
+GET http://localhost:8000/api/whatsapp/start-client
+Accept: application/json
+
+### Obtener QR para escanear
+GET http://localhost:8000/api/whatsapp/qr
+Accept: image/png
+
+### Verificar estado de la sesión
+GET http://localhost:8000/api/whatsapp/status
+Accept: application/json
+
+
+### ============================================
+### MENSAJES DE TEXTO
+### ============================================
+
+### Enviar mensaje de texto simple
+POST {{baseUrl}}/messages/text
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "text": "¡Hola! Este es un mensaje de prueba desde el sistema 🚀"
+}
+
+### Enviar mensaje con sessionId específico
+POST {{baseUrl}}/messages/text
+Content-Type: application/json
+
+{
+  "sessionId": "{{sessionId}}",
+  "to": "{{phoneNumber}}",
+  "text": "Mensaje con sessionId específico"
+}
+
+
+### ============================================
+### DOCUMENTOS
+### ============================================
+
+### Enviar documento por URL
+POST {{baseUrl}}/messages/document
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "documentUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+  "fileName": "documento-prueba.pdf",
+  "mimetype": "application/pdf",
+  "caption": "📄 Este es un documento de ejemplo"
+}
+
+### Enviar documento por upload (multipart)
+# Nota: Reemplaza la ruta con un archivo real de tu sistema
+POST {{baseUrl}}/messages/document/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="to"
+
+{{phoneNumber}}
+------WebKitFormBoundary
+Content-Disposition: form-data; name="caption"
+
+Documento adjunto desde el sistema
+------WebKitFormBoundary
+Content-Disposition: form-data; name="document"; filename="test.pdf"
+Content-Type: application/pdf
+
+< C:\Users\ASUS\Downloads\doctor-analytics.pdf
+------WebKitFormBoundary--
+
+
+### ============================================
+### IMÁGENES
+### ============================================
+
+### Enviar imagen por URL
+POST {{baseUrl}}/messages/image
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "imageUrl": "https://picsum.photos/800/600",
+  "caption": "📸 Esta es una imagen de prueba"
+}
+
+### Enviar imagen local por upload
+# Nota: Reemplaza la ruta con una imagen real de tu sistema
+POST {{baseUrl}}/messages/image/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="to"
+
+{{phoneNumber}}
+------WebKitFormBoundary
+Content-Disposition: form-data; name="caption"
+
+Imagen adjunta desde el sistema
+------WebKitFormBoundary
+Content-Disposition: form-data; name="image"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< d:/ruta/a/tu/imagen.jpg
+------WebKitFormBoundary--
+
+
+### ============================================
+### AUDIO
+### ============================================
+
+### Enviar audio por URL como nota de voz (PTT)
+POST {{baseUrl}}/messages/audio
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "audioUrl": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  "ptt": true
+}
+
+### Enviar audio por URL como archivo de audio normal
+POST {{baseUrl}}/messages/audio
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "audioUrl": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  "ptt": false
+}
+
+### Enviar audio local por upload
+# Nota: Reemplaza la ruta con un archivo de audio real
+POST {{baseUrl}}/messages/audio/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="to"
+
+{{phoneNumber}}
+------WebKitFormBoundary
+Content-Disposition: form-data; name="ptt"
+
+true
+------WebKitFormBoundary
+Content-Disposition: form-data; name="audio"; filename="test.mp3"
+Content-Type: audio/mpeg
+
+< d:/ruta/a/tu/audio.mp3
+------WebKitFormBoundary--
+
+
+### ============================================
+### VIDEO
+### ============================================
+
+### Enviar video por URL
+POST {{baseUrl}}/messages/video
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "videoUrl": "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4",
+  "caption": "🎥 Este es un video de prueba"
+}
+
+### Enviar video por URL como GIF (reproduce en loop)
+POST {{baseUrl}}/messages/video
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "videoUrl": "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4",
+  "caption": "🔄 Video corto en loop",
+  "gifPlayback": true
+}
+
+### Enviar video local por upload
+# Nota: Reemplaza la ruta con un video real de tu sistema
+POST {{baseUrl}}/messages/video/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="to"
+
+{{phoneNumber}}
+------WebKitFormBoundary
+Content-Disposition: form-data; name="caption"
+
+Video adjunto desde el sistema
+------WebKitFormBoundary
+Content-Disposition: form-data; name="gifPlayback"
+
+false
+------WebKitFormBoundary
+Content-Disposition: form-data; name="video"; filename="test.mp4"
+Content-Type: video/mp4
+
+< d:/ruta/a/tu/video.mp4
+------WebKitFormBoundary--
+
+
+### ============================================
+### EJEMPLOS DE USO EN PRODUCCIÓN
+### ============================================
+
+### Ejemplo: Enviar confirmación de pedido
+POST {{baseUrl}}/messages/text
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "text": "✅ *Pedido Confirmado*\n\nNúmero de pedido: #12345\nTotal: Bs. 150.00\n\nGracias por su compra!"
+}
+
+### Ejemplo: Enviar factura en PDF
+POST {{baseUrl}}/messages/document
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "documentUrl": "https://tu-servidor.com/facturas/factura-12345.pdf",
+  "fileName": "Factura-12345.pdf",
+  "mimetype": "application/pdf",
+  "caption": "🧾 Su factura #12345 ha sido generada exitosamente"
+}
+
+### Ejemplo: Enviar imagen de producto
+POST {{baseUrl}}/messages/image
+Content-Type: application/json
+
+{
+  "to": "{{phoneNumber}}",
+  "imageUrl": "https://tu-servidor.com/productos/producto-123.jpg",
+  "caption": "🛍️ *Producto Disponible*\n\nPrecio: Bs. 50.00\nStock: 10 unidades"
+}
+
+
+### ============================================
+### NOTAS DE DESARROLLO
+### ============================================
+# 
+# PARÁMETROS OPCIONALES:
+# - sessionId: Si no se proporciona, se usa el de la BD
+# - caption: Texto adicional para documentos, imágenes y videos
+# - ptt: true = nota de voz, false = archivo de audio normal
+# - gifPlayback: true = video se reproduce en loop como GIF
+# - fileName: Nombre del archivo (para documentos)
+# - mimetype: Tipo MIME del archivo (para documentos)
+#
+# VALIDACIONES:
+# - to: Requerido, debe ser un número válido
+# - URLs: Deben ser URLs válidas y accesibles
+# - Archivos: Los uploads validan tipos permitidos
+#
+# TIMEOUTS:
+# - Texto: 30 segundos
+# - Documentos/Imágenes/Audio: 60 segundos
+# - Videos: 90 segundos
+#
+# RATE LIMITING:
+# - Los endpoints tienen rate limiting en el gateway
+# - Si alcanzas el límite, espera unos minutos
+#
+### ============================================

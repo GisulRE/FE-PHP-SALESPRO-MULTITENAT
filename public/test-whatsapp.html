@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="csrf-token" content="test-token" />
+		<title>Test WhatsApp Buttons</title>
+		<link
+			rel="stylesheet"
+			href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+		/>
+		<link
+			rel="stylesheet"
+			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+		/>
+		<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+	</head>
+	<body class="p-5">
+		<div class="container">
+			<h1>🧪 Test de Botones WhatsApp</h1>
+			<p class="text-muted">
+				Esta página sirve para probar que el JavaScript funcione correctamente
+			</p>
+
+			<div class="alert alert-info">
+				<strong>Instrucciones:</strong>
+				<ol>
+					<li>Abre la consola del navegador (F12)</li>
+					<li>Ingresa un número de teléfono</li>
+					<li>Haz click en el botón de WhatsApp</li>
+					<li>Observa los logs en la consola</li>
+				</ol>
+			</div>
+
+			<!-- Test 1: Botón del Modal -->
+			<div class="card mb-4">
+				<div class="card-header bg-primary text-white">
+					<h5><i class="fa fa-comment"></i> Test 1: Botón del Modal</h5>
+				</div>
+				<div class="card-body">
+					<div class="form-group">
+						<label for="whatsapp_phone">Número de teléfono (Modal)</label>
+						<input
+							type="tel"
+							class="form-control"
+							id="whatsapp_phone"
+							placeholder="Ej: 59176543210"
+							value="59176543210"
+						/>
+					</div>
+					<button type="button" class="btn btn-success" id="send-whatsapp-btn">
+						<i class="fa fa-whatsapp"></i> Enviar Factura (Modal)
+					</button>
+					<div class="mt-3">
+						<small class="text-muted"
+							>Sale ID simulado: <strong id="modal-sale-id">123</strong></small
+						>
+					</div>
+				</div>
+			</div>
+
+			<!-- Test 2: Botón del Panel Final -->
+			<div class="card mb-4">
+				<div class="card-header bg-success text-white">
+					<h5><i class="fa fa-check"></i> Test 2: Botón del Panel Final</h5>
+				</div>
+				<div class="card-body">
+					<div class="form-group">
+						<label for="final_whatsapp_phone">Número de teléfono (Final)</label>
+						<input
+							type="tel"
+							class="form-control"
+							id="final_whatsapp_phone"
+							placeholder="Ej: 59176543210"
+							value="59176543210"
+						/>
+					</div>
+					<input type="hidden" name="ajax_sale_id" value="456" />
+					<button
+						type="button"
+						class="btn btn-success"
+						id="send-final-whatsapp-btn"
+					>
+						<i class="fa fa-whatsapp"></i> Enviar Factura (Final)
+					</button>
+					<div class="mt-3">
+						<small class="text-muted"
+							>Sale ID simulado: <strong>456</strong></small
+						>
+					</div>
+				</div>
+			</div>
+
+			<!-- Logs -->
+			<div class="card">
+				<div class="card-header bg-dark text-white">
+					<h5><i class="fa fa-list"></i> Logs de Eventos</h5>
+				</div>
+				<div class="card-body">
+					<pre
+						id="log-output"
+						class="bg-light p-3"
+						style="max-height: 300px; overflow-y: auto"
+					></pre>
+				</div>
+			</div>
+		</div>
+
+		<!-- Modal simulado -->
+		<div id="imprimir-factura-modal" data-sale-id="123"></div>
+
+		<script>
+			// Helper para mostrar logs en la página
+			function addLog(message, type = "info") {
+				const timestamp = new Date().toLocaleTimeString();
+				const color =
+					{
+						info: "text-primary",
+						success: "text-success",
+						error: "text-danger",
+						warning: "text-warning",
+					}[type] || "text-dark";
+
+				const logEl = document.getElementById("log-output");
+				logEl.innerHTML =
+					`[${timestamp}] <span class="${color}">${message}</span>\n` +
+					logEl.innerHTML;
+				console.log(`[${timestamp}] ${message}`);
+			}
+
+			// Verificar jQuery
+			if (typeof $ === "undefined") {
+				addLog("❌ ERROR: jQuery no está cargado", "error");
+			} else {
+				addLog("✅ jQuery cargado correctamente: v" + $.fn.jquery, "success");
+			}
+
+			// Verificar SweetAlert2
+			if (typeof Swal === "undefined") {
+				addLog("❌ ERROR: SweetAlert2 no está cargado", "error");
+			} else {
+				addLog("✅ SweetAlert2 cargado correctamente", "success");
+			}
+
+			$(document).ready(function () {
+				addLog("✅ Document Ready ejecutado", "success");
+
+				// Verificar que los elementos existen
+				addLog("🔍 Verificando elementos del DOM...", "info");
+				addLog(
+					`  - #send-whatsapp-btn: ${$("#send-whatsapp-btn").length} elementos`,
+					"info",
+				);
+				addLog(
+					`  - #send-final-whatsapp-btn: ${$("#send-final-whatsapp-btn").length} elementos`,
+					"info",
+				);
+				addLog(
+					`  - #whatsapp_phone: ${$("#whatsapp_phone").length} elementos`,
+					"info",
+				);
+				addLog(
+					`  - #final_whatsapp_phone: ${$("#final_whatsapp_phone").length} elementos`,
+					"info",
+				);
+
+				// ========== CÓDIGO EXACTO DEL POS ==========
+
+				// Enviar factura por WhatsApp desde el modal
+				$(document).on("click", "#send-whatsapp-btn", function (event) {
+					event.preventDefault();
+					addLog("🔥 CLICK DETECTADO en #send-whatsapp-btn", "warning");
+
+					var phone = $("#whatsapp_phone").val().trim();
+					var sale_id = $("#modal-sale-id").text(); // Simulado
+
+					addLog(
+						"🔍 Click en botón WhatsApp (Modal): phone=" +
+							phone +
+							", sale_id=" +
+							sale_id,
+						"info",
+					);
+
+					console.log("🔍 Click en botón WhatsApp (Modal)", {
+						phone: phone,
+						sale_id: sale_id,
+						modal_data: $("#imprimir-factura-modal").data(),
+					});
+
+					if (!phone) {
+						addLog("⚠️ Validación fallida: Teléfono vacío", "warning");
+						Swal.fire({
+							icon: "warning",
+							title: "Número requerido",
+							text: "Por favor ingrese un número de teléfono",
+						});
+						return;
+					}
+
+					// Validar formato básico (solo números)
+					if (!/^[0-9]+$/.test(phone)) {
+						addLog("⚠️ Validación fallida: Formato inválido", "warning");
+						Swal.fire({
+							icon: "warning",
+							title: "Formato inválido",
+							text: "Ingrese solo números, sin espacios ni caracteres especiales",
+						});
+						return;
+					}
+
+					if (!sale_id) {
+						addLog("⚠️ Validación fallida: Sale ID vacío", "warning");
+						Swal.fire({
+							icon: "error",
+							title: "Error",
+							text: "No se pudo identificar la factura",
+						});
+						return;
+					}
+
+					addLog("✅ Todas las validaciones pasaron", "success");
+
+					// Deshabilitar botón mientras se envía
+					var $btn = $(this);
+					var originalText = $btn.html();
+					$btn
+						.prop("disabled", true)
+						.html('<i class="fa fa-spinner fa-spin"></i> Enviando...');
+					addLog("🔄 Botón deshabilitado, iniciando AJAX...", "info");
+
+					console.log("📤 Enviando factura por WhatsApp (Modal)", {
+						sale_id: sale_id,
+						phone: phone,
+						url: "/sales/send-invoice-whatsapp",
+					});
+
+					// Simulación de AJAX (cambiar por AJAX real en producción)
+					setTimeout(function () {
+						addLog("✅ Simulación: Factura enviada exitosamente", "success");
+						$btn.prop("disabled", false).html(originalText);
+						Swal.fire({
+							icon: "success",
+							title: "¡Enviado!",
+							text: "✅ Factura enviada exitosamente por WhatsApp (SIMULADO)",
+							timer: 3000,
+						});
+					}, 1000);
+
+					/* AJAX REAL (descomentar en producción)
+                $.ajax({
+                    url: '/sales/send-invoice-whatsapp',
+                    type: 'POST',
+                    data: {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                        sale_id: sale_id,
+                        phone: phone
+                    },
+                    success: function(response) {
+                        addLog('✅ Respuesta del servidor: ' + JSON.stringify(response), 'success');
+                        console.log('✅ Respuesta del servidor:', response);
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: '¡Enviado!',
+                                text: response.message,
+                                timer: 3000
+                            });
+                            $('#whatsapp_phone').val('');
+                        } else {
+                            console.error('Error en respuesta:', response);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message || 'No se pudo enviar la factura'
+                            });
+                        }
+                    },
+                    error: function(xhr) {
+                        addLog('❌ Error AJAX: ' + JSON.stringify(xhr.responseJSON), 'error');
+                        console.error('Error AJAX:', xhr);
+                        var errorMsg = 'Error al enviar la factura por WhatsApp';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg = xhr.responseJSON.message;
+                        }
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: errorMsg
+                        });
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).html(originalText);
+                    }
+                });
+                */
+				});
+
+				// Enviar factura por WhatsApp desde el panel final
+				$(document).on("click", "#send-final-whatsapp-btn", function (event) {
+					event.preventDefault();
+					addLog("🔥 CLICK DETECTADO en #send-final-whatsapp-btn", "warning");
+
+					var phone = $("#final_whatsapp_phone").val().trim();
+					var sale_id = $('input[name="ajax_sale_id"]').val();
+
+					addLog(
+						"🔍 Click en botón WhatsApp (Final Tab): phone=" +
+							phone +
+							", sale_id=" +
+							sale_id,
+						"info",
+					);
+
+					console.log("🔍 Click en botón WhatsApp (Final Tab)", {
+						phone: phone,
+						sale_id: sale_id,
+						ajax_sale_id_value: $('input[name="ajax_sale_id"]').val(),
+						ajax_sale_id_element: $('input[name="ajax_sale_id"]'),
+					});
+
+					if (!phone) {
+						addLog("⚠️ Validación fallida: Teléfono vacío", "warning");
+						Swal.fire({
+							icon: "warning",
+							title: "Número requerido",
+							text: "Por favor ingrese un número de teléfono",
+						});
+						return;
+					}
+
+					if (!/^[0-9]+$/.test(phone)) {
+						addLog("⚠️ Validación fallida: Formato inválido", "warning");
+						Swal.fire({
+							icon: "warning",
+							title: "Formato inválido",
+							text: "Ingrese solo números, sin espacios ni caracteres especiales",
+						});
+						return;
+					}
+
+					if (!sale_id) {
+						addLog("⚠️ Validación fallida: Sale ID vacío", "warning");
+						Swal.fire({
+							icon: "error",
+							title: "Error",
+							text: "No se pudo identificar la venta",
+						});
+						return;
+					}
+
+					addLog("✅ Todas las validaciones pasaron", "success");
+
+					var $btn = $(this);
+					var originalText = $btn.html();
+					$btn
+						.prop("disabled", true)
+						.html('<i class="fa fa-spinner fa-spin"></i> Enviando...');
+					addLog("🔄 Botón deshabilitado, iniciando AJAX...", "info");
+
+					// Simulación
+					setTimeout(function () {
+						addLog("✅ Simulación: Factura enviada exitosamente", "success");
+						$btn.prop("disabled", false).html(originalText);
+						Swal.fire({
+							icon: "success",
+							title: "¡Enviado!",
+							text: "✅ Factura enviada exitosamente por WhatsApp (SIMULADO)",
+							timer: 3000,
+						});
+					}, 1000);
+				});
+
+				addLog("✅ Event listeners registrados correctamente", "success");
+			});
+		</script>
+	</body>
+</html>
