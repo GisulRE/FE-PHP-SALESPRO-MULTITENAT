@@ -10,8 +10,8 @@ return new class extends Migration {
             return;
         }
 
-        // COMENTAMOS ESTA LÍNEA PARA EVITAR EL ERROR DE PERMISOS "SYSTEM_USER"
-        // DB::unprepared('DROP PROCEDURE IF EXISTS check_year_resetcount_pv');
+        // SI ya existe el procedimiento, lo eliminamos para evitar errores al crear uno nuevo
+        DB::unprepared('DROP PROCEDURE IF EXISTS check_year_resetcount_pv');
 
         DB::unprepared(
             'CREATE PROCEDURE check_year_resetcount_pv()

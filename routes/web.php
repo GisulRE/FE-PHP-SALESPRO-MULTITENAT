@@ -344,6 +344,9 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::put('user/update_permission', 'UserController@permission')->name('user.updatePermission');
 	Route::resource('user', 'UserController');
 
+	// Companies routes
+	Route::resource('companies', 'CompanyController');
+
 	Route::get('setting/general_setting', 'SettingController@generalSetting')->name('setting.general');
 	Route::post('setting/general_setting_store', 'SettingController@generalSettingStore')->name('setting.generalStore');
 	Route::get('setting/general_setting/change-theme/{theme}', 'SettingController@changeTheme');

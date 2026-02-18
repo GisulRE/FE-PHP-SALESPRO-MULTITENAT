@@ -374,7 +374,7 @@
                         </a>
                         <ul id="people" class="collapse list-unstyled ">
 
-                            @if (in_array('customers-index', $permissions) && !in_array('user', $blocked_modules))
+                            @if (in_array('users-index', $permissions) && !in_array('user', $blocked_modules))
                                 <li id="user-list-menu">
                                     <a href="{{ route('user.index') }}">{{ trans('file.User List') }}</a>
                                 </li>
@@ -384,6 +384,10 @@
                                         <a href="{{ route('user.create') }}">{{ trans('file.Add User') }}</a>
                                     </li>
                                 @endif
+
+                                <li id="company-list-menu">
+                                    <a href="{{ route('companies.index') }}">{{ trans('file.Companies') }}</a>
+                                </li>
                             @endif
 
                             @if (in_array('customers-index', $permissions) && !in_array('customer', $blocked_modules))

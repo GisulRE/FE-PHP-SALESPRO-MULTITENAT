@@ -190,6 +190,7 @@ return [
     "Shipping" => "Envío",
     "Finalize Sale" => "Finalizar venta",
     "People" => "Gente",
+    "Companies" => "Empresas",
     "Option" => "Opción",
     "Bill" => "Cuenta",
     "Go To" => "Ir",
@@ -705,4 +706,5 @@ return [
     "prod warehouse after qty" => "Prod. Cantidad Despues",
     'permission category' => 'Permiso Categoría',
     'Update Permissions' => 'Actualizar Permisos',
+    'Cancel' => 'Cancelar'
 ];

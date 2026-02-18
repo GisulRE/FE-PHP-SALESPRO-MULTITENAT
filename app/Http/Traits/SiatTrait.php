@@ -40,6 +40,12 @@ trait SiatTrait
     public function getToken()
     {
         $pos_setting = PosSetting::latest()->first();
+        if (!$pos_setting) {
+            // No SIAT configuration available, mark as not auth and exit
+            Session::put('auth_siat', false);
+            return;
+        }
+
         $user_siat = $pos_setting->user_siat;
         $pass_siat = $pos_setting->pass_siat;
         $url_siat = $pos_setting->url_siat;
@@ -88,6 +94,12 @@ trait SiatTrait
     public function getResponse(string $operacion, $sucursal_id, $p_venta, $cuis, $nit)
     {
         $pos_setting = PosSetting::latest()->first();
+        if (!$pos_setting) {
+            Log::warning('SIAT: PosSetting no configurado para getResponse');
+            Session::flash('warning', 'SIAT no configurado');
+            return;
+        }
+
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
         $path = '/sincronizacion/sincronizacion';
