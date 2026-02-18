@@ -8,27 +8,14 @@ class CreateKardexTable extends Migration
 {
     public function up()
     {
-        Schema::create('kardex', function (Blueprint $table) {
-            $table->integer('transaction_id')->unsigned();
-            $table->integer('product_id');
-            $table->string('product', 191)->nullable();
-            $table->string('transaction_type', 13)->nullable();
-            $table->integer('warehouse_id')->unsigned()->nullable();
-            $table->string('warehouse', 191)->nullable();
-            $table->integer('warehouse_qty_before')->nullable();
-            $table->integer('warehouse_qty_after')->nullable();
-            $table->bigInteger('entrada')->nullable();
-            $table->bigInteger('salida')->nullable();
-            $table->double('qty')->nullable();
-            $table->string('cost', 191)->nullable();
-            $table->string('total_cost', 417)->nullable();
-            $table->integer('from_to')->nullable();
-            $table->timestamp('date')->nullable();
-        });
+        // NOTA: Esta migración está deshabilitada porque kardex es una VISTA, no una tabla.
+        // La vista se crea en la migración 2026_02_14_130070_create_kardex_view.php
+        
+        // No hacer nada aquí para evitar conflictos con la vista
     }
 
     public function down()
     {
-        Schema::dropIfExists('kardex');
+        // No hacer nada - la vista se elimina en su propia migración
     }
 }

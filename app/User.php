@@ -12,7 +12,7 @@ class User extends Authenticatable
     use HasRoles;
 
     protected $fillable = [
-        'name', 'email', 'password',"phone","company_name", "role_id", "biller_id", "is_active", "is_deleted"
+        'name', 'email', 'password',"phone","company_name", "role_id", "biller_id", "company_id", "is_active", "is_deleted"
     ];
 
     protected $hidden = [
@@ -31,6 +31,11 @@ class User extends Authenticatable
     public function biller()
     {
     	return $this->belongsTo('App\Biller');
+    }
+
+    public function company()
+    {
+        return $this->belongsTo('App\Company');
     }
 
 }

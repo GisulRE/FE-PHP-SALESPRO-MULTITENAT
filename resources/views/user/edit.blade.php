@@ -73,6 +73,15 @@
                                             value="{{$lims_user_data->company_name}}">
                                     </div>
                                     <div class="form-group">
+                                        <label><strong>Company *</strong></label>
+                                        <input type="hidden" name="company_id_hidden" value="{{$lims_user_data->company_id}}">
+                                        <select name="company_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select Company...">
+                                          @foreach($lims_company_list as $company)
+                                              <option value="{{$company->id}}">{{$company->name}}</option>
+                                          @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
                                         <label><strong>{{trans('file.Role')}} *</strong></label>
                                         <input type="hidden" name="role_id_hidden" value="{{$lims_user_data->role_id}}">
                                         <select name="role_id" required class="selectpicker form-control"
@@ -125,6 +134,7 @@
 
 
         $('select[name=role_id]').val($("input[name='role_id_hidden']").val());
+        $('select[name=company_id]').val($("input[name='company_id_hidden']").val());
         if ($('select[name=role_id]').val() > 2) {
             //$('#warehouseId').show();
             //$('select[name=warehouse_id]').val($("input[name='warehouse_id_hidden']").val());

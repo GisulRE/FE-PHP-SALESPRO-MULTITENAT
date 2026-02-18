@@ -742,16 +742,20 @@ $supplier_index_permission_active = DB::table('role_has_permissions')
                                 @if ($user_index_permission_active && !in_array('user', $blocked_modules))
                                                     <li id="user-list-menu"><a
                                                             href="{{ route('user.index') }}">{{ trans('file.User List') }}</a></li>
-                                                    <?php        $user_add_permission_active = DB::table('permissions')
+                                                            <?php        $user_add_permission_active = DB::table('permissions')
                                     ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                                     ->where([['permissions.name', 'users-add'], ['role_id', $role->id]])
                                     ->first();
-                                                                                                            ?>
-                                                    @if ($user_add_permission_active)
-                                                        <li id="user-create-menu"><a
-                                                                href="{{ route('user.create') }}">{{ trans('file.Add User') }}</a>
-                                                        </li>
-                                                    @endif
+                                ?>
+                                        @if ($user_add_permission_active)
+                                            <li id="user-create-menu"><a
+                                                href="{{ route('user.create') }}">{{ trans('file.Add User') }}</a>
+                                            </li>
+                                        @endif
+                                        @if ($user_index_permission_active)
+                                            <li id="company-list-menu"><a
+                                                href="{{ route('companies.index') }}">{{ trans('file.Companies') }}</a></li>
+                                        @endif
                                 @endif
 
                                 @if ($customer_index_permission_active && !in_array('customer', $blocked_modules))
