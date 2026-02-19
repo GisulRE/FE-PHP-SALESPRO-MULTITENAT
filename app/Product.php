@@ -3,6 +3,8 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class Product extends Model
 {
@@ -12,8 +14,24 @@ class Product extends Model
         "price", "price_a", "price_b", "price_c", "qty", "alert_quantity", "promotion", "promotion_price", "starting_date", "last_date",
         "tax_id", "tax_method", "image", "file", "is_variant", "featured", "product_list", "qty_list", "price_list", "is_pricelist", 
         "product_details", "is_active", "courtesy", "permanent", "starting_date_courtesy", "ending_date_courtesy", "courtesy_clearance_price",
-        "commission_percentage", "codigo_actividad", "codigo_producto_servicio", "is_basicservice", "account_id"
+        "commission_percentage", "codigo_actividad", "codigo_producto_servicio", "is_basicservice", "account_id", "company_id"
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope('company', function (Builder $builder) {
+            try {
+                if (Auth::check()) {
+                    $companyId = Auth::user()->company_id;
+                    if ($companyId) {
+                        $builder->where('company_id', $companyId);
+                    }
+                }
+            } catch (\Exception $e) {
+                // in console/tests avoid breaking
+            }
+        });
+    }
 
     public function category()
     {
