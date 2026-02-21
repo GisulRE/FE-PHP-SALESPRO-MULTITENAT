@@ -9,13 +9,16 @@ class CreateSiatProductoServiciosTable extends Migration
     public function up()
     {
         Schema::create('siat_producto_servicios', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->string('codigo',100)->nullable();
-            $table->string('descripcion',255)->nullable();
-            $table->string('unidad_medida',50)->nullable();
-            $table->decimal('precio_unitario',20,6)->nullable();
-            $table->tinyInteger('activo')->default(1);
+            $table->increments('id');
+            $table->string('codigo_actividad', 100);
+            $table->string('codigo_producto', 100);
+            $table->string('descripcion_producto', 200)->nullable();
             $table->timestamps();
+            $table->unsignedInteger('usuario_alta');
+            $table->unsignedInteger('usuario_modificacion');
+            $table->unsignedInteger('id_empresa')->nullable();
+            $table->string('sucursal', 50);
+            $table->string('codigo_punto_venta', 100);
         });
     }
 

@@ -40,12 +40,6 @@ trait SiatTrait
     public function getToken()
     {
         $pos_setting = PosSetting::latest()->first();
-        if (!$pos_setting) {
-            // No SIAT configuration available, mark as not auth and exit
-            Session::put('auth_siat', false);
-            return;
-        }
-
         $user_siat = $pos_setting->user_siat;
         $pass_siat = $pos_setting->pass_siat;
         $url_siat = $pos_setting->url_siat;
@@ -94,12 +88,6 @@ trait SiatTrait
     public function getResponse(string $operacion, $sucursal_id, $p_venta, $cuis, $nit)
     {
         $pos_setting = PosSetting::latest()->first();
-        if (!$pos_setting) {
-            Log::warning('SIAT: PosSetting no configurado para getResponse');
-            Session::flash('warning', 'SIAT no configurado');
-            return;
-        }
-
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
         $path = '/sincronizacion/sincronizacion';
@@ -443,17 +431,30 @@ trait SiatTrait
         $array_product_sales = DB::table('product_sales')->where('sale_id', '=', $venta_id)->get();
         foreach ($array_product_sales as $nro_prod_sales => $product_sales) {
             $info_product = Product::where('id', $product_sales->product_id)->first();
-            $info_unit = Unit::where('id', $info_product->unit_id)->first();
-            if ($info_product->unit_id > 0) {
-                $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
-            } else {
-                $unitDefault = Unit::where('is_active', true)->where('codigo_clasificador_siat', 57)->orwhere('codigo_clasificador_siat', 58)->first();
-                if ($unitDefault) {
-                    $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_par_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
-                } else {
-                    $info_par_unit['codigo_clasificador'] = "58";
-                    $info_par_unit['descripcion'] = "UNIDAD (SERVICIOS)";
+            $info_par_unit = null;
+
+            if ($info_product && $info_product->unit_id > 0) {
+                $info_unit = Unit::where('id', $info_product->unit_id)->first();
+                if ($info_unit) {
+                    $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
                 }
+            } else {
+                $unitDefault = Unit::where('is_active', true)
+                    ->where(function ($q) {
+                        $q->where('codigo_clasificador_siat', 57)
+                            ->orWhere('codigo_clasificador_siat', 58);
+                    })
+                    ->first();
+                if ($unitDefault) {
+                    $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $unitDefault->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+                }
+            }
+
+            if (!$info_par_unit) {
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
             }
 
             $descripcion_adicional = "";
@@ -939,12 +940,25 @@ trait SiatTrait
         $array_product_sales = DB::table('product_sales')->where('sale_id', '=', $venta_id)->get();
         foreach ($array_product_sales as $nro_prod_sales => $product_sales) {
             $info_product = Product::where('id', $product_sales->product_id)->first();
-            $info_unit = Unit::where('id', $info_product->unit_id)->first();
-            if ($info_product->unit_id > 0) {
-                $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+            $info_par_unit = null;
+
+            if ($info_product && $info_product->unit_id > 0) {
+                $info_unit = Unit::where('id', $info_product->unit_id)->first();
+                if ($info_unit) {
+                    $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+                }
             } else {
-                $info_par_unit['codigo_clasificador'] = "58";
-                $info_par_unit['descripcion'] = "UNIDAD (SERVICIOS)";
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
+            }
+
+            if (!$info_par_unit) {
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
             }
 
             $descripcion_adicional = "";
@@ -1149,13 +1163,27 @@ trait SiatTrait
         $array_product_sales = DB::table('product_sales')->where('sale_id', '=', $venta_id)->get();
         foreach ($array_product_sales as $nro_prod_sales => $product_sales) {
             $info_product = Product::where('id', $product_sales->product_id)->first();
-            $info_unit = Unit::where('id', $info_product->unit_id)->first();
-            if ($info_product->unit_id > 0) {
-                $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+            $info_par_unit = null;
+
+            if ($info_product && $info_product->unit_id > 0) {
+                $info_unit = Unit::where('id', $info_product->unit_id)->first();
+                if ($info_unit) {
+                    $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+                }
             } else {
-                $info_par_unit['codigo_clasificador'] = "58";
-                $info_par_unit['descripcion'] = "UNIDAD (SERVICIOS)";
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
             }
+
+            if (!$info_par_unit) {
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
+            }
+
             if ($data_cliente->codigo_documento_sector == 13) {
                 $info_product->price = $info_product->price - $data_cliente->monto_descuento_ley_1886 - $data_cliente->monto_descuento_tarifa_dignidad;
             }
@@ -1386,12 +1414,25 @@ trait SiatTrait
         $array_product_sales = DB::table('product_sales')->where('sale_id', '=', $venta_id)->get();
         foreach ($array_product_sales as $nro_prod_sales => $product_sales) {
             $info_product = Product::where('id', $product_sales->product_id)->first();
-            $info_unit = Unit::where('id', $info_product->unit_id)->first();
-            if ($info_product->unit_id > 0) {
-                $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+            $info_par_unit = null;
+
+            if ($info_product && $info_product->unit_id > 0) {
+                $info_unit = Unit::where('id', $info_product->unit_id)->first();
+                if ($info_unit) {
+                    $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+                }
             } else {
-                $info_par_unit['codigo_clasificador'] = "58";
-                $info_par_unit['descripcion'] = "UNIDAD (SERVICIOS)";
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
+            }
+
+            if (!$info_par_unit) {
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
             }
 
             $data_product_sales[$nro_prod_sales] = array(
@@ -1670,33 +1711,59 @@ trait SiatTrait
         }
         
         // procedemos a cambiar el estado de la factura de VIGENTE -> ANULADO
-        // Optimización: Evitar consultas adicionales si ya tenemos los datos
-        if (!isset($venta_facturada)) {
-            $venta_facturada = CustomerSale::where('cuf', $id)->first(['sale_id', 'nro_factura', 'estado_factura']);
-        }
+        // Obtenemos los datos que necesitamos para el mensaje ANTES de hacer el UPDATE
+        // (los $venta_facturada previos pueden tener select limitado sin PK, así que
+        //  usamos UPDATE directo por WHERE-clause en lugar de fetch+save para evitar
+        //  que Eloquent falle silenciosamente por PK nula)
         if (!isset($factura)) {
             $factura = $this->getFacturaData($id);
         }
-        
+
+        // Datos para el mensaje de respuesta
+        $nro_factura_msj = null;
+        if (!$tipo_id && isset($venta_facturada)) {
+            $nro_factura_msj = $venta_facturada->nro_factura;
+        } elseif ($tipo_id && isset($factura['numeroFactura'])) {
+            $nro_factura_msj = $factura['numeroFactura'];
+        }
+
         if ($response->successful()) {
             $data_response = $response->json();
-            
+
             Log::info("Response => " . json_encode($data_response, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-            
-            // Optimización: Actualizar directamente sin consultar de nuevo
-            if ($venta_facturada) {
-                $venta_facturada->estado_factura = "ANULADO";
-                $venta_facturada->save();
-            }
-            //$sale = Sale::find($venta_id);
-            //$sale->status = 0;
-            
-            if ($tipo_id) {
-                $msj = 'Factura Nro. ' . $factura['numeroFactura'] . '\n Estado: ' . $data_response['codigo_estado'] . ' - ' . $data_response['codigo_descripcion'];
+
+            // UPDATE directo: no depende de PK cargada en el modelo
+            $campos_anulacion = [
+                'estado_factura' => 'ANULADO',
+                'cuf'            => null,
+                'codigo_cufd'    => null,
+            ];
+
+            if (!$tipo_id && $venta_id) {
+                // Anulación por sale_id
+                $rows = CustomerSale::where('sale_id', $venta_id)->update($campos_anulacion);
+                Log::info("ANULADO en customer_sales por sale_id={$venta_id} | rows={$rows}");
             } else {
-                $msj = 'Factura Nro. ' . $venta_facturada->nro_factura . '\n Estado: ' . $data_response['codigo_estado'] . ' - ' . $data_response['codigo_descripcion'];
+                // Anulación por CUF (libro de ventas)
+                $cuf_original = $tipo_id ? $id : ($venta_facturada->cuf ?? null);
+                if (!$nro_factura_msj && isset($venta_facturada)) {
+                    $nro_factura_msj = $venta_facturada->nro_factura ?? null;
+                }
+                if ($cuf_original) {
+                    $rows = CustomerSale::where('cuf', $cuf_original)->update($campos_anulacion);
+                    Log::info("ANULADO en customer_sales por cuf={$cuf_original} | rows={$rows}");
+                } elseif ($venta_id) {
+                    $rows = CustomerSale::where('sale_id', $venta_id)->update($campos_anulacion);
+                    Log::info("ANULADO en customer_sales fallback por sale_id={$venta_id} | rows={$rows}");
+                }
             }
-            
+
+            if ($tipo_id) {
+                $msj = 'Factura Nro. ' . ($nro_factura_msj ?? 'N/A') . '\n Estado: ' . $data_response['codigo_estado'] . ' - ' . $data_response['codigo_descripcion'];
+            } else {
+                $msj = 'Factura Nro. ' . ($nro_factura_msj ?? 'N/A') . '\n Estado: ' . $data_response['codigo_estado'] . ' - ' . $data_response['codigo_descripcion'];
+            }
+
             $respuesta = array('mensaje' => $msj, 'estado' => true);
         } else {
             $http_status = $response->status();
@@ -2850,12 +2917,25 @@ Descripción: " . $data_response['descripcion'];
         $array_product_sales = DB::table('product_sales')->where('sale_id', '=', $venta_id)->get();
         foreach ($array_product_sales as $nro_prod_sales => $product_sales) {
             $info_product = Product::where('id', $product_sales->product_id)->first();
-            $info_unit = Unit::where('id', $info_product->unit_id)->first();
-            if ($info_product->unit_id > 0) {
-                $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+            $info_par_unit = null;
+
+            if ($info_product && $info_product->unit_id > 0) {
+                $info_unit = Unit::where('id', $info_product->unit_id)->first();
+                if ($info_unit) {
+                    $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+                }
             } else {
-                $info_par_unit['codigo_clasificador'] = "58";
-                $info_par_unit['descripcion'] = "UNIDAD (SERVICIOS)";
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
+            }
+
+            if (!$info_par_unit) {
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
             }
 
             $descripcion_adicional = "";
@@ -3038,13 +3118,27 @@ Descripción: " . $data_response['descripcion'];
         $array_product_sales = DB::table('product_sales')->where('sale_id', '=', $venta_id)->get();
         foreach ($array_product_sales as $nro_prod_sales => $product_sales) {
             $info_product = Product::where('id', $product_sales->product_id)->first();
-            $info_unit = Unit::where('id', $info_product->unit_id)->first();
-            if ($info_product->unit_id > 0) {
-                $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+            $info_par_unit = null;
+
+            if ($info_product && $info_product->unit_id > 0) {
+                $info_unit = Unit::where('id', $info_product->unit_id)->first();
+                if ($info_unit) {
+                    $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $info_unit->codigo_clasificador_siat)->where('tipo_clasificador', 'unidadMedida')->first();
+                }
             } else {
-                $info_par_unit['codigo_clasificador'] = "58";
-                $info_par_unit['descripcion'] = "UNIDAD (SERVICIOS)";
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
             }
+
+            if (!$info_par_unit) {
+                $info_par_unit = [
+                    'codigo_clasificador' => "58",
+                    'descripcion' => "UNIDAD (SERVICIOS)",
+                ];
+            }
+
             if ($data_cliente->codigo_documento_sector == 13) {
                 $info_product->price = $info_product->price - $data_cliente->monto_descuento_ley_1886 - $data_cliente->monto_descuento_tarifa_dignidad;
             }

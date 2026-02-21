@@ -9,12 +9,15 @@ class CreateSiatLeyendasFacturasTable extends Migration
     public function up()
     {
         Schema::create('siat_leyendas_facturas', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->string('codigo',100)->nullable();
-            $table->string('texto',500)->nullable();
-            $table->tinyInteger('orden')->default(0);
-            $table->tinyInteger('activo')->default(1);
+            $table->increments('id');
+            $table->string('codigo_actividad', 100);
+            $table->string('descripcion_leyenda', 500)->nullable();
             $table->timestamps();
+            $table->unsignedInteger('usuario_alta');
+            $table->unsignedInteger('usuario_modificacion');
+            $table->unsignedInteger('id_empresa')->nullable();
+            $table->string('sucursal', 50);
+            $table->string('codigo_punto_venta', 100);
         });
     }
 

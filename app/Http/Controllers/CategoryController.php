@@ -25,7 +25,7 @@ class CategoryController extends Controller
         if ($role->hasPermissionTo('category')) {
             $lims_pos_setting_data = PosSetting::latest()->first();
             $lims_categories = Category::where('is_active', true)->pluck('name', 'id');
-            if ($lims_pos_setting_data->user_category) {
+            if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
                 $lims_category_all = Category::select('categories.id', 'categories.name', 'categories.image', 'categories.parent_id', 'categories.is_active', 'categories.codigo_actividad', 'categories.codigo_producto_servicio')
                     ->join('user_category', 'categories.id', '=', 'user_category.category_id')->where('user_category.user_id', '=', Auth::user()->id)->where('categories.is_active', '=', true)->get();
             } else
@@ -47,7 +47,7 @@ class CategoryController extends Controller
             4 => 'is_active',
         );
         $lims_pos_setting_data = PosSetting::latest()->first();
-        if ($lims_pos_setting_data->user_category)
+        if ($lims_pos_setting_data && $lims_pos_setting_data->user_category)
             $totalData = UserCategory::where('user_id', Auth::user()->id)->count();
         else
             $totalData = Category::where('is_active', true)->count();
@@ -62,7 +62,7 @@ class CategoryController extends Controller
         $order = $columns[$request->input('order.0.column')];
         $dir = $request->input('order.0.dir');
         if (empty($request->input('search.value'))) {
-            if ($lims_pos_setting_data->user_category) {
+            if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
                 $categories = Category::select('categories.id', 'categories.name', 'categories.image', 'categories.parent_id', 'categories.is_active', 'categories.codigo_actividad', 'categories.codigo_producto_servicio')
                 ->offset($start)
                     ->join('user_category', 'categories.id', '=', 'user_category.category_id')
@@ -80,7 +80,7 @@ class CategoryController extends Controller
             }
         } else {
             $search = $request->input('search.value');
-            if ($lims_pos_setting_data->user_category) {
+            if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
                 $categories = Category::select('categories.id', 'categories.name', 'categories.image', 'categories.parent_id', 'categories.is_active', 'categories.codigo_actividad', 'categories.codigo_producto_servicio')
                 ->join('user_category', 'categories.id', '=', 'user_category.category_id')
                 ->where([

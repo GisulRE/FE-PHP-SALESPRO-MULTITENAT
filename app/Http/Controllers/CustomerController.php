@@ -572,7 +572,7 @@ class CustomerController extends Controller
     public function searchCustomer(Request $request)
     {
         $data = $request->all();
-        $pos_setting = PosSetting::firstOrNew(['id' => 1]);
+        $pos_setting = PosSetting::latest()->first() ?? new PosSetting();
         if (Auth::user()->role_id > 2 && $pos_setting->customer_sucursal) {
             $biller_data = Biller::select('sucursal')->find(Auth::user()->biller_id);
             $list_customers = Customer::select("id", "name", "valor_documento", "codigofijo", "nro_medidor")

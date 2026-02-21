@@ -30,6 +30,9 @@ class WarehouseController extends Controller
         ]);
         $input = $request->all();
         $input['is_active'] = true;
+        if (auth()->check()) {
+            $input['company_id'] = auth()->user()->company_id;
+        }
         Warehouse::create($input);
         return redirect('warehouse')->with('message', 'Data inserted successfully');
     }
@@ -107,6 +110,9 @@ class WarehouseController extends Controller
             $warehouse->email = $data['email'];
             $warehouse->address = $data['address'];
             $warehouse->is_active = true;
+            if (auth()->check()) {
+                $warehouse->company_id = auth()->user()->company_id;
+            }
             $warehouse->save();
         }
         return redirect('warehouse')->with('message', 'Warehouse imported successfully');

@@ -111,5 +111,74 @@ class DatabaseSeeder extends Seeder
         } catch (\Exception $e) {
             // ignore if DB not ready
         }
+
+        // Create a default company and a test user 'prueba' with provided password
+        try {
+            $companyId = null;
+            if (\Schema::hasTable('companies')) {
+                $company = \DB::table('companies')->where('name', 'Empresa Prueba')->first();
+                if (!$company) {
+                    $companyId = \DB::table('companies')->insertGetId([
+                        'name' => 'Empresa Prueba',
+                        'address' => null,
+                        'phone' => null,
+                        'email' => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    $companyId = $company->id;
+                }
+            }
+
+            // Ensure there is a 'User' role to assign
+            $userRoleId = null;
+            if (\Schema::hasTable('roles')) {
+                $userRole = \DB::table('roles')->where('name', 'User')->first();
+                if (!$userRole) {
+                    $userRoleId = \DB::table('roles')->insertGetId([
+                        'name' => 'User',
+                        'guard_name' => 'web',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    $userRoleId = $userRole->id;
+                }
+            }
+
+            if (\Schema::hasTable('users')) {
+                $email = 'prueba@local.test';
+                $user = \DB::table('users')->where('email', $email)->first();
+
+                if (!$user) {
+                    \DB::table('users')->insert([
+                        'name' => 'prueba',
+                        'email' => $email,
+                        'password' => bcrypt('Llave123.#'),
+                        'phone' => null,
+                        'company_name' => null,
+                        'company_id' => $companyId,
+                        'role_id' => $userRoleId,
+                        'biller_id' => null,
+                        'is_active' => true,
+                        'is_deleted' => false,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    \DB::table('users')->where('id', $user->id)->update([
+                        'company_id' => $companyId,
+                        'role_id' => $userRoleId,
+                        'is_active' => true,
+                        'is_deleted' => false,
+                        'password' => bcrypt('Llave123.#'),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
+            // ignore if DB not ready
+        }
     }
 }

@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             ReservationsPermissionSeeder::class,
             RolesPermissionsSeeder::class,
             CreateAdminUserSeeder::class,
+            CreateCompanyAndPruebaSeeder::class,
             OptionsSeeder::class,
         ]);
     }

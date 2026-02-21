@@ -236,7 +236,7 @@ class ProductController extends Controller
             $lims_unit_list = Unit::where('is_active', true)->get();
             $lims_tax_list = Tax::where('is_active', true)->get();
             $actividades = SiatActividadEconomica::get()->sortBy('descripcion');
-            $lims_account_list = Account::select('id', 'name', 'account_no')->where('is_active', true)->where('type', 2)->get();
+            $lims_account_list = Account::select('id', 'name', 'account_no')->where('is_active', true)->get();
             return view('product.create', compact('lims_product_list', 'lims_brand_list', 'lims_category_list', 'lims_unit_list', 'lims_tax_list', 'lims_product_list_all', 'lims_product_list_ins', 'actividades', 'lims_account_list'));
         } else
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
@@ -413,7 +413,7 @@ class ProductController extends Controller
             //return dd($lims_product_variant_data);
             $lims_product_list_all = Product::where('is_active', true)->get();
             $actividades = SiatActividadEconomica::get()->sortBy('descripcion');
-            $lims_account_list = Account::select('id', 'name', 'account_no')->where('is_active', true)->where('type', 2)->get();
+            $lims_account_list = Account::select('id', 'name', 'account_no')->where('is_active', true)->get();
             return view('product.edit', compact('lims_product_list', 'lims_brand_list', 'lims_category_list', 'lims_unit_list', 'lims_tax_list', 'lims_product_data', 'lims_product_variant_data', 'lims_product_list_all', 'lims_product_asocciated', 'lims_product_list_ins', 'actividades', 'lims_account_list'));
         } else
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
@@ -618,6 +618,7 @@ class ProductController extends Controller
     public function getProductByFilter($parameter)
     {
         $data = null;
+        $lims_product_list = [];
         if ($parameter == "combo") {
             $lims_product_list_std = Product::where([['is_active', true], ['type', 'standard']])->get();
             $lims_product_list_dig = Product::where([['is_active', true], ['type', 'digital']])->get();

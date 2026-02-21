@@ -10,19 +10,17 @@ class SiatSucursal extends Model
 {
     protected $table = 'sucursal_siat';
 
-    protected $fillable =[
-
-        "sucursal",
-        "nombre", 
-        "descripcion_sucursal", 
-        "domicilio_tributario",
-        "ciudad_municipio",
-        "telefono",
-        "email",
-        "id_autorizacion_facturacion",
-        "departamento",
-        "estado",
-        "usuario_alta"
+    // Ajustado a las columnas reales existentes en la tabla `sucursal_siat`
+    protected $fillable = [
+        'codigo',
+        'nombre',
+        'direccion',
+        'telefono',
+        'ciudad',
+        'estado',
+        'empresa_id',
+        'departamento',
+        'email'
     ];
 
     public function almacen()
