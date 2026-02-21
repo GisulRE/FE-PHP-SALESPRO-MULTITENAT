@@ -131,13 +131,13 @@ class ProductController extends Controller
                 $nestedData['image'] = '<img src="' . url('public/images/product', $product_image) . '" height="80" width="80">';
                 $nestedData['name'] = $product->name;
                 $nestedData['code'] = $product->code;
-                if ($product->brand_id)
+                if ($product->brand_id && $product->brand)
                     $nestedData['brand'] = $product->brand->title;
                 else
                     $nestedData['brand'] = "N/A";
-                $nestedData['category'] = $product->category->name;
+                $nestedData['category'] = $product->category ? $product->category->name : 'N/A';
                 $nestedData['qty'] = number_format($product->cost, 2, ',', ' ');
-                if ($product->purchase_unit_id)
+                if ($product->purchase_unit_id && $product->unit)
                     $nestedData['unit'] = $product->unit->unit_name;
                 else
                     $nestedData['unit'] = 'N/A';
@@ -168,10 +168,12 @@ class ProductController extends Controller
                         </ul>
                     </div>';
                 // data for product details by one click
-                if ($product->tax_id)
-                    $tax = Tax::find($product->tax_id)->name;
-                else
+                if ($product->tax_id) {
+                    $taxObj = Tax::find($product->tax_id);
+                    $tax = $taxObj ? $taxObj->name : 'N/A';
+                } else {
                     $tax = "N/A";
+                }
 
                 if ($product->tax_method == 1)
                     $tax_method = trans('file.Exclusive');
@@ -247,13 +249,21 @@ class ProductController extends Controller
             'code' => [
                 'max:255',
                 Rule::unique('products')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                    $query->where('is_active', 1);
+                    if (Auth::check()) {
+                        $query->where('company_id', Auth::user()->company_id);
+                    }
+                    return $query;
                 }),
             ],
             'name' => [
                 'max:255',
                 Rule::unique('products')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                    $query->where('is_active', 1);
+                    if (Auth::check()) {
+                        $query->where('company_id', Auth::user()->company_id);
+                    }
+                    return $query;
                 }),
             ],
             'file' => 'nullable|image|mimes:jpeg,jpg,png,gif'
@@ -261,29 +271,40 @@ class ProductController extends Controller
         try {
             $data = $request->except('image', 'file');
             if ($data['type'] == 'combo') {
-                $data['product_list'] = implode(",", $data['product_id']);
-                $data['qty_list'] = implode(",", $data['product_qty']);
-                $data['price_list'] = implode(",", $data['unit_price']);
-                $data['cost'] = $data['unit_id'] = $data['purchase_unit_id'] = $data['sale_unit_id'] = 0;
+                $data['product_list'] = isset($data['product_id']) ? implode(",", $data['product_id']) : '';
+                $data['qty_list']     = isset($data['product_qty']) ? implode(",", $data['product_qty']) : '';
+                $data['price_list']   = isset($data['unit_price']) ? implode(",", $data['unit_price']) : '';
+                $data['cost'] = 0;
+                $data['unit_id'] = $data['purchase_unit_id'] = $data['sale_unit_id'] = null;
             } elseif ($data['type'] == 'producto_terminado') {
-                $data['product_list'] = implode(",", $data['product_id']);
-                $data['qty_list'] = implode(",", $data['product_qty']);
-                $data['price_list'] = implode(",", $data['unit_price']);
-                //$data['cost'] = $data['unit_id'] = $data['purchase_unit_id'] = $data['sale_unit_id'] = 0;
+                $data['product_list'] = isset($data['product_id']) ? implode(",", $data['product_id']) : '';
+                $data['qty_list']     = isset($data['product_qty']) ? implode(",", $data['product_qty']) : '';
+                $data['price_list']   = isset($data['unit_price']) ? implode(",", $data['unit_price']) : '';
             }
 
-            $data['product_details'] = str_replace('"', '@', $data['product_details']);
+            $data['product_details'] = str_replace('"', '@', $data['product_details'] ?? '');
 
-            if ($data['starting_date'])
+            if (!empty($data['starting_date']))
                 $data['starting_date'] = date('Y-m-d', strtotime($data['starting_date']));
-            if ($data['last_date'])
+            else
+                $data['starting_date'] = null;
+            if (!empty($data['last_date']))
                 $data['last_date'] = date('Y-m-d', strtotime($data['last_date']));
-            if ($data['permanent'] == 'FALSE') {
-                if ($data['starting_date_courtesy'])
+            else
+                $data['last_date'] = null;
+
+            $permanent = $data['permanent'] ?? 'TRUE';
+            if ($permanent == 'FALSE') {
+                if (!empty($data['starting_date_courtesy']))
                     $data['starting_date_courtesy'] = date('Y-m-d', strtotime($data['starting_date_courtesy']));
-                if ($data['ending_date_courtesy'])
+                else
+                    $data['starting_date_courtesy'] = null;
+                if (!empty($data['ending_date_courtesy']))
                     $data['ending_date_courtesy'] = date('Y-m-d', strtotime($data['ending_date_courtesy']));
+                else
+                    $data['ending_date_courtesy'] = null;
             } else {
+                $data['permanent'] = 'TRUE';
                 $data['starting_date_courtesy'] = null;
                 $data['ending_date_courtesy'] = null;
             }
@@ -292,6 +313,7 @@ class ProductController extends Controller
                     $data['courtesy_clearance_price'] = 0;
                 }
             } else {
+                $data['courtesy'] = 'FALSE';
                 $data['courtesy_clearance_price'] = 0;
             }
             $data['is_active'] = true;
@@ -323,6 +345,10 @@ class ProductController extends Controller
                 $data['featured'] = 0;
             if (!isset($data['is_basicservice']))
                 $data['is_basicservice'] = 0;
+            // Assign current user's company when creating product
+            if (Auth::check()) {
+                $data['company_id'] = Auth::user()->company_id;
+            }
             $lims_product_data = Product::create($data);
             //dealing with product variant
             if (isset($data['is_variant'])) {
@@ -341,19 +367,15 @@ class ProductController extends Controller
                 }
             }
 
-            if (isset($data['courtesy'])) {
-                if ($data['courtesy'] == "TRUE") {
+            if (isset($data['courtesy']) && $data['courtesy'] == "TRUE") {
+                if (!empty($data['product_id_courtesy'])) {
                     foreach ($data['product_id_courtesy'] as $item) {
                         ProductAssociated::create([
                             'product_courtesy_id' => $lims_product_data->id,
                             'product_associated_id' => $item,
                         ]);
                     }
-                } else {
-                    $data['courtesy_clearance_price'] = 0;
                 }
-            } else {
-                $data['courtesy_clearance_price'] = 0;
             }
 
             \Session::flash('create_message', 'Producto creado con éxito');
@@ -399,18 +421,26 @@ class ProductController extends Controller
 
     public function updateProduct(Request $request)
     {
+        $companyId = Auth::check() ? Auth::user()->company_id : null;
         $this->validate($request, [
             'name' => [
                 'max:255',
-                Rule::unique('products')->ignore($request->input('id'))->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('products')->ignore($request->input('id'))->where(function ($query) use ($companyId) {
+                    $query->where('is_active', 1);
+                    if ($companyId) {
+                        $query->where('company_id', $companyId);
+                    }
+                    return $query;
                 }),
             ],
-
             'code' => [
                 'max:255',
-                Rule::unique('products')->ignore($request->input('id'))->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('products')->ignore($request->input('id'))->where(function ($query) use ($companyId) {
+                    $query->where('is_active', 1);
+                    if ($companyId) {
+                        $query->where('company_id', $companyId);
+                    }
+                    return $query;
                 }),
             ],
             'file' => 'nullable|image|mimes:jpeg,jpg,png,gif'
@@ -425,7 +455,8 @@ class ProductController extends Controller
                 $data['product_list'] = implode(",", $data['product_id']);
                 $data['qty_list'] = implode(",", $data['product_qty']);
                 $data['price_list'] = implode(",", $data['unit_price']);
-                $data['cost'] = $data['unit_id'] = $data['purchase_unit_id'] = $data['sale_unit_id'] = 0;
+                $data['cost'] = 0;
+                $data['unit_id'] = $data['purchase_unit_id'] = $data['sale_unit_id'] = null;
                 if (!isset($data['saveprice'])) {
                     $data['is_pricelist'] = false;
                     $price = 0;
@@ -776,13 +807,15 @@ class ProductController extends Controller
                     $code = trim($data['codigo']);
                     $name = trim($data['nombre']);
 
-                    // Buscar producto por código o nombre
+                    // Buscar producto por código o nombre (filtrado por empresa actual)
                     $product = Product::where('is_active', true)
                         ->where(function ($q) use ($code, $name) {
                             $q->where('code', $code)
                                 ->orWhere('name', $name);
                         })
                         ->first();
+                    // Asignar company_id del usuario autenticado
+                    $currentCompanyId = Auth::check() ? Auth::user()->company_id : null;
 
                     if ($data['marca'] != 'N/A' && $data['marca'] != '') {
                         $lims_brand_data = Brand::firstOrCreate(['title' => $data['marca'], 'is_active' => true]);
@@ -812,9 +845,9 @@ class ProductController extends Controller
                             $product->purchase_unit_id = $lims_unit_data->id;
                             $product->sale_unit_id = $lims_unit_data->id;
                         } else {
-                            $product->unit_id = 0;
-                            $product->purchase_unit_id = 0;
-                            $product->sale_unit_id = 0;
+                            $product->unit_id = null;
+                            $product->purchase_unit_id = null;
+                            $product->sale_unit_id = null;
                         }
                         $product->cost = $data['costo'] ?? 0;
                         $product->price = $data['precio'];
@@ -835,6 +868,9 @@ class ProductController extends Controller
                         if (!$product->image) {
                             $product->image = 'zummXD2dvAtI.png';
                         }
+                        if ($currentCompanyId) {
+                            $product->company_id = $currentCompanyId;
+                        }
                         $product->save();
                     } else {
                         // Crear nuevo producto
@@ -850,9 +886,9 @@ class ProductController extends Controller
                             $product->purchase_unit_id = $lims_unit_data->id;
                             $product->sale_unit_id = $lims_unit_data->id;
                         } else {
-                            $product->unit_id = 0;
-                            $product->purchase_unit_id = 0;
-                            $product->sale_unit_id = 0;
+                            $product->unit_id = null;
+                            $product->purchase_unit_id = null;
+                            $product->sale_unit_id = null;
                         }
                         $product->cost = $data['costo'] ?? 0;
                         $product->price = $data['precio'];
@@ -871,6 +907,9 @@ class ProductController extends Controller
                         $product->is_active = true;
                         $product->is_basicservice = false;
                         $product->image = 'zummXD2dvAtI.png';
+                        if ($currentCompanyId) {
+                            $product->company_id = $currentCompanyId;
+                        }
                         $product->save();
                     }
                 }

@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             RolesPermissionsSeeder::class,
             CreateAdminUserSeeder::class,
             CreateCompanyAndPruebaSeeder::class,
+            OptionsSeeder::class,
         ]);
     }
 }
