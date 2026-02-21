@@ -22,7 +22,7 @@ class CreateCustomerCompanyTable extends Migration
             $table->string('url_custom', 255)->nullable();
             $table->tinyInteger('is_active')->default(1);
             $table->dateTime('created_at')->nullable();
-            $table->timestamp('updated_at')->useCurrent();
+            $table->timestamp('updated_at')->nullable();
         });
     }
 

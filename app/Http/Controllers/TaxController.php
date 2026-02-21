@@ -24,11 +24,12 @@ class TaxController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = Auth::user()->company_id;
         $this->validate($request, [
             'name' => [
                 'max:255',
-                    Rule::unique('taxes')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('taxes')->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ],
 
@@ -37,6 +38,7 @@ class TaxController extends Controller
         ]);
         $input = $request->all();
         $input['is_active'] = true;
+        $input['company_id'] = $companyId;
         Tax::create($input);
         return redirect('tax')->with('message', 'Data inserted successfully');
     }
@@ -57,11 +59,12 @@ class TaxController extends Controller
 
     public function update(Request $request, $id)
     {
+        $companyId = Auth::user()->company_id;
         $this->validate($request, [
             'name' => [
                 'max:255',
-                Rule::unique('taxes')->ignore($request->tax_id)->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('taxes')->ignore($request->tax_id)->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ],
 

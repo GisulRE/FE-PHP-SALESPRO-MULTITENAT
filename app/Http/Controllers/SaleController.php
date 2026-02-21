@@ -95,8 +95,9 @@ class SaleController extends Controller
             $lims_pos_setting_data = PosSetting::latest()->first();
             $lims_account_list = Account::where('is_active', true)->get();
             $lims_methodpay_list = MethodPayment::where('name', '!=', 'Guardar Mas Tarde')->get();
+            $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
 
-            return view('sale.index', compact('lims_gift_card_list', 'lims_pos_setting_data', 'lims_account_list', 'all_permission', 'start_date', 'end_date', 'lims_methodpay_list'));
+            return view('sale.index', compact('lims_gift_card_list', 'lims_pos_setting_data', 'lims_account_list', 'all_permission', 'start_date', 'end_date', 'lims_methodpay_list', 'lista_documentos'));
         } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
@@ -378,24 +379,32 @@ class SaleController extends Controller
 
                 if (!empty($venta_facturada)) {
 
-                    // se podrá imprimir la factura tanto vigente como anulado, y en contigencia.
-                    $nestedData['options'] .=
-                        '<li>
-                        <button type="button" class="imprimir-factura-modal btn btn-link" data-id = "' . $sale->id . '" data-toggle="modal" data-target="#imprimir-factura-modal"><i class="fa fa-print"></i> ' . 'Imprimir Factura' . '</button>
-                    </li>';
+                    if ($venta_facturada->estado_factura == 'ANULADO') {
+                        // Factura anulada: ofrecer re-facturar (CUF=null, el modal detecta y genera nueva)
+                        $nestedData['options'] .=
+                            '<li>
+                            <button type="button" class="imprimir-factura-modal btn btn-link" data-id = "' . $sale->id . '" data-toggle="modal" data-target="#imprimir-factura-modal"><i class="fa fa-refresh"></i> Re-Facturar</button>
+                        </li>';
+                    } else {
+                        // Vigente, Contingencia, Masivo: mostrar botón imprimir
+                        $nestedData['options'] .=
+                            '<li>
+                            <button type="button" class="imprimir-factura-modal btn btn-link" data-id = "' . $sale->id . '" data-toggle="modal" data-target="#imprimir-factura-modal"><i class="fa fa-print"></i> ' . 'Imprimir Factura' . '</button>
+                        </li>';
+                    }
 
                     if (in_array("sales-delete", $request['all_permission']) && ($venta_facturada->estado_factura == 'VIGENTE' || $venta_facturada->estado_factura == 'FACTURADA')) {
-                        // "la venta está vigente, por tanto mostramos botón para anular.                        
+                        // Vigente: mostrar botón anular
                         $nestedData['options'] .=
                             '<li>
                                 <button type="button" class="anular-factura-modal btn btn-link" data-id = "' . $sale->id . '" data-toggle="modal" data-target="#anular-factura-modal"><i class="fa fa-file-excel-o"></i> ' . __("file.Cancel Invoice") . '</button>
                             </li>';
+                    }
 
-                        // cerramos la lista de botones de Action, porque las ventas facturadas no podrán eliminadas.
-                        $nestedData['options'] .= '
-                                </ul>
-                            </div>';
-                    };
+                    // Cerrar siempre el dropdown cuando existe registro de factura
+                    $nestedData['options'] .= '
+                            </ul>
+                        </div>';
                 } else {
                     if (in_array("sales-delete", $request['all_permission'])) {
                         $nestedData['options'] .= \Form::open(["route" => ["sales.destroy", $sale->id], "method" => "DELETE"]) . '
@@ -3466,7 +3475,37 @@ class SaleController extends Controller
             $obj_cliente->save();
             $data_p_venta->save();
         }
-        
+
+        // Si el CustomerSale existe pero está ANULADO, asignar nuevo nro_factura para re-facturar
+        if ($obj_cliente && $obj_cliente->estado_factura === 'ANULADO') {
+            $data_biller_pv = Biller::where('id', $lims_sale_data->biller_id)->first();
+            $data_p_venta_reset = SiatPuntoVenta::where([
+                'sucursal' => $data_biller_pv->sucursal,
+                'codigo_punto_venta' => $data_biller_pv->punto_venta_siat
+            ])->first();
+
+            if ($obj_cliente->codigo_documento_sector == 1) {
+                $obj_cliente->nro_factura = $data_p_venta_reset->correlativo_factura;
+                $data_p_venta_reset->correlativo_factura += 1;
+            } elseif ($obj_cliente->codigo_documento_sector == 2) {
+                $obj_cliente->nro_factura = $data_p_venta_reset->correlativo_alquiler;
+                $data_p_venta_reset->correlativo_alquiler += 1;
+            } elseif ($obj_cliente->codigo_documento_sector == 13) {
+                $obj_cliente->nro_factura = $data_p_venta_reset->correlativo_servicios_basicos;
+                $data_p_venta_reset->correlativo_servicios_basicos += 1;
+            } elseif ($obj_cliente->codigo_documento_sector == 24) {
+                $obj_cliente->nro_factura = $data_p_venta_reset->correlativo_nota_debcred;
+                $data_p_venta_reset->correlativo_nota_debcred += 1;
+            }
+
+            $obj_cliente->estado_factura   = null;  // se asignará VIGENTE al facturar
+            $obj_cliente->codigo_recepcion = null;
+            $obj_cliente->save();
+            $data_p_venta_reset->save();
+
+            Log::info("Re-facturación tras ANULADO: nuevo nro_factura=" . $obj_cliente->nro_factura . " | sale_id=" . $id);
+        }
+
         $lims_pos_setting_data = PosSetting::latest()->first();
 
         // punto de venta info
@@ -4285,6 +4324,20 @@ class SaleController extends Controller
             'req_factura_total' => $req_factura_total,
         ]);
 
+        // Pre-fetch ANTES de anular: anularFactura() pondrá cuf = null en la BD.
+        // Necesitamos los datos para el WhatsApp ANTES de que se borren.
+        $wa_customer_sale = null;
+        $wa_sale          = null;
+        if (!$tipo_id) {
+            $wa_sale          = Sale::find($identificador_clean);
+            $wa_customer_sale = CustomerSale::where('sale_id', $identificador_clean)->first();
+        } else {
+            $wa_customer_sale = CustomerSale::where('cuf', $identificador_clean)->first();
+            if ($wa_customer_sale) {
+                $wa_sale = Sale::find($wa_customer_sale->sale_id);
+            }
+        }
+
         $respuesta = $this->anularFactura($identificador_clean, $motivo_anulacion_id, $tipo_id, $punto_venta_id, $sucursal_id);
         Log::info("Response Front => " . json_encode($respuesta));
 
@@ -4295,28 +4348,10 @@ class SaleController extends Controller
                 if (!\App\Helpers\WhatsAppHelper::hasActiveSession()) {
                     Log::warning('No se envía WhatsApp: no hay sesión activa');
                 } else {
-                    $sale = null;
-                    $customer_sale = null;
-                    $customer = null;
-
-                    if (!$tipo_id) {
-                    
-                        $sale = Sale::find($identificador_clean);
-                        $customer_sale = CustomerSale::where('sale_id', $identificador_clean)->first();
-                    } else {
-                    
-                        $customer_sale = CustomerSale::where('cuf', $identificador_clean)->first();
-
-                        if (!$customer_sale) {
-                        
-                            $prefix = substr($identificador_clean, 0, 50);
-                            $customer_sale = CustomerSale::where('cuf', 'like', $prefix . '%')
-                                ->orderBy('created_at', 'desc')
-                                ->first();
-                        }
-
-                        $sale = $customer_sale ? Sale::find($customer_sale->sale_id) : null;
-                    }
+                    // Usar datos pre-fetchados (CUF ya fue limpiado en BD por anularFactura)
+                    $sale          = $wa_sale;
+                    $customer_sale = $wa_customer_sale;
+                    $customer      = null;
 
                     if ($sale) {
                         $customer = Customer::find($sale->customer_id);
@@ -4549,8 +4584,8 @@ class SaleController extends Controller
                 $tipo_factura = $tipo_factura_lookup[$venta_facturada->codigo_documento_sector] ?? 'COM-VEN';
                 
                 // Badge con color según estado
-                $badge_class = 'badge-success'; // VIGENTE
-                if ($venta_facturada->estado_factura == 'ANULADA') {
+                $badge_class = 'badge-success'; // VIGENTE / CONTINGENCIA / MASIVO
+                if ($venta_facturada->estado_factura == 'ANULADO') {
                     $badge_class = 'badge-danger';
                 } elseif ($venta_facturada->estado_factura == 'PENDIENTE') {
                     $badge_class = 'badge-warning';

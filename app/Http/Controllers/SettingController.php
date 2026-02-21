@@ -344,7 +344,8 @@ class SettingController extends Controller
     public function posSettingUpdate(Request $request)
     {
         $data = $request->all();
-        $pos_setting = PosSetting::firstOrNew(['id' => 1]);
+        $companyId = auth()->user()->company_id;
+        $pos_setting = PosSetting::firstOrNew(['company_id' => $companyId]);
         if (isset($data['hour_resetshift'])) {
             $pos_setting->hour_resetshift = $data['hour_resetshift'];
         }
@@ -361,9 +362,10 @@ class SettingController extends Controller
     public function posSettingStore(Request $request)
     {
         $data = $request->all();
+        $companyId = auth()->user()->company_id;
 
-        $pos_setting = PosSetting::firstOrNew(['id' => 1]);
-        $pos_setting->id = 1;
+        $pos_setting = PosSetting::firstOrNew(['company_id' => $companyId]);
+        $pos_setting->company_id = $companyId;
         $pos_setting->customer_id = $data['customer_id'];
         $pos_setting->warehouse_id = $data['warehouse_id'];
         $pos_setting->type_print = $data['type_print_id'];

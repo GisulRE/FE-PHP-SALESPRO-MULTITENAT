@@ -15,7 +15,7 @@ class CreateSucursalSiatTable extends Migration
             $table->string('direccion',255)->nullable();
             $table->string('telefono',100)->nullable();
             $table->string('ciudad',100)->nullable();
-            $table->tinyInteger('activo')->default(1);
+            $table->tinyInteger('estado')->default(1);
             $table->unsignedBigInteger('empresa_id')->nullable();
             $table->timestamps();
         });

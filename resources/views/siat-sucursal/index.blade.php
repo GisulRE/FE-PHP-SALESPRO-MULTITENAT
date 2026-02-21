@@ -27,11 +27,11 @@
                     @foreach ($sucursales as $key => $sucursal)
                         <tr data-id="{{ $sucursal->id }}">
                             <td>{{ $key }}</td>
-                            <td>{{ $sucursal->sucursal }}</td>
+                            <td>{{ $sucursal->codigo }}</td>
                             <td>{{ $sucursal->nombre }}</td>
-                            <td>{{ $sucursal->descripcion_sucursal }}</td>
-                            <td>{{ $sucursal->domicilio_tributario }}</td>
-                            <td>{{ $sucursal->departamento }}</td>
+                            <td>{{ $sucursal->direccion }}</td>
+                            <td>{{ $sucursal->direccion }}</td>
+                            <td>{{ $sucursal->departamento ?? '' }}</td>
                             <td>
                                 @if ($sucursal->estado == 1)
                                     <span class="badge badge-success">Activo</span>

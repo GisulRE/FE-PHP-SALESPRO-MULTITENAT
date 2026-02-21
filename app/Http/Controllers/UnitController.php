@@ -26,24 +26,26 @@ class UnitController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = Auth::user()->company_id;
         $this->validate($request, [
             'unit_code' => [
                 'max:255',
-                    Rule::unique('units')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('units')->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ],
 
             'unit_name' => [
                 'max:255',
-                    Rule::unique('units')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('units')->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ]
 
         ]);
         $input = $request->all();
         $input['is_active'] = true;
+        $input['company_id'] = $companyId;
         if(!$input['base_unit']){
             $input['operator'] = '*';
             $input['operation_value'] = 1;
@@ -68,17 +70,18 @@ class UnitController extends Controller
 
     public function update(Request $request, $id)
     {
+        $companyId = Auth::user()->company_id;
         $this->validate($request, [
             'unit_code' => [
                 'max:255',
-                    Rule::unique('units')->ignore($request->unit_id)->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('units')->ignore($request->unit_id)->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ],
             'unit_name' => [
                 'max:255',
-                    Rule::unique('units')->ignore($request->unit_id)->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('units')->ignore($request->unit_id)->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ]
         ]);

@@ -239,7 +239,7 @@ class AttendanceController extends Controller
     {
         $hour = date('H:i');
         $date = date('Y-m-d');
-        $pos_setting = PosSetting::firstOrNew(['id' => 1]);
+        $pos_setting = PosSetting::latest()->first() ?? new PosSetting();
         if ($pos_setting->hour_resetshift != null) {
             $diff = strtotime($pos_setting->hour_resetshift) - strtotime($hour);
             if ($diff <= 0) {

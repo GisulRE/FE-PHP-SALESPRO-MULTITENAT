@@ -14,7 +14,8 @@ class SiatSucursalController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('sucursal_siat')) {
-            $sucursales = SiatSucursal::paginate();
+            $empresa_id = Auth::user()->company_id;
+            $sucursales = SiatSucursal::where('empresa_id', $empresa_id)->paginate();
             return view('siat-sucursal.index', ['sucursales' => $sucursales]);
         } else
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
@@ -27,9 +28,21 @@ class SiatSucursalController extends Controller
 
     public function store(Request $request)
     {
-        $user = Auth::user()->id;
-        $data = $request->all();
-        $data['usuario_alta'] = $user;
+        $user = Auth::user();
+
+        // Mapear campos del formulario a las columnas reales de la tabla
+        $data = [
+            'codigo' => $request->input('sucursal'),
+            'nombre' => $request->input('nombre'),
+            'direccion' => $request->input('domicilio_tributario') ?? $request->input('descripcion_sucursal'),
+            'departamento' => $request->input('departamento'),
+            'email' => $request->input('email'),
+            'telefono' => $request->input('telefono'),
+            'ciudad' => $request->input('ciudad_municipio'),
+            'estado' => $request->has('estado') ? (int)$request->input('estado') : 1,
+            'empresa_id' => $user->company_id ?? null,
+        ];
+
         SiatSucursal::create($data);
         return redirect('sucursal')->with('message', 'Sucursal creada correctamente');
     }
@@ -41,9 +54,19 @@ class SiatSucursalController extends Controller
 
     public function update(Request $request, $id)
     {
-        $user = Auth::user()->id;
-        $data = $request->all();
-        $data['usuario_modificacion'] = $user;
+        $user = Auth::user();
+
+        $data = [
+            'codigo' => $request->input('sucursal'),
+            'nombre' => $request->input('nombre'),
+            'direccion' => $request->input('domicilio_tributario') ?? $request->input('descripcion_sucursal'),
+            'departamento' => $request->input('departamento'),
+            'email' => $request->input('email'),
+            'telefono' => $request->input('telefono'),
+            'ciudad' => $request->input('ciudad_municipio'),
+            'estado' => $request->has('estado') ? (int)$request->input('estado') : 1,
+            'empresa_id' => $user->company_id ?? null,
+        ];
 
         $update_data = SiatSucursal::find($id);
         $update_data->update($data);
@@ -54,11 +77,12 @@ class SiatSucursalController extends Controller
     {
         $msj = '';
         $item_sucursal = SiatSucursal::find($id);
-        if ($item_sucursal->estado == true) {
-            $item_sucursal->estado = false;
+        // Usar la columna `estado`
+        if ($item_sucursal->estado == 1) {
+            $item_sucursal->estado = 0;
             $msj = 'baja';
         } else {
-            $item_sucursal->estado = true;
+            $item_sucursal->estado = 1;
             $msj = 'alta';
         }
 

@@ -3046,7 +3046,7 @@ class ReportController extends Controller
             $sucursal_ini = 0;
             $sucursal_fin = 9999999;
         }
-        $account_list = Account::where('is_active', true)->where('type', 2)
+        $account_list = Account::where('is_active', true)
             ->whereBetween('id', [$account_ini, $account_fin])->pluck('id');
         if ($sucursal > -1) {
             $resumen = DB::table('product_sales')
@@ -3072,7 +3072,7 @@ class ReportController extends Controller
                 ->orderBy('accounts.account_no', 'ASC')->get();
         }
         $lims_sucursal_list = SiatSucursal::select('id', 'nombre', 'sucursal')->where('estado', true)->get();
-        $lims_account_list = Account::where('is_active', true)->where('type', 2)->get();
+        $lims_account_list = Account::where('is_active', true)->get();
         $listResumen = collect();
         if (sizeof($resumen) > 0) {
             foreach ($account_list as $key => $account) {

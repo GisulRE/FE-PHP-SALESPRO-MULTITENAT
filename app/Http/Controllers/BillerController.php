@@ -119,7 +119,7 @@ class BillerController extends Controller
         $lims_biller_data = Biller::where('id', $id)->first();
         $sucursales = SiatSucursal::where('estado', true)->get();
         $p_ventas = SiatPuntoVenta::where('sucursal', $lims_biller_data->sucursal)->get();
-        $pos_setting = PosSetting::firstOrNew(['id' => 1]);
+        $pos_setting = PosSetting::latest()->first() ?? new PosSetting();
         if ($lims_biller_data->sucursal && $pos_setting->customer_sucursal) {
             $lims_customer_list = Customer::where([['is_active', true], ['sucursal_id', $lims_biller_data->sucursal]])->get();
         }else{

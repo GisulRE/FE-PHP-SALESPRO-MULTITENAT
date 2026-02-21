@@ -46,18 +46,18 @@ class CreateCustomerSalesTable extends Migration
             $table->string('ciudad', 100)->nullable();
             $table->string('zona', 100)->nullable();
             $table->string('domicilio_cliente', 500)->nullable();
-            $table->double('consumo_periodo')->nullable();
+            $table->double('consumo_periodo')->unsigned()->nullable();
             $table->unsignedInteger('beneficiario_ley_1886')->nullable();
-            $table->double('monto_descuento_ley_1886')->nullable();
-            $table->double('monto_descuento_tarifa_dignidad')->nullable();
-            $table->double('tasa_aseo')->nullable();
-            $table->double('tasa_alumbrado')->nullable();
-            $table->double('otras_tasas')->nullable();
-            $table->double('ajuste_no_sujeto_iva')->nullable();
+            $table->double('monto_descuento_ley_1886')->unsigned()->nullable();
+            $table->double('monto_descuento_tarifa_dignidad')->unsigned()->nullable();
+            $table->double('tasa_aseo')->unsigned()->nullable();
+            $table->double('tasa_alumbrado')->unsigned()->nullable();
+            $table->double('otras_tasas')->unsigned()->nullable();
+            $table->double('ajuste_no_sujeto_iva')->unsigned()->nullable();
             $table->string('detalle_ajuste_no_sujeto_iva', 200)->nullable();
-            $table->double('ajuste_sujeto_iva')->nullable();
+            $table->double('ajuste_sujeto_iva')->unsigned()->nullable();
             $table->string('detalle_ajuste_sujeto_iva', 200)->nullable();
-            $table->double('otros_pagos_no_sujeto_iva')->nullable();
+            $table->double('otros_pagos_no_sujeto_iva')->unsigned()->nullable();
             $table->string('detalle_otros_pagos_no_sujeto_iva', 200)->nullable();
         });
     }

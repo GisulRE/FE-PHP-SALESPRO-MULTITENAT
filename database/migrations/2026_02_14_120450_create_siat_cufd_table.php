@@ -9,15 +9,18 @@ class CreateSiatCufdTable extends Migration
     public function up()
     {
         Schema::create('siat_cufd', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->increments('id');
             $table->string('codigo_cufd',150)->nullable();
-            $table->string('codigo_sucursal',50)->nullable();
-            $table->string('codigo_punto_venta',50)->nullable();
-            $table->dateTime('fecha_hora')->nullable();
-            $table->string('tipo',50)->nullable();
-            $table->string('estado',50)->nullable();
-            $table->text('respuesta')->nullable();
+            $table->string('codigo_control',150)->nullable();
+            $table->string('direccion',255)->nullable();
+            $table->dateTime('fecha_registro')->nullable();
+            $table->dateTime('fecha_vigencia')->nullable();
+            $table->string('sucursal',50)->nullable();
+            $table->string('codigo_punto_venta',100)->nullable();
+            $table->tinyInteger('estado')->default(1);
             $table->timestamps();
+            $table->unsignedInteger('usuario_alta')->nullable();
+            $table->unsignedInteger('id_empresa')->nullable();
         });
     }
 

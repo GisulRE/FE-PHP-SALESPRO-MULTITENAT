@@ -9,12 +9,16 @@ class CreateSiatDocumentoSectorTable extends Migration
     public function up()
     {
         Schema::create('siat_documento_sector', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->string('codigo',50)->nullable();
-            $table->string('descripcion',255)->nullable();
-            $table->string('tipo_documento',100)->nullable();
-            $table->tinyInteger('activo')->default(1);
+            $table->increments('id');
+            $table->string('codigo_actividad', 100);
+            $table->string('codigo_documento_sector', 100);
+            $table->string('tipo_documento_sector', 10);
             $table->timestamps();
+            $table->unsignedInteger('usuario_alta');
+            $table->unsignedInteger('usuario_modificacion');
+            $table->unsignedInteger('id_empresa')->nullable();
+            $table->string('sucursal', 50);
+            $table->string('codigo_punto_venta', 100);
         });
     }
 
