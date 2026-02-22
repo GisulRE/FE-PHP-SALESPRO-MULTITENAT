@@ -19,6 +19,7 @@ class CreateCashierTable extends Migration
             $table->dateTime('end_date')->nullable();
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

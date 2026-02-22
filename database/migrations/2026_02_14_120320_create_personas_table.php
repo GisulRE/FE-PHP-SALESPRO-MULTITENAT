@@ -30,6 +30,7 @@ class CreatePersonasTable extends Migration
             $table->tinyInteger('estado');
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

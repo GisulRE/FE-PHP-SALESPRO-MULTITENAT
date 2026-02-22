@@ -23,6 +23,7 @@ class CreateFacturaMasivaTable extends Migration
             $table->unsignedTinyInteger('cantidad_paquetes')->nullable();
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

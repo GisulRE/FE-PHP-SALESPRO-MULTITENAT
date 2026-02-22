@@ -12,6 +12,7 @@ class CreateProductAssociatedTable extends Migration
             $table->increments('id');
             $table->unsignedInteger('product_courtesy_id');
             $table->unsignedInteger('product_associated_id');
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

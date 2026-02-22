@@ -14,6 +14,7 @@ class CreateBillerWarehousesTable extends Migration
             $table->integer('warehouse_id');
             $table->dateTime('created_at')->nullable();
             $table->timestamp('updated_at')->useCurrent();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

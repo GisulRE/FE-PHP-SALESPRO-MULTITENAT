@@ -59,6 +59,7 @@ class CreateCustomerSalesTable extends Migration
             $table->string('detalle_ajuste_sujeto_iva', 200)->nullable();
             $table->double('otros_pagos_no_sujeto_iva')->unsigned()->nullable();
             $table->string('detalle_otros_pagos_no_sujeto_iva', 200)->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

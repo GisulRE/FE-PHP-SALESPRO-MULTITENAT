@@ -16,6 +16,7 @@ class CreateLoteSalesTable extends Migration
             $table->string('data', 255)->nullable();
             $table->dateTime('created_at')->nullable();
             $table->timestamp('updated_at')->useCurrent();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

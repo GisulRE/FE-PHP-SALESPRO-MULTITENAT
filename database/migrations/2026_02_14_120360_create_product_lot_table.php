@@ -23,6 +23,7 @@ class CreateProductLotTable extends Migration
             $table->dateTime('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
             $table->dateTime('low_date')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

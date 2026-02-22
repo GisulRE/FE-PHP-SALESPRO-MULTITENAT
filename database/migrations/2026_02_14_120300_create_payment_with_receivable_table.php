@@ -15,8 +15,9 @@ class CreatePaymentWithReceivableTable extends Migration
             $table->double('amount');
             $table->text('sales');
             $table->integer('status')->default(1);
-            $table->dateTime('created_at');
+            $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->useCurrent();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

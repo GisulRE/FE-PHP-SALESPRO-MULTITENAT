@@ -14,7 +14,9 @@ class CreateTipTable extends Migration
             $table->decimal('porcentaje',8,2)->nullable();
             $table->text('descripcion')->nullable();
             $table->tinyInteger('activo')->default(1);
-            $table->timestamps();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

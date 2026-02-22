@@ -32,6 +32,7 @@ class CreatePuntosVentaTable extends Migration
             $table->string('numero_contrato',200)->nullable();
             $table->tinyInteger('is_siat')->default(1);
             $table->tinyInteger('is_active')->default(1);
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

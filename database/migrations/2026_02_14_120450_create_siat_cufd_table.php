@@ -18,9 +18,11 @@ class CreateSiatCufdTable extends Migration
             $table->string('sucursal',50)->nullable();
             $table->string('codigo_punto_venta',100)->nullable();
             $table->tinyInteger('estado')->default(1);
-            $table->timestamps();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
             $table->unsignedInteger('usuario_alta')->nullable();
             $table->unsignedInteger('id_empresa')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 
