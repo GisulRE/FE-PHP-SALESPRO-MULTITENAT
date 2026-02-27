@@ -20,7 +20,9 @@ class CreateSiatParametricasVariosTable extends Migration
             $table->tinyInteger('estado')->default(1);
             $table->string('sucursal', 100)->default(1);
             $table->string('codigo_punto_venta', 100)->default(1);
-            $table->timestamps();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

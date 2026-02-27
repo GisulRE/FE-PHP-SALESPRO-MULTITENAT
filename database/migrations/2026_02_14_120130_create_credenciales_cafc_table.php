@@ -24,6 +24,7 @@ class CreateCredencialesCafcTable extends Migration
             $table->unsignedInteger('correlativo_factura')->nullable();
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

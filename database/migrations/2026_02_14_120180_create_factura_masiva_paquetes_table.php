@@ -21,6 +21,7 @@ class CreateFacturaMasivaPaquetesTable extends Migration
             $table->string('estado')->nullable();
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

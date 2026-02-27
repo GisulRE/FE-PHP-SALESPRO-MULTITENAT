@@ -15,7 +15,9 @@ class CreateSalesImportTempTable extends Migration
             $table->string('status',50)->default('pending');
             $table->unsignedBigInteger('user_id')->nullable();
             $table->text('error_message')->nullable();
-            $table->timestamps();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

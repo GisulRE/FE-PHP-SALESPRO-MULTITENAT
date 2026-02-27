@@ -103,7 +103,10 @@ class PurchaseController extends Controller
             if (Auth::user()->role_id > 2 && config('staff_access') == 'own') {
                 $purchases = Purchase::select('purchases.*')
                     ->with('supplier', 'warehouse')
-                    ->leftJoin('suppliers', 'purchases.supplier_id', '=', 'suppliers.id')
+                    ->leftJoin('suppliers', function($join) {
+                        $join->on('purchases.supplier_id', '=', 'suppliers.id')
+                             ->where('suppliers.company_id', '=', auth()->user()->company_id);
+                    })
                     ->whereDate('purchases.created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
                     ->where('purchases.user_id', Auth::id())
                     ->orwhere([
@@ -118,7 +121,10 @@ class PurchaseController extends Controller
                     ->limit($limit)
                     ->orderBy($order, $dir)->get();
 
-                $totalFiltered = Purchase::leftJoin('suppliers', 'purchases.supplier_id', '=', 'suppliers.id')
+                $totalFiltered = Purchase::leftJoin('suppliers', function($join) {
+                        $join->on('purchases.supplier_id', '=', 'suppliers.id')
+                             ->where('suppliers.company_id', '=', auth()->user()->company_id);
+                    })
                     ->whereDate('purchases.created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
                     ->where('purchases.user_id', Auth::id())
                     ->orwhere([
@@ -133,7 +139,10 @@ class PurchaseController extends Controller
             } else {
                 $purchases = Purchase::select('purchases.*')
                     ->with('supplier', 'warehouse')
-                    ->leftJoin('suppliers', 'purchases.supplier_id', '=', 'suppliers.id')
+                    ->leftJoin('suppliers', function($join) {
+                        $join->on('purchases.supplier_id', '=', 'suppliers.id')
+                             ->where('suppliers.company_id', '=', auth()->user()->company_id);
+                    })
                     ->whereDate('purchases.created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
                     ->orwhere('purchases.reference_no', 'LIKE', "%{$search}%")
                     ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
@@ -142,7 +151,10 @@ class PurchaseController extends Controller
                     ->orderBy($order, $dir)
                     ->get();
 
-                $totalFiltered = Purchase::leftJoin('suppliers', 'purchases.supplier_id', '=', 'suppliers.id')
+                $totalFiltered = Purchase::leftJoin('suppliers', function($join) {
+                        $join->on('purchases.supplier_id', '=', 'suppliers.id')
+                             ->where('suppliers.company_id', '=', auth()->user()->company_id);
+                    })
                     ->whereDate('purchases.created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
                     ->orwhere('purchases.reference_no', 'LIKE', "%{$search}%")
                     ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
@@ -159,8 +171,13 @@ class PurchaseController extends Controller
 
                 if ($purchase->supplier_id) {
                     $supplier = $purchase->supplier;
+                    if (!$supplier) {
+                        $supplier = new Supplier();
+                        $supplier->name = 'N/A';
+                    }
                 } else {
                     $supplier = new Supplier();
+                    $supplier->name = 'N/A';
                 }
                 $nestedData['supplier'] = $supplier->name;
                 if ($purchase->status == 1) {
@@ -219,21 +236,29 @@ class PurchaseController extends Controller
 
                 // data for purchase details by one click
                 $user = User::find($purchase->user_id);
+                
+                $warehouse = $purchase->warehouse;
+                if (!$warehouse) {
+                    $warehouse = new Warehouse();
+                    $warehouse->name = 'N/A';
+                    $warehouse->phone = '';
+                    $warehouse->address = '';
+                }
 
                 $nestedData['purchase'] = array(
                     '[ "' . date(config('date_format'), strtotime($purchase->created_at->toDateString())) . '"',
                     ' "' . $purchase->reference_no . '"',
                     ' "' . $purchase_status . '"',
                     ' "' . $purchase->id . '"',
-                    ' "' . $purchase->warehouse->name . '"',
-                    ' "' . $purchase->warehouse->phone . '"',
-                    ' "' . $purchase->warehouse->address . '"',
+                    ' "' . $warehouse->name . '"',
+                    ' "' . $warehouse->phone . '"',
+                    ' "' . $warehouse->address . '"',
                     ' "' . $supplier->name . '"',
-                    ' "' . $supplier->company_name . '"',
-                    ' "' . $supplier->email . '"',
-                    ' "' . $supplier->phone_number . '"',
-                    ' "' . $supplier->address . '"',
-                    ' "' . $supplier->city . '"',
+                    ' "' . ($supplier->company_name ?? '') . '"',
+                    ' "' . ($supplier->email ?? '') . '"',
+                    ' "' . ($supplier->phone_number ?? '') . '"',
+                    ' "' . ($supplier->address ?? '') . '"',
+                    ' "' . ($supplier->city ?? '') . '"',
                     ' "' . $purchase->total_tax . '"',
                     ' "' . $purchase->total_discount . '"',
                     ' "' . $purchase->total_cost . '"',
@@ -330,8 +355,12 @@ class PurchaseController extends Controller
         if (!$lims_product_data) {
             $lims_product_data = Product::join('product_variants', 'products.id', 'product_variants.product_id')
                 ->select('products.*', 'product_variants.item_code')
-                ->where([['product_variants.item_code', $product_code], ['products.is_active', true]])
+                ->where([['product_variants.item_code', $product_code[0]], ['products.is_active', true]])
                 ->first();
+        }
+
+        if (!$lims_product_data) {
+            return response()->json(['error' => 'Product not found'], 404);
         }
 
         $product[] = $lims_product_data->name;
@@ -345,8 +374,13 @@ class PurchaseController extends Controller
 
         if ($lims_product_data->tax_id) {
             $lims_tax_data = Tax::find($lims_product_data->tax_id);
-            $product[] = $lims_tax_data->rate;
-            $product[] = $lims_tax_data->name;
+            if ($lims_tax_data) {
+                $product[] = $lims_tax_data->rate;
+                $product[] = $lims_tax_data->name;
+            } else {
+                $product[] = 0;
+                $product[] = 'No Tax';
+            }
         } else {
             $product[] = 0;
             $product[] = 'No Tax';
@@ -437,6 +471,11 @@ class PurchaseController extends Controller
             /* Register Item Products */
             foreach ($product_id as $i => $id) {
                 $lims_purchase_unit_data = Unit::where('unit_name', $purchase_unit[$i])->first();
+                
+                if (!$lims_purchase_unit_data) {
+                    Log::error("Unit not found: '" . $purchase_unit[$i] . "'");
+                    throw new \Exception("Unidad no encontrada: '" . $purchase_unit[$i] . "'");
+                }
 
                 if ($lims_purchase_unit_data->operator == '*') {
                     $quantity = $recieved[$i] * $lims_purchase_unit_data->operation_value;
@@ -515,7 +554,8 @@ class PurchaseController extends Controller
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::error("error save purchase: " . $th->getMessage());
-            return redirect('purchases')->with('not_permitted', 'Fallo al crear Compra, Intente de nuevo!');
+            Log::error("Stack trace: " . $th->getTraceAsString());
+            return redirect('purchases')->with('not_permitted', 'Fallo al crear Compra: ' . $th->getMessage());
         }
     }
 

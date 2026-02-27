@@ -14,7 +14,9 @@ class CreateUserCategoryTable extends Migration
             $table->text('description')->nullable();
             $table->json('permissions')->nullable();
             $table->tinyInteger('active')->default(1);
-            $table->timestamps();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

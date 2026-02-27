@@ -18,6 +18,7 @@ class CreateAttentionShiftTable extends Migration
             $table->integer('status');
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->useCurrent();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

@@ -172,9 +172,6 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('sales/sale_by_csv', 'SaleController@saleByCsv');
 	Route::get('sales/product_sale/{id}', 'SaleController@productSaleData');
 	Route::post('importsale', 'SaleController@importSale')->name('sale.import');
-	// AJAX endpoints for POS multi-step flow
-	Route::post('sales/store-ajax', 'SaleController@storeAjax')->name('sales.store-ajax');
-	Route::post('sales/finalize-ajax', 'SaleController@finalizeAjax')->name('sales.finalize-ajax');
 	// WhatsApp: Enviar factura por WhatsApp
 	Route::post('sales/send-invoice-whatsapp', 'SaleController@sendInvoiceWhatsApp')->name('sales.send-invoice-whatsapp');
 	Route::get('pos', 'SaleController@posSale')->name('sale.pos');

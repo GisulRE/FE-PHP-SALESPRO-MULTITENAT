@@ -19,7 +19,9 @@ class CreateRegistrosSincronizacionSiatTable extends Migration
             $table->text('mensaje')->nullable();
             $table->string('cufd',100)->nullable();
             $table->string('cuf',100)->nullable();
-            $table->timestamps();
+            $table->timestamp('created_at')->useCurrent();
+            $table->timestamp('updated_at')->useCurrent();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

@@ -13,11 +13,14 @@ class CreateSucursalSiatTable extends Migration
             $table->string('codigo',100)->nullable();
             $table->string('nombre',200)->nullable();
             $table->string('direccion',255)->nullable();
+            $table->string('departamento',191)->nullable();
             $table->string('telefono',100)->nullable();
             $table->string('ciudad',100)->nullable();
             $table->tinyInteger('estado')->default(1);
             $table->unsignedBigInteger('empresa_id')->nullable();
-            $table->timestamps();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

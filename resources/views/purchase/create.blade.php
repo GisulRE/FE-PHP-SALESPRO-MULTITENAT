@@ -430,7 +430,7 @@
 
         lims_productcodeSearch.autocomplete({
             minLength: 0,
-            source: "getproducts",
+            source: "{{ route('purchases.getproducts') }}",
             focus: function(event, ui) {
                 $("#lims_productcodeSearch").val(ui.item.value);
                 return false;
@@ -569,11 +569,12 @@
         function productSearch(data) {
             $.ajax({
                 type: 'GET',
-                url: 'lims_product_search',
+                url: '{{ route("product_purchase.search") }}',
                 data: {
                     data: data
                 },
                 success: function(data) {
+                    console.log('Product data received:', data);
                     //console.log(data);
                     var flag = 1;
                     $(".product-code").each(function(i) {

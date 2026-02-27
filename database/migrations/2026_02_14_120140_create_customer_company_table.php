@@ -23,6 +23,7 @@ class CreateCustomerCompanyTable extends Migration
             $table->tinyInteger('is_active')->default(1);
             $table->dateTime('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

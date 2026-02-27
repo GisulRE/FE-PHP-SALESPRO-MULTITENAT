@@ -166,7 +166,10 @@ class SaleController extends Controller
             if (Auth::user()->role_id > 2) {
                 $sales = Sale::select('sales.*')
                     ->with('biller', 'customer', 'warehouse', 'user')
-                    ->join('customers', 'sales.customer_id', '=', 'customers.id')
+                    ->leftJoin('customers', function($join) {
+                        $join->on('sales.customer_id', '=', 'customers.id')
+                             ->where('customers.company_id', '=', auth()->user()->company_id);
+                    })
                     //->join('customer_sales', 'sales.id', '=', 'customer_sales.sale_id')
                     ->whereDate('sales.date_sell', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
                     ->whereDate('date_sell', ">=", $start_date)
@@ -196,8 +199,11 @@ class SaleController extends Controller
             } else {
                 $sales = Sale::select('sales.*')
                     ->with('biller', 'customer', 'warehouse', 'user')
-                    ->join('customers', 'sales.customer_id', '=', 'customers.id')
-                    ->join('billers', 'sales.biller_id', '=', 'billers.id')
+                    ->leftJoin('customers', function($join) {
+                        $join->on('sales.customer_id', '=', 'customers.id')
+                             ->where('customers.company_id', '=', auth()->user()->company_id);
+                    })
+                    ->leftJoin('billers', 'sales.biller_id', '=', 'billers.id')
                     ->whereDate('sales.date_sell', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
                     ->whereDate('date_sell', ">=", $start_date)
                     ->whereDate('date_sell', "<=", $end_date)
@@ -226,7 +232,15 @@ class SaleController extends Controller
                         $employes_names = $employes_names . " " . $employee->name;
                     }
                 }
-                $nestedData['biller'] = '<div>' . $sale->biller->name . '</div><div>' . $employes_names . '</div>';
+                
+                // Validar biller
+                if ($sale->biller) {
+                    $nestedData['biller'] = '<div>' . $sale->biller->name . '</div><div>' . $employes_names . '</div>';
+                } else {
+                    $nestedData['biller'] = '<div>N/A</div><div>' . $employes_names . '</div>';
+                }
+                
+                // Validar customer
                 if ($sale->customer) {
                     if ($sale->codigoCliente != null || $sale->codigoCliente != '')
                         $nestedData['customer'] = $sale->customer->name . "|" . $sale->codigoCliente . "|" . $sale->numero_medidor;
@@ -426,20 +440,47 @@ class SaleController extends Controller
                     $coupon_code = null;
                 }
 
+                // Validar relaciones
+                $biller = $sale->biller;
+                if (!$biller) {
+                    $biller = new Biller();
+                    $biller->name = 'N/A';
+                    $biller->company_name = '';
+                    $biller->email = '';
+                    $biller->phone_number = '';
+                    $biller->address = '';
+                    $biller->city = '';
+                }
+
+                $customer = $sale->customer;
+                if (!$customer) {
+                    $customer = new Customer();
+                    $customer->name = 'N/A';
+                    $customer->phone_number = '';
+                    $customer->address = '';
+                    $customer->city = '';
+                }
+
+                $warehouse = $sale->warehouse;
+                if (!$warehouse) {
+                    $warehouse = new Warehouse();
+                    $warehouse->name = 'N/A';
+                }
+
                 $nestedData['sale'] = array(
                     '[ "' . date(config('date_format'), strtotime($sale->date_sell)) . '"',
                     ' "' . $sale->reference_no . '"',
                     ' "' . $sale_status . '"',
-                    ' "' . $sale->biller->name . '"',
-                    ' "' . $sale->biller->company_name . '"',
-                    ' "' . $sale->biller->email . '"',
-                    ' "' . $sale->biller->phone_number . '"',
-                    ' "' . $sale->biller->address . '"',
-                    ' "' . $sale->biller->city . '"',
-                    ' "' . $sale->customer->name . '"',
-                    ' "' . $sale->customer->phone_number . '"',
-                    ' "' . $sale->customer->address . '"',
-                    ' "' . $sale->customer->city . '"',
+                    ' "' . $biller->name . '"',
+                    ' "' . ($biller->company_name ?? '') . '"',
+                    ' "' . ($biller->email ?? '') . '"',
+                    ' "' . ($biller->phone_number ?? '') . '"',
+                    ' "' . ($biller->address ?? '') . '"',
+                    ' "' . ($biller->city ?? '') . '"',
+                    ' "' . $customer->name . '"',
+                    ' "' . ($customer->phone_number ?? '') . '"',
+                    ' "' . ($customer->address ?? '') . '"',
+                    ' "' . ($customer->city ?? '') . '"',
                     ' "' . $sale->id . '"',
                     ' "' . $sale->total_tax . '"',
                     ' "' . $sale->total_discount . '"',
@@ -454,7 +495,7 @@ class SaleController extends Controller
                     ' "' . $sale->staff_note . '"',
                     ' "' . $sale->user->name . '"',
                     ' "' . $sale->user->email . '"',
-                    ' "' . $sale->warehouse->name . '"',
+                    ' "' . $warehouse->name . '"',
                     ' "' . $coupon_code . '"',
                     ' "' . $sale->coupon_discount . '"',
                     ' "' . $sale->total_tips . '"',
@@ -565,9 +606,7 @@ class SaleController extends Controller
     {
         try {
             DB::beginTransaction();
-            //Log::info(json_encode($request->all()));
             $data = $request->all();
-            // return dd($request->all());
             $data['user_id'] = Auth::id();
             $datesell = date('Y-m-d', strtotime($data['date_sell']));
             $time = date('H:i:s');
@@ -651,13 +690,6 @@ class SaleController extends Controller
                     $data[$k] = number_format((float) $data[$k], 2, '.', '');
                 }
             }
-
-            Log::info('=== VENTA POS - DATOS RECIBIDOS ===');
-            Log::info('Sale Data:', [
-                'customer_id' => $data['customer_id'] ?? null,
-                'warehouse_id' => $data['warehouse_id'] ?? null,
-                'grand_total' => $data['grand_total'] ?? null,
-            ]);
 
             $lims_sale_data = Sale::create($data);
 
@@ -845,27 +877,10 @@ class SaleController extends Controller
 
                 $mail_data['total'][$i] = $product_sale['total'];
                 
-                Log::info("=== PRODUCTO #{$i} GUARDADO ===", [
-                    'product_id' => $product_sale['product_id'] ?? null,
-                    'qty' => $product_sale['qty'] ?? null,
-                    'net_unit_price (Base)' => $product_sale['net_unit_price'] ?? null,
-                    'discount (Total)' => $product_sale['discount'] ?? null,
-                    'tax' => $product_sale['tax'] ?? null,
-                    'total (Final)' => $product_sale['total'] ?? null,
-                ]);
-                
                 if (!$stock_outsale) {
                     Product_Sale::create($product_sale);
                 }
             } // Fin del foreach product
-
-            Log::info('=== RESUMEN VENTA POS ===', [
-                'sale_id' => $lims_sale_data->id,
-                'reference_no' => $lims_sale_data->reference_no,
-                'total_productos' => count($product_id),
-                'total_discount' => $lims_sale_data->total_discount,
-                'grand_total' => $lims_sale_data->grand_total,
-            ]);
 
             if ($stock_outsale) {
                 //$lims_sale_data->delete();
@@ -898,7 +913,7 @@ class SaleController extends Controller
                         $message->to($mail_data['email'])->subject('Sale Details');
                     });
                 } catch (\Exception $e) {
-                    $message = ' Venta creada con éxito. Por favor configure su <a href="setting/mail_setting">configuración de</a> correo electrónico.';
+                    // Silenciar error de correo
                 }
             }
 
@@ -937,16 +952,24 @@ class SaleController extends Controller
             }
 
             if ($data['payment_status'] == 3 || $data['payment_status'] == 4 || ($data['payment_status'] == 2 && $data['pos'] && $data['paid_amount'] > 0)) {
-                // ... (Se mantiene igual toda la lógica de pagos) ...
-                if ($data['monto_tarjeta'] != null) {
-                    $paying_method = 'Tarjeta_Credito_Debito';
+                // Función helper para obtener account_id de forma segura
+                $getAccountId = function($biller_account_field, $payment_method_id = null) use ($user) {
                     if ($user->biller_id != null) {
                         $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_tarjeta);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
+                        $account = Account::select('id as account_id')->find($biller_data->$biller_account_field);
+                        if ($account) return $account->account_id;
+                    } else if ($payment_method_id) {
+                        $account_payment = AccountPayment::where([['is_active', true], ['methodpay_id', $payment_method_id]])->first();
+                        if ($account_payment) return $account_payment->account_id;
                     }
-                    $account_id = $data_ant->account_id;
+                    // Fallback: usar cuenta por defecto
+                    $default_account = Account::where('is_default', true)->first();
+                    return $default_account ? $default_account->id : null;
+                };
+                
+                if ($data['monto_tarjeta'] != null) {
+                    $paying_method = 'Tarjeta_Credito_Debito';
+                    $account_id = $getAccountId('account_id_tarjeta', $data['paid_by_id'] ?? 2);
 
                     $pago_card_cred_deb = new Payment();
                     $pago_card_cred_deb->user_id = Auth::id();
@@ -978,13 +1001,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_cheque'] != null) {
                     $paying_method = 'Cheque';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_cheque);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_cheque', $data['paid_by_id'] ?? 3);
 
                     $pago_cheque = new Payment();
                     $pago_cheque->user_id = Auth::id();
@@ -1007,13 +1024,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_vale'] != null) {
                     $paying_method = 'Vale';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_vale);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_vale', $data['paid_by_id'] ?? 5);
 
                     $pago_vale = new Payment();
                     $pago_vale->user_id = Auth::id();
@@ -1030,13 +1041,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_otros'] != null) {
                     $paying_method = 'Otros';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_otros);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_otros', $data['paid_by_id'] ?? 12);
 
                     $pago_otros = new Payment();
                     $pago_otros->user_id = Auth::id();
@@ -1053,13 +1058,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_pago_posterior'] != null) {
                     $paying_method = 'Pago_Posterior';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_pagoposterior);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_pagoposterior', $data['paid_by_id'] ?? 8);
 
                     $pago_posterior = new Payment();
                     $pago_posterior->user_id = Auth::id();
@@ -1076,13 +1075,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_transferencia_bancaria'] != null) {
                     $paying_method = 'Transferencia_Bancaria';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_transferenciabancaria);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_transferenciabancaria', $data['paid_by_id'] ?? 9);
 
                     $pago_tranferencia_bancaria = new Payment();
                     $pago_tranferencia_bancaria->user_id = Auth::id();
@@ -1099,28 +1092,22 @@ class SaleController extends Controller
                 }
                 if ($data['monto_deposito'] != null) {
                     $paying_method = 'Deposito';
+                    $account_field = 'account_id_deposito';
+                    $payment_method_id = $data['paid_by_id'] ?? 7;
+                    
                     if ($data['bandera_factura_hidden']) {
-                        if ($user->biller_id != null) {
-                            $biller_data = Biller::find($user->biller_id);
-                            $data_ant = Account::select('id as account_id')->find($biller_data->account_id_deposito);
-                        } else {
-                            $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                        }
+                        $account_field = 'account_id_deposito';
                     } else {
                         if ($data['paid_by_id'] == 7) {
                             $paying_method = 'Deposito';
+                            $account_field = 'account_id_qr'; // Usar QR para depósito sin factura
                         } else if ($data['paid_by_id'] == 6 || $data['paid_by_id'] == 11) {
                             $paying_method = 'Qr_simple';
-                        }
-                        if ($user->biller_id != null) {
-                            $biller_data = Biller::find($user->biller_id);
-                            $data_ant = Account::select('id as account_id')->find($biller_data->account_id_qr);
-                        } else {
-                            $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
+                            $account_field = 'account_id_qr';
                         }
                     }
-
-                    $account_id = $data_ant->account_id;
+                    
+                    $account_id = $getAccountId($account_field, $payment_method_id);
 
                     $lims_customer_data = Customer::find($data['customer_id']);
                     $lims_customer_data->expense += $data['monto_deposito'];
@@ -1141,13 +1128,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_swift'] != null) {
                     $paying_method = 'Swift';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_swift);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_swift', $data['paid_by_id'] ?? 10);
 
                     $pago_swift = new Payment();
                     $pago_swift->user_id = Auth::id();
@@ -1164,13 +1145,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_canal_pago'] != null) {
                     $paying_method = 'Canal_Pago';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_deposito);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_deposito', $data['paid_by_id'] ?? 7);
 
                     $pago_swift = new Payment();
                     $pago_swift->user_id = Auth::id();
@@ -1187,13 +1162,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_billetera'] != null) {
                     $paying_method = 'Billetera_Movil';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_deposito);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_deposito', $data['paid_by_id'] ?? 7);
 
                     $pago_swift = new Payment();
                     $pago_swift->user_id = Auth::id();
@@ -1210,13 +1179,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_pago_online'] != null) {
                     $paying_method = 'Pago_Online';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_deposito);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_deposito', $data['paid_by_id'] ?? 7);
 
                     $pago_swift = new Payment();
                     $pago_swift->user_id = Auth::id();
@@ -1233,13 +1196,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_debito_automatico'] != null) {
                     $paying_method = 'Debito_Automatico';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_deposito);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_deposito', $data['paid_by_id'] ?? 7);
 
                     $pago_d_automatico = new Payment();
                     $pago_d_automatico->user_id = Auth::id();
@@ -1256,13 +1213,7 @@ class SaleController extends Controller
                 }
                 if ($data['balance_gift_card'] > 0) {
                     $paying_method = 'Tarjeta_Regalo';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id_giftcard);
-                    } else {
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id_giftcard', $data['paid_by_id'] ?? 4);
 
                     $pago_gift_card = new Payment();
                     $pago_gift_card->user_id = Auth::id();
@@ -1290,14 +1241,7 @@ class SaleController extends Controller
                 }
                 if ($data['monto_efectivo'] != null) {
                     $paying_method = 'Efectivo';
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $data_ant = Account::select('id as account_id')->find($biller_data->account_id);
-                    } else {
-                        $data['paid_by_id'] = 1;
-                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $data['paid_by_id']]])->first();
-                    }
-                    $account_id = $data_ant->account_id;
+                    $account_id = $getAccountId('account_id', 1);
 
                     $pago_efectivo = new Payment();
                     $pago_efectivo->user_id = Auth::id();
@@ -1616,24 +1560,32 @@ class SaleController extends Controller
                 $data['pos'] = $lims_pos_setting_data->print;
                 if ($data['pos']) {
                     if ($lims_pos_setting_data->type_print == 4 || $lims_pos_setting_data->type_print == 5 || $lims_pos_setting_data->type_print == 7) {
-                        return redirect()->to('pos')->with(['message' => $message, 'printsale' => true, 'saleid' => $lims_sale_data->id]);
+                        return redirect()->to('pos')->with(['printsale' => true, 'saleid' => $lims_sale_data->id]);
                     } else {
-                        return redirect('sales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
+                        return redirect('sales/gen_invoice/' . $lims_sale_data->id);
                     }
                 } else {
-                    return redirect()->to('pos')->with('message', $message);
+                    return redirect()->to('pos');
                 }
             } elseif ($data['pos']) {
-                return redirect()->to('pos')->with('message', $message);
+                return redirect()->to('pos');
             } else {
-                return redirect()->to('sales')->with('message', $message);
+                return redirect()->to('sales');
             }
         } catch (\Throwable $e) {
             DB::rollback();
-            Log::error("error save sale message: " . $e->getMessage());
-            Log::error("error save sale line: " . $e->getLine());
-            Log::error("error save sale code: " . $e->getCode());
-            return redirect()->to('sales')->with('message', 'Falló al registrar la venta');
+            
+            $error_message = 'Falló al registrar la venta';
+            
+            // Si es petición AJAX, retornar JSON
+            if ($request->ajax() || $request->wantsJson() || (isset($request->ajax_preview) && $request->ajax_preview)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $error_message
+                ], 500);
+            }
+            
+            return redirect()->to('sales')->with('not_permitted', $error_message);
         }
     }
 
@@ -3408,155 +3360,6 @@ class SaleController extends Controller
             return $pdf->stream("invoice_" . $lims_sale_data->reference_no . ".pdf", array("Attachment" => false));
         } else {
             return view('sale.invoice', compact('lims_sale_data', 'lims_product_sale_data', 'lims_biller_data', 'lims_warehouse_data', 'lims_customer_data', 'lims_payment_data', 'numberInWords', 'cadenaCentavos'));
-        }
-    }
-
-    /**
-     * AJAX helper to create sale via AJAX (preview) by delegating to store with flag
-     */
-    public function storeAjax(Request $request)
-    {
-        $request->merge(['ajax_preview' => true]);
-        return $this->store($request);
-    }
-
-    /**
-     * Finalize (facturar) for an existing sale via AJAX. Executes SIAT/offline generation and returns print URL.
-     */
-    public function finalizeAjax(Request $request)
-    {
-        $data = $request->all();
-        $id = $data['sale_id'] ?? null;
-        if (!$id) return response()->json(['status' => false, 'message' => 'Sale id required']);
-
-        $lims_sale_data = Sale::find($id);
-        if (!$lims_sale_data) return response()->json(['status' => false, 'message' => 'Sale not found']);
-
-        $obj_cliente = CustomerSale::where('sale_id', $id)->first();
-        
-        // Si no existe CustomerSale, crearlo con los datos del request
-        if (!$obj_cliente) {
-            $obj_cliente = new CustomerSale();
-            $obj_cliente->sale_id = $id;
-            $obj_cliente->customer_id = $data['customer_id'] ?? $lims_sale_data->customer_id;
-            $obj_cliente->razon_social = $data['sales_razon_social'] ?? '';
-            $obj_cliente->email = $data['sales_email'] ?? '';
-            $obj_cliente->codigofijo = $data['codigo_fijo'] ?? $data['customer_id'] ?? $lims_sale_data->customer_id;
-            $obj_cliente->tipo_documento = $data['sales_tipo_documento_hidden'] ?? 1;
-            $obj_cliente->valor_documento = $data['sales_valor_documento'] ?? '0';
-            $obj_cliente->complemento_documento = $data['sales_complemento_documento'] ?? null;
-            $obj_cliente->codigo_excepcion = $data['bandera_codigo_excepcion_hidden'] ?? 0;
-            $obj_cliente->codigo_documento_sector = $data['bandera_codigo_documento_sector_hidden'] ?? 1;
-            $obj_cliente->glosa_periodo_facturado = $data['glosa_periodo_facturado'] ?? '';
-            $obj_cliente->tipo_metodo_pago = $data['paid_by_id'] ?? 1; // Por defecto 1 = Efectivo
-            $obj_cliente->usuario = Auth::user()->name;
-            
-            // Obtener datos del punto de venta
-            $data_biller = Biller::where('id', $lims_sale_data->biller_id)->first();
-            $data_p_venta = SiatPuntoVenta::where([
-                'sucursal' => $data_biller->sucursal,
-                'codigo_punto_venta' => $data_biller->punto_venta_siat
-            ])->first();
-            
-            // Asignar número de factura según el tipo de documento sector
-            if ($obj_cliente->codigo_documento_sector == 1) {
-                $obj_cliente->nro_factura = $data_p_venta->correlativo_factura;
-                $data_p_venta->correlativo_factura += 1;
-            } elseif ($obj_cliente->codigo_documento_sector == 2) {
-                $obj_cliente->nro_factura = $data_p_venta->correlativo_alquiler;
-                $data_p_venta->correlativo_alquiler += 1;
-            } elseif ($obj_cliente->codigo_documento_sector == 13) {
-                $obj_cliente->nro_factura = $data_p_venta->correlativo_servicios_basicos;
-                $data_p_venta->correlativo_servicios_basicos += 1;
-            }
-            
-            $obj_cliente->sucursal = $data_p_venta->sucursal;
-            $obj_cliente->codigo_punto_venta = $data_p_venta->codigo_punto_venta;
-            $obj_cliente->save();
-            $data_p_venta->save();
-        }
-
-        // Si el CustomerSale existe pero está ANULADO, asignar nuevo nro_factura para re-facturar
-        if ($obj_cliente && $obj_cliente->estado_factura === 'ANULADO') {
-            $data_biller_pv = Biller::where('id', $lims_sale_data->biller_id)->first();
-            $data_p_venta_reset = SiatPuntoVenta::where([
-                'sucursal' => $data_biller_pv->sucursal,
-                'codigo_punto_venta' => $data_biller_pv->punto_venta_siat
-            ])->first();
-
-            if ($obj_cliente->codigo_documento_sector == 1) {
-                $obj_cliente->nro_factura = $data_p_venta_reset->correlativo_factura;
-                $data_p_venta_reset->correlativo_factura += 1;
-            } elseif ($obj_cliente->codigo_documento_sector == 2) {
-                $obj_cliente->nro_factura = $data_p_venta_reset->correlativo_alquiler;
-                $data_p_venta_reset->correlativo_alquiler += 1;
-            } elseif ($obj_cliente->codigo_documento_sector == 13) {
-                $obj_cliente->nro_factura = $data_p_venta_reset->correlativo_servicios_basicos;
-                $data_p_venta_reset->correlativo_servicios_basicos += 1;
-            } elseif ($obj_cliente->codigo_documento_sector == 24) {
-                $obj_cliente->nro_factura = $data_p_venta_reset->correlativo_nota_debcred;
-                $data_p_venta_reset->correlativo_nota_debcred += 1;
-            }
-
-            $obj_cliente->estado_factura   = null;  // se asignará VIGENTE al facturar
-            $obj_cliente->codigo_recepcion = null;
-            $obj_cliente->save();
-            $data_p_venta_reset->save();
-
-            Log::info("Re-facturación tras ANULADO: nuevo nro_factura=" . $obj_cliente->nro_factura . " | sale_id=" . $id);
-        }
-
-        $lims_pos_setting_data = PosSetting::latest()->first();
-
-        // punto de venta info
-        $data_biller = Biller::where('id', $lims_sale_data->biller_id)->first();
-        $data_p_venta = SiatPuntoVenta::where([
-            'sucursal' => $data_biller->sucursal,
-            'codigo_punto_venta' => $data_biller->punto_venta_siat,
-        ])->first();
-        $update_p_venta = SiatPuntoVenta::where([
-            'sucursal' => $data_biller->sucursal,
-            'codigo_punto_venta' => $data_biller->punto_venta_siat,
-        ])->first();
-
-        try {
-            if ($data_p_venta->modo_contingencia == true) {
-                $codigoEvento = $this->getTipoEventoContingenciaPuntoVenta($lims_sale_data->biller_id);
-                if ($codigoEvento && $obj_cliente->codigo_documento_sector == 1) {
-                    $respuesta = $this->generarFacturaIndividualOffline($id, $codigoEvento);
-                }
-                if ($codigoEvento && $obj_cliente->codigo_documento_sector == 13) {
-                    $respuesta = $this->generarFacturaServicioBasicoOffline($id, $codigoEvento);
-                }
-                if ($codigoEvento && $obj_cliente->codigo_documento_sector == 2) {
-                    $respuesta = $this->generarFacturaAlquilerOffline($id, $codigoEvento);
-                }
-            } else {
-                if ($obj_cliente->codigo_documento_sector == 1) {
-                    if (($lims_pos_setting_data->cufd_centralizado ?? 0) == 1) {
-                        $respuesta = $this->generarFacturaIndividualComisionista($id);
-                    } else {
-                        $respuesta = $this->generarFacturaIndividual($id);
-                    }
-                }
-                if ($obj_cliente->codigo_documento_sector == 2) {
-                    $respuesta = $this->generarFacturaIndividualAlquiler($id);
-                }
-                if ($obj_cliente->codigo_documento_sector == 13) {
-                    $respuesta = $this->generarFacturaServicioBasico($id);
-                }
-            }
-
-            if (isset($respuesta) && $respuesta['status']) {
-                // Usar la ruta de factura SIAT en lugar de la genérica
-                return response()->json(['status' => true, 'message' => $respuesta['mensaje'], 'print_url' => url('sales/imprimir_factura/' . $id)]);
-            } else {
-                $msg = $respuesta['mensaje'] ?? 'Error generating invoice';
-                return response()->json(['status' => false, 'message' => $msg]);
-            }
-        } catch (\Throwable $e) {
-            Log::error('finalizeAjax error: ' . $e->getMessage());
-            return response()->json(['status' => false, 'message' => 'Error processing invoice']);
         }
     }
 

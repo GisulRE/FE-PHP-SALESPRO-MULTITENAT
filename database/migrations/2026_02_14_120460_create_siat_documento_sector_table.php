@@ -13,12 +13,14 @@ class CreateSiatDocumentoSectorTable extends Migration
             $table->string('codigo_actividad', 100);
             $table->string('codigo_documento_sector', 100);
             $table->string('tipo_documento_sector', 10);
-            $table->timestamps();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
             $table->unsignedInteger('usuario_alta');
             $table->unsignedInteger('usuario_modificacion');
             $table->unsignedInteger('id_empresa')->nullable();
             $table->string('sucursal', 50);
             $table->string('codigo_punto_venta', 100);
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

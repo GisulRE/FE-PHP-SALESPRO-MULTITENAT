@@ -17,6 +17,7 @@ class CreateMoneyTransfersTable extends Migration
             $table->string('note', 250)->nullable();
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 

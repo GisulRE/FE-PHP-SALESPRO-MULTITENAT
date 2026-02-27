@@ -21,6 +21,7 @@ class CreateRecordTable extends Migration
             $table->integer('warehouse_qty_after')->nullable();
             $table->decimal('cb_cost', 10, 0)->default(0);
             $table->timestamp('action_taken_at')->nullable()->useCurrent();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
 
