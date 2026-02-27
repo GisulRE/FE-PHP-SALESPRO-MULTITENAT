@@ -13,7 +13,7 @@ class CreateSiatActividadesEconomicasTable extends Migration
             $table->string('codigo_caeb', 100);
             $table->string('descripcion', 200)->nullable();
             $table->string('tipo_actividad', 10);
-            $table->timestamps('created_at')->nullable();
+            $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
             $table->unsignedInteger('usuario_alta');
             $table->unsignedInteger('usuario_modificacion');

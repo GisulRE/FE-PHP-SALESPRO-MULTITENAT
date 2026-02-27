@@ -12,7 +12,7 @@ class CreateSiatLeyendasFacturasTable extends Migration
             $table->increments('id');
             $table->string('codigo_actividad', 100);
             $table->string('descripcion_leyenda', 500)->nullable();
-            $table->timestamps('created_at')->nullable();
+            $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
             $table->unsignedInteger('usuario_alta');
             $table->unsignedInteger('usuario_modificacion');
