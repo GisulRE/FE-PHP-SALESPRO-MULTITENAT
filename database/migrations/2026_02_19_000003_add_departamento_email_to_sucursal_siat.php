@@ -11,10 +11,10 @@ return new class extends Migration
         if (Schema::hasTable('sucursal_siat')) {
             Schema::table('sucursal_siat', function (Blueprint $table) {
                 if (!Schema::hasColumn('sucursal_siat', 'departamento')) {
-                    $table->string('departamento')->nullable()->after('direccion');
+                    $table->string('departamento', 100)->nullable();
                 }
                 if (!Schema::hasColumn('sucursal_siat', 'email')) {
-                    $table->string('email')->nullable()->after('departamento');
+                    $table->string('email', 100)->nullable();
                 }
             });
         }

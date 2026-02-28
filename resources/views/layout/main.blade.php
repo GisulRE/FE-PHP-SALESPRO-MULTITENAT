@@ -109,9 +109,7 @@
                         </p>
                         {!! Form::open(['route' => 'expenses.store', 'method' => 'post']) !!}
                         @php
-                            $lims_expense_category_list = DB::table('expense_categories')
-                                ->where('is_active', true)
-                                ->get();
+                            $lims_expense_category_list = \App\ExpenseCategory::where('is_active', true)->get();
                             $lims_account_list = \App\Account::where('is_active', true)->get();
                         @endphp
                         <div class="row">

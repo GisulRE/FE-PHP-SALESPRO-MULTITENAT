@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\ExpenseCategory;
+use Auth;
 use Keygen;
 use Illuminate\Validation\Rule;
 
@@ -28,11 +29,12 @@ class ExpenseCategoryController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = Auth::user()->company_id;
         $this->validate($request, [
             'code' => [
                 'max:255',
-                    Rule::unique('expense_categories')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('expense_categories')->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ]
         ]);
@@ -55,11 +57,12 @@ class ExpenseCategoryController extends Controller
 
     public function update(Request $request, $id)
     {
+        $companyId = Auth::user()->company_id;
         $this->validate($request, [
             'code' => [
                 'max:255',
-                    Rule::unique('expense_categories')->ignore($request->expense_category_id)->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('expense_categories')->ignore($request->expense_category_id)->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ]
         ]);

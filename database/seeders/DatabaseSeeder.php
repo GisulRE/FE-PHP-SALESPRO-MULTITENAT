@@ -21,6 +21,12 @@ class DatabaseSeeder extends Seeder
             CreateAdminUserSeeder::class,
             CreateCompanyAndPruebaSeeder::class,
             OptionsSeeder::class,
+            CustomersSeeder::class,
+            SuppliersSeeder::class,
+            UnitsSeeder::class,
+            WarehousesSeeder::class,
+            BillersSeeder::class,
+            ProductsSeeder::class,
         ]);
     }
 }
