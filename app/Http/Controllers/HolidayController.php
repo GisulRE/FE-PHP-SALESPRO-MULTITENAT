@@ -21,7 +21,7 @@ class HolidayController extends Controller
             $approve_permission = false;
             $lims_holiday_list = Holiday::where('user_id', Auth::id())->orderBy('id', 'desc')->get();
         }
-        $lims_employee_all = User::where('is_active', true)->get();
+        $lims_employee_all = User::where('is_active', true)->where('company_id', Auth::user()->company_id)->get();
         return view('holiday.index', compact('lims_holiday_list', 'approve_permission', 'lims_employee_all'));
     }
 

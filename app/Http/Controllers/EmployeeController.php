@@ -27,7 +27,7 @@ class EmployeeController extends Controller
             $lims_employee_all = Employee::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_department_list = Department::where('is_active', true)->get();
-            $lims_users_all = User::where('is_active', true)->limit(100)->get();
+            $lims_users_all = User::where('is_active', true)->where('company_id', Auth::user()->company_id)->limit(100)->get();
             return view('employee.index', compact('lims_employee_all', 'lims_department_list', 'lims_warehouse_list', 'all_permission', 'lims_users_all'));
         } else
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
@@ -49,14 +49,15 @@ class EmployeeController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = Auth::user()->company_id;
         $data = $request->except('image');
         $message = 'Empleado registrado con éxito';
         if (isset($data['user'])) {
             $this->validate($request, [
                 'name' => [
                     'max:255',
-                    Rule::unique('users')->where(function ($query) {
-                        return $query->where('is_deleted', false);
+                    Rule::unique('users')->where(function ($query) use ($companyId) {
+                        return $query->where('is_deleted', false)->where('company_id', $companyId);
                     }),
                 ],
                 'email' => [
@@ -72,6 +73,7 @@ class EmployeeController extends Controller
             $data['is_deleted'] = false;
             $data['password'] = bcrypt($data['password']);
             $data['phone'] = $data['phone_number'];
+            $data['company_id'] = $companyId;
             User::create($data);
             $user = User::latest()->first();
             $data['user_id'] = $user->id;
@@ -81,8 +83,8 @@ class EmployeeController extends Controller
         $this->validate($request, [
             'email' => [
                 'max:255',
-                Rule::unique('employees')->where(function ($query) {
-                    return $query->where('is_active', true);
+                Rule::unique('employees')->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', true)->where('company_id', $companyId);
                 }),
             ],
             'image' => 'image|mimes:jpg,jpeg,png,gif|max:100000',
@@ -105,6 +107,7 @@ class EmployeeController extends Controller
         $data['name'] = $data['employee_name'];
         $data['is_active'] = true;
         $data['warehouse_id'] = $data['warehouse_id_sale'];
+        $data['company_id'] = $companyId;
         Employee::create($data);
 
         return redirect('employees')->with('message', $message);
@@ -112,13 +115,14 @@ class EmployeeController extends Controller
 
     public function update(Request $request, $id)
     {
+        $companyId = Auth::user()->company_id;
         $lims_employee_data = Employee::find($request['employee_id']);
         if ($lims_employee_data->user_id) {
             $this->validate($request, [
                 'name' => [
                     'max:255',
-                    Rule::unique('users')->ignore($lims_employee_data->user_id)->where(function ($query) {
-                        return $query->where('is_deleted', false);
+                    Rule::unique('users')->ignore($lims_employee_data->user_id)->where(function ($query) use ($companyId) {
+                        return $query->where('is_deleted', false)->where('company_id', $companyId);
                     }),
                 ],
                 'email' => [
@@ -135,8 +139,8 @@ class EmployeeController extends Controller
             'email' => [
                 'email',
                 'max:255',
-                Rule::unique('employees')->ignore($lims_employee_data->id)->where(function ($query) {
-                    return $query->where('is_active', true);
+                Rule::unique('employees')->ignore($lims_employee_data->id)->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', true)->where('company_id', $companyId);
                 }),
             ],
             'image' => 'image|mimes:jpg,jpeg,png,gif|max:100000',

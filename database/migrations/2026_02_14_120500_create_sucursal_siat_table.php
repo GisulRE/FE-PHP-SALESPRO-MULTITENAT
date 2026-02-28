@@ -10,17 +10,20 @@ class CreateSucursalSiatTable extends Migration
     {
         Schema::create('sucursal_siat', function (Blueprint $table) {
             $table->bigIncrements('id');
-            $table->string('codigo',100)->nullable();
-            $table->string('nombre',200)->nullable();
-            $table->string('direccion',255)->nullable();
-            $table->string('departamento',191)->nullable();
-            $table->string('telefono',100)->nullable();
-            $table->string('ciudad',100)->nullable();
-            $table->tinyInteger('estado')->default(1);
-            $table->unsignedBigInteger('empresa_id')->nullable();
+            $table->string('sucursal', 50);
+            $table->string('nombre', 100);
+            $table->string('descripcion_sucursal', 200);
+            $table->string('domicilio_tributario', 200);
+            $table->string('ciudad_municipio', 200);
+            $table->string('telefono', 100);
+            $table->string('email', 100)->nullable();
+            $table->unsignedInteger('id_autorizacion_facturacion')->nullable();
+            $table->string('departamento', 100);
+            $table->string('estado', 20);
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
-            $table->timestamp('deleted_at')->nullable();
+            $table->unsignedInteger('usuario_alta');
+            $table->unsignedInteger('id_empresa')->nullable();
         });
     }
 

@@ -25,7 +25,7 @@ class PayrollController extends Controller
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('payroll')) {
             $lims_account_list = Account::where('is_active', true)->get();
-            $lims_employee_list = Employee::where('is_active', true)->get();
+            $lims_employee_list = Employee::where('is_active', true)->where('company_id', Auth::user()->company_id)->get();
             return view('payroll.index', compact('lims_account_list', 'lims_employee_list'));
         } else
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');

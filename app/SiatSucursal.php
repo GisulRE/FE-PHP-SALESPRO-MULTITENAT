@@ -10,26 +10,28 @@ class SiatSucursal extends Model
 {
     protected $table = 'sucursal_siat';
 
-    // Ajustado a las columnas reales existentes en la tabla `sucursal_siat`
     protected $fillable = [
-        'codigo',
+        'sucursal',
         'nombre',
-        'direccion',
+        'descripcion_sucursal',
+        'domicilio_tributario',
+        'ciudad_municipio',
         'telefono',
-        'ciudad',
-        'estado',
-        'empresa_id',
+        'email',
+        'id_autorizacion_facturacion',
         'departamento',
-        'email'
+        'estado',
+        'usuario_alta',
+        'id_empresa',
     ];
 
     public function almacen()
     {
-        return $this->belongsTo(Warehouse::class, 'id', 'sucursal_id');
+        return $this->hasOne(Warehouse::class, 'sucursal_id', 'id');
     }
 
-    public function getCodigoAutorizacion()
+    public function autorizacionFacturacion()
     {
-        return $this->belongsTo(AutorizacionFacturacion::class, 'id_autorizacion_facturacion', 'id');;
+        return $this->belongsTo(AutorizacionFacturacion::class, 'id_autorizacion_facturacion', 'id');
     }
 }

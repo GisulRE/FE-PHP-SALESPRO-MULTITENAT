@@ -46,11 +46,12 @@ class AccountsController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = Auth::user()->company_id;
         $this->validate($request, [
             'account_no' => [
                 'max:255',
-                Rule::unique('accounts')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('accounts')->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ],
         ]);
@@ -109,11 +110,12 @@ class AccountsController extends Controller
 
     public function update(Request $request, $id)
     {
+        $companyId = Auth::user()->company_id;
         $this->validate($request, [
             'account_no' => [
                 'max:255',
-                Rule::unique('accounts')->ignore($request->account_id)->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('accounts')->ignore($request->account_id)->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ],
         ]);

@@ -22,6 +22,14 @@ class AttendanceController extends Controller
             $lims_employee_list = Employee::where('is_active', true)->get();
             $lims_hrm_setting_data = HrmSetting::latest()->first();
 
+            // Si no existe configuración HRM para la empresa, crear un valor por defecto
+            if (! $lims_hrm_setting_data) {
+                $lims_hrm_setting_data = HrmSetting::create([
+                    'checkin' => '09:00',
+                    'checkout' => '18:00',
+                ]);
+            }
+
             return view('attendance.index', compact('lims_employee_list', 'lims_hrm_setting_data'));
         } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
@@ -168,9 +176,10 @@ class AttendanceController extends Controller
         $employee_id = $data['employee_id'];
         $lims_hrm_setting_data = HrmSetting::latest()->first();
         $checkin = $lims_hrm_setting_data->checkin;
-        foreach ($employee_id as $id) {
+            foreach ($employee_id as $id) {
             $data['date'] = date('Y-m-d', strtotime(str_replace('/', '-', $data['date'])));
             $data['user_id'] = Auth::id();
+                $data['company_id'] = Auth::user()->company_id;
             $lims_attendance_data = Attendance::whereDate('date', $data['date'])->where('employee_id', $id)->first();
             if (!$lims_attendance_data) {
                 $data['employee_id'] = $id;
@@ -199,6 +208,7 @@ class AttendanceController extends Controller
         if (!$lims_attendance_data) {
             $data['employee_id'] = $id;
             $data['checkin'] = date('h:ia');
+            $data['company_id'] = Auth::user()->company_id;
             $diff = strtotime($checkin) - strtotime($data['checkin']);
             if ($diff >= 0) {
                 $data['status'] = 1;

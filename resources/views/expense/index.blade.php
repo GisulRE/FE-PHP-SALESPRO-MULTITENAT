@@ -107,12 +107,8 @@
                         <small>{{ trans('file.The field labels marked with * are required input fields') }}.</small></p>
                     {!! Form::open(['route' => ['expenses.update', 1], 'method' => 'put']) !!}
                     <?php
-                    $lims_expense_category_list = DB::table('expense_categories')
-                        ->where('is_active', true)
-                        ->get();
-                    $lims_warehouse_list = DB::table('warehouses')
-                        ->where('is_active', true)
-                        ->get();
+                    $lims_expense_category_list = \App\ExpenseCategory::where('is_active', true)->get();
+                    $lims_warehouse_list = \App\Warehouse::where('is_active', true)->get();
                     ?>
                     <div class="form-group">
                         <input type="hidden" name="expense_id">
