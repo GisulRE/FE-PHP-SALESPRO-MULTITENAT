@@ -21,10 +21,15 @@ class DatabaseSeeder extends Seeder
             CreateAdminUserSeeder::class,
             CreateCompanyAndPruebaSeeder::class,
             OptionsSeeder::class,
+            // Primero clientes y proveedores (billers los referencian)
             CustomersSeeder::class,
             SuppliersSeeder::class,
             UnitsSeeder::class,
             WarehousesSeeder::class,
+            // SIAT: sucursales y puntos de venta (billers los referencian)
+            SucursalSiatSeeder::class,
+            PuntoVentaSeeder::class,
+            // Facturadores (necesitan warehouse, customer, SIAT)
             BillersSeeder::class,
             ProductsSeeder::class,
         ]);

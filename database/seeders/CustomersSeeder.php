@@ -32,13 +32,7 @@ class CustomersSeeder extends Seeder
             }
         }
 
-        // Verificar si ya existen customers
-        if (Customer::withoutGlobalScope('company_id')->count() > 0) {
-            $this->command->info('Customers ya existen, omitiendo seeder...');
-            return;
-        }
-
-        $this->command->info('Creando Customers...');
+        $this->command->info('Creando Customers por empresa...');
 
         // Obtener el primer customer group
         $customerGroup = CustomerGroup::first();
@@ -47,6 +41,16 @@ class CustomersSeeder extends Seeder
         $companies = Company::all();
 
         foreach ($companies as $company) {
+            // Verificar si ya existen customers para ESTA empresa
+            $existsForCompany = Customer::withoutGlobalScope('company_id')
+                ->where('company_id', $company->id)
+                ->exists();
+
+            if ($existsForCompany) {
+                $this->command->line("  Ya existen customers para: {$company->name}");
+                continue;
+            }
+
             $this->command->info('Creando customers para: ' . $company->name);
 
             $customers = [
