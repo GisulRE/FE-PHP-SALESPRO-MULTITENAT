@@ -61,6 +61,31 @@ class DatabaseSeeder extends Seeder
             $this->call(\ReservationsPermissionSeeder::class);
         }
 
+        // SIAT: Sucursales por empresa
+        if (class_exists('\SucursalSiatSeeder')) {
+            $this->call(\SucursalSiatSeeder::class);
+        }
+
+        // SIAT: Puntos de Venta por empresa
+        if (class_exists('\PuntoVentaSeeder')) {
+            $this->call(\PuntoVentaSeeder::class);
+        }
+
+        // Clientes genéricos por empresa
+        if (class_exists('\CustomersSeeder')) {
+            $this->call(\CustomersSeeder::class);
+        }
+
+        // Facturadores por empresa
+        if (class_exists('\BillersSeeder')) {
+            $this->call(\BillersSeeder::class);
+        }
+
+        // Proveedores por empresa
+        if (class_exists('\SuppliersSeeder')) {
+            $this->call(\SuppliersSeeder::class);
+        }
+
         // Legacy fallback: ensure an admin user exists with requested password
         try {
             if (\Schema::hasTable('roles') && \Schema::hasTable('users')) {

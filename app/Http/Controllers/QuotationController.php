@@ -569,18 +569,35 @@ class QuotationController extends Controller
     public function limsProductSearch(Request $request)
     {
         $todayDate = date('Y-m-d');
-        $product_code = explode(" ", $request['data']);
+        $data_str = $request['data'];
         $product_variant_id = null;
-        $lims_product_data = Product::where('code', $product_code[0])->first();
+
+        // El formato del autocomplete es "CODE (Product Name)"
+        // Extraemos el código tomando todo hasta el primer " ("
+        $paren_pos = strpos($data_str, ' (');
+        $product_code_str = $paren_pos !== false ? substr($data_str, 0, $paren_pos) : $data_str;
+
+        $lims_product_data = Product::where('code', $product_code_str)->where('is_active', true)->first();
+
         if (!$lims_product_data) {
+            // Intentar con variante
             $lims_product_data = Product::join('product_variants', 'products.id', 'product_variants.product_id')
                 ->select('products.*', 'product_variants.id as product_variant_id', 'product_variants.item_code', 'product_variants.additional_price')
-                ->where('product_variants.item_code', $product_code)->where('products.is_active', true)
+                ->where('product_variants.item_code', $product_code_str)
+                ->where('products.is_active', true)
                 ->first();
-            $product_variant_id = $lims_product_data->product_variant_id;
-            $lims_product_data->code = $lims_product_data->item_code;
-            $lims_product_data->price += $lims_product_data->additional_price;
+
+            if ($lims_product_data) {
+                $product_variant_id = $lims_product_data->product_variant_id;
+                $lims_product_data->code = $lims_product_data->item_code;
+                $lims_product_data->price += $lims_product_data->additional_price;
+            }
         }
+
+        if (!$lims_product_data) {
+            return response()->json(null, 404);
+        }
+
         $product[] = $lims_product_data->name;
         $product[] = $lims_product_data->code;
         if ($lims_product_data->promotion && $todayDate <= $lims_product_data->last_date) {
