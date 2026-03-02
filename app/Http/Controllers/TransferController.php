@@ -69,35 +69,49 @@ class TransferController extends Controller
 
     public function getProduct($id)
     {
-        $lims_product_warehouse_data = Product_Warehouse::where([
-            ['warehouse_id', $id],
-            ['qty', '>', 0]
-        ])->whereNull('variant_id')->get();
-        $lims_product_with_variant_warehouse_data = Product_Warehouse::where([
-            ['warehouse_id', $id],
-            ['qty', '>', 0]
-        ])->whereNotNull('variant_id')->get();
+        $companyId = Auth::user()->company_id;
+
+        // JOIN directo con products filtrando por compañía — resuelve el N+1 y
+        // evita que Product::find() devuelva null por el global scope de compañía.
+        $baseQuery = Product_Warehouse::join('products', 'product_warehouse.product_id', '=', 'products.id')
+            ->where('product_warehouse.warehouse_id', $id)
+            ->where('product_warehouse.qty', '>', 0)
+            ->where('products.is_active', true)
+            ->where('products.company_id', $companyId)
+            ->select(
+                'product_warehouse.product_id',
+                'product_warehouse.variant_id',
+                'product_warehouse.qty',
+                'products.name',
+                'products.code'
+            );
+
+        $lims_product_warehouse_data          = (clone $baseQuery)->whereNull('product_warehouse.variant_id')->get();
+        $lims_product_with_variant_warehouse_data = (clone $baseQuery)->whereNotNull('product_warehouse.variant_id')->get();
+
         $product_code = [];
         $product_name = [];
-        $product_qty = [];
-        $product_data = [];
-        //product without variant
+        $product_qty  = [];
+
+        // Productos sin variante
         foreach ($lims_product_warehouse_data as $product_warehouse) {
-            $product_qty[] = $product_warehouse->qty;
-            $lims_product_data = Product::select('name', 'code')->find($product_warehouse->product_id);
-            $product_code[] = $lims_product_data->code;
-            $product_name[] = $lims_product_data->name;
+            $product_qty[]  = $product_warehouse->qty;
+            $product_code[] = $product_warehouse->code;
+            $product_name[] = $product_warehouse->name;
         }
-        //product with variant
+
+        // Productos con variante
         foreach ($lims_product_with_variant_warehouse_data as $product_warehouse) {
-            $product_qty[] = $product_warehouse->qty;
-            $lims_product_data = Product::select('name', 'code')->find($product_warehouse->product_id);
-            $lims_product_variant_data = ProductVariant::select('item_code')->FindExactProduct($product_warehouse->product_id, $product_warehouse->variant_id)->first();
+            $lims_product_variant_data = ProductVariant::select('item_code')
+                ->FindExactProduct($product_warehouse->product_id, $product_warehouse->variant_id)
+                ->first();
+            if (!$lims_product_variant_data) continue;
+            $product_qty[]  = $product_warehouse->qty;
             $product_code[] = $lims_product_variant_data->item_code;
-            $product_name[] = $lims_product_data->name;
+            $product_name[] = $product_warehouse->name;
         }
-        $product_data = [$product_code, $product_name, $product_qty];
-        return $product_data;
+
+        return [$product_code, $product_name, $product_qty];
     }
 
     public function limsProductSearch(Request $request)
@@ -595,133 +609,171 @@ class TransferController extends Controller
 
     public function importTransfer(Request $request)
     {
-        //get the file
         $upload = $request->file('file');
         $ext = pathinfo($upload->getClientOriginalName(), PATHINFO_EXTENSION);
-        //checking if this is a CSV file
         if ($ext != 'csv')
-            return redirect()->back()->with('message', 'Please upload a CSV file');
+            return redirect()->back()->with('message', 'Por favor sube un archivo CSV.');
 
         $filePath = $upload->getRealPath();
         $file_handle = fopen($filePath, 'r');
+
+        // Columnas esperadas: product_code, quantity, product_unit, product_cost, tax_name
         $i = 0;
-        //validate the file
+        $product_data = [];
+        $unit         = [];
+        $tax          = [];
+        $qty          = [];
+        $cost         = [];
+
         while (!feof($file_handle)) {
             $current_line = fgetcsv($file_handle);
-            if ($current_line && $i > 0) {
-                $product_data[] = Product::where('code', $current_line[0])->first();
-                if (!$product_data[$i - 1])
-                    return redirect()->back()->with('message', 'Product does not exist!');
-                $unit[] = Unit::where('unit_code', $current_line[2])->first();
-                if (!$unit[$i - 1])
-                    return redirect()->back()->with('message', 'Purchase unit does not exist!');
-                if (strtolower($current_line[4]) != "no tax") {
-                    $tax[] = Tax::where('name', $current_line[4])->first();
-                    if (!$tax[$i - 1])
-                        return redirect()->back()->with('message', 'Tax name does not exist!');
-                } else
-                    $tax[$i - 1]['rate'] = 0;
+            if (!$current_line) { $i++; continue; } // línea vacía al final
+            if ($i === 0) { $i++; continue; }        // saltar cabecera
 
-                $qty[] = $current_line[1];
-                $cost[] = $current_line[3];
+            // product_code → columna 0
+            $product = Product::where('code', trim($current_line[0]))->first();
+            if (!$product)
+                return redirect()->back()->with('message', "Producto no encontrado: {$current_line[0]}");
+
+            // quantity → columna 1
+            $qty[] = (float) $current_line[1];
+
+            // product_unit → columna 2
+            $unitRow = Unit::where('unit_code', trim($current_line[2]))->first();
+            if (!$unitRow)
+                return redirect()->back()->with('message', "Unidad no encontrada: {$current_line[2]}");
+
+            // product_cost → columna 3
+            $cost[] = (float) $current_line[3];
+
+            // tax_name → columna 4
+            if (strtolower(trim($current_line[4])) !== 'no tax') {
+                $taxRow = Tax::where('name', trim($current_line[4]))->first();
+                if (!$taxRow)
+                    return redirect()->back()->with('message', "Impuesto no encontrado: {$current_line[4]}");
+                $tax[] = ['rate' => $taxRow->rate, 'name' => $taxRow->name];
+            } else {
+                $tax[] = ['rate' => 0, 'name' => 'No Tax'];
             }
+
+            $product_data[] = $product;
+            $unit[]         = $unitRow;
             $i++;
         }
+        fclose($file_handle);
+
+        if (empty($product_data))
+            return redirect()->back()->with('message', 'El archivo CSV no contiene productos válidos.');
 
         $data = $request->except('file');
-        $data['reference_no'] = 'tr-' . date("Ymd") . '-' . date("his");
+        $data['reference_no']  = 'tr-' . date("Ymd") . '-' . date("his");
+        $data['shipping_cost'] = (float) ($data['shipping_cost'] ?? 0);
+        $data['user_id']       = Auth::id();
+        $data['company_id']    = Auth::user()->company_id;
+        $data['total_qty']     = 0;
+        $data['total_tax']     = 0;
+        $data['total_cost']    = 0;
+        $data['item']          = 0;
+        $data['grand_total']   = 0;
+
         $document = $request->document;
         if ($document) {
             $v = Validator::make(
-                [
-                    'extension' => strtolower($request->document->getClientOriginalExtension()),
-                ],
-                [
-                    'extension' => 'in:jpg,jpeg,png,gif,pdf,csv,docx,xlsx,txt',
-                ]
+                ['extension' => strtolower($document->getClientOriginalExtension())],
+                ['extension' => 'in:jpg,jpeg,png,gif,pdf,csv,docx,xlsx,txt']
             );
             if ($v->fails())
                 return redirect()->back()->withErrors($v->errors());
 
-            $ext = pathinfo($document->getClientOriginalName(), PATHINFO_EXTENSION);
-            $documentName = $data['reference_no'] . '.' . $ext;
+            $docExt      = pathinfo($document->getClientOriginalName(), PATHINFO_EXTENSION);
+            $documentName = $data['reference_no'] . '.' . $docExt;
             $document->move('public/documents/transfer', $documentName);
             $data['document'] = $documentName;
         }
-        $item = 0;
-        $grand_total = $data['shipping_cost'];
-        $data['user_id'] = Auth::id();
-        Transfer::create($data);
-        $lims_transfer_data = Transfer::latest()->first();
 
-        foreach ($product_data as $key => $product) {
-            if ($product['tax_method'] == 1) {
-                $net_unit_cost = $cost[$key];
-                $product_tax = $net_unit_cost * ($tax[$key]['rate'] / 100) * $qty[$key];
-                $total = ($net_unit_cost * $qty[$key]) + $product_tax;
-            } elseif ($product['tax_method'] == 2) {
-                $net_unit_cost = (100 / (100 + $tax[$key]['rate'])) * $cost[$key];
-                $product_tax = ($cost[$key] - $net_unit_cost) * $qty[$key];
-                $total = $cost[$key] * $qty[$key];
-            }
-            if ($data['status'] == 1) {
-                if ($unit[$key]['operator'] == '*')
-                    $quantity = $qty[$key] * $unit[$key]['operation_value'];
-                elseif ($unit[$key]['operator'] == '/')
-                    $quantity = $qty[$key] / $unit[$key]['operation_value'];
-                $product_warehouse = Product_Warehouse::where([
-                    ['product_id', $product['id']],
-                    ['warehouse_id', $data['from_warehouse_id']]
-                ])->first();
-                Log::debug("Antes Product_Warehouse: " . json_encode($product_warehouse));
-                $product_warehouse->qty -= $quantity;
-                $product_warehouse->save();
-                $product_warehouse = Product_Warehouse::where([
-                    ['product_id', $product['id']],
-                    ['warehouse_id', $data['to_warehouse_id']]
-                ])->first();
-                if ($product_warehouse) {
-                    $product_warehouse->qty += $quantity;
-                    $product_warehouse->save();
+        try {
+            DB::beginTransaction();
+
+            $lims_transfer_data = Transfer::create($data);
+
+            foreach ($product_data as $key => $product) {
+                $taxRate = $tax[$key]['rate'];
+                $unitRow = $unit[$key];
+                $unitQty = $qty[$key];
+                $unitCost = $cost[$key];
+
+                // Calcular coste neto y tax según tax_method del producto
+                if ($product->tax_method == 2) {
+                    // inclusive
+                    $net_unit_cost = (100 / (100 + $taxRate)) * $unitCost;
+                    $product_tax   = ($unitCost - $net_unit_cost) * $unitQty;
+                    $total         = $unitCost * $unitQty;
                 } else {
-                    $product_warehouse = new Product_Warehouse();
-                    $product_warehouse->product_id = $product['id'];
-                    $product_warehouse->warehouse_id = $data['to_warehouse_id'];
-                    $product_warehouse->qty = $quantity;
-                    $product_warehouse->save();
+                    // exclusive (default) o sin tax
+                    $net_unit_cost = $unitCost;
+                    $product_tax   = $net_unit_cost * ($taxRate / 100) * $unitQty;
+                    $total         = ($net_unit_cost * $unitQty) + $product_tax;
                 }
-                Log::debug("Despues Product_Warehouse: " . json_encode($product_warehouse));
-            } elseif ($data['status'] == 3) {
-                if ($unit[$key]['operator'] == '*')
-                    $quantity = $qty[$key] * $unit[$key]['operation_value'];
-                elseif ($unit[$key]['operator'] == '/')
-                    $quantity = $qty[$key] / $unit[$key]['operation_value'];
-                $product_warehouse = Product_Warehouse::where([
-                    ['product_id', $product['id']],
-                    ['warehouse_id', $data['from_warehouse_id']]
-                ])->first();
-                $product_warehouse->qty -= $quantity;
-                $product_warehouse->save();
+
+                // Cantidad real según operador de unidad
+                $quantity = ($unitRow->operator == '/')
+                    ? $unitQty / $unitRow->operation_value
+                    : $unitQty * $unitRow->operation_value;
+
+                // Mover stock sólo si status Completado (1) o Enviado (3)
+                if (in_array($data['status'], [1, 3])) {
+                    $pw_from = Product_Warehouse::where('product_id', $product->id)
+                        ->where('warehouse_id', $data['from_warehouse_id'])
+                        ->first();
+                    if (!$pw_from)
+                        throw new \Exception("Sin stock en almacén origen para: {$product->name}");
+                    $pw_from->qty -= $quantity;
+                    $pw_from->save();
+                }
+
+                if ($data['status'] == 1) {
+                    $pw_to = Product_Warehouse::where('product_id', $product->id)
+                        ->where('warehouse_id', $data['to_warehouse_id'])
+                        ->first();
+                    if ($pw_to) {
+                        $pw_to->qty += $quantity;
+                        $pw_to->save();
+                    } else {
+                        $pw_to = new Product_Warehouse();
+                        $pw_to->product_id   = $product->id;
+                        $pw_to->warehouse_id = $data['to_warehouse_id'];
+                        $pw_to->qty          = $quantity;
+                        $pw_to->save();
+                    }
+                }
+
+                $product_transfer = new ProductTransfer();
+                $product_transfer->transfer_id      = $lims_transfer_data->id;
+                $product_transfer->product_id       = $product->id;
+                $product_transfer->qty              = $unitQty;
+                $product_transfer->purchase_unit_id = $unitRow->id;
+                $product_transfer->net_unit_cost    = round($net_unit_cost, 2);
+                $product_transfer->tax_rate         = $taxRate;
+                $product_transfer->tax              = round($product_tax, 2);
+                $product_transfer->total            = round($total, 2);
+                $product_transfer->save();
+
+                $lims_transfer_data->total_qty  += $unitQty;
+                $lims_transfer_data->total_tax  += round($product_tax, 2);
+                $lims_transfer_data->total_cost += round($total, 2);
             }
 
-            $product_transfer = new ProductTransfer();
-            $product_transfer->transfer_id = $lims_transfer_data->id;
-            $product_transfer->product_id = $product['id'];
-            $product_transfer->qty = $qty[$key];
-            $product_transfer->purchase_unit_id = $unit[$key]['id'];
-            $product_transfer->net_unit_cost = number_format((float) $net_unit_cost, 2, '.', '');
-            $product_transfer->tax_rate = $tax[$key]['rate'];
-            $product_transfer->tax = number_format((float) $product_tax, 2, '.', '');
-            $product_transfer->total = number_format((float) $total, 2, '.', '');
-            $product_transfer->save();
-            $lims_transfer_data->total_qty += $qty[$key];
-            $lims_transfer_data->total_tax += number_format((float) $product_tax, 2, '.', '');
-            $lims_transfer_data->total_cost += number_format((float) $total, 2, '.', '');
+            $lims_transfer_data->item        = count($product_data);
+            $lims_transfer_data->grand_total = $lims_transfer_data->total_cost + $lims_transfer_data->shipping_cost;
+            $lims_transfer_data->save();
+
+            DB::commit();
+            return redirect('transfers')->with('message', 'Transferencia importada con éxito');
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            Log::error("Error importar transferencia CSV: " . $th->getMessage());
+            return redirect()->back()->with('not_permitted', 'Error al importar: ' . $th->getMessage());
         }
-        $lims_transfer_data->item = $key + 1;
-        $lims_transfer_data->grand_total = $lims_transfer_data->total_cost + $lims_transfer_data->shipping_cost;
-        $lims_transfer_data->save();
-        return redirect('transfers')->with('message', 'Transfer imported successfully');
     }
 
     public function edit($id)
