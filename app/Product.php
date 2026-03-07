@@ -24,7 +24,7 @@ class Product extends Model
                 if (Auth::check()) {
                     $companyId = Auth::user()->company_id;
                     if ($companyId) {
-                        $builder->where('company_id', $companyId);
+                        $builder->where('products.company_id', $companyId);
                     }
                 }
             } catch (\Exception $e) {

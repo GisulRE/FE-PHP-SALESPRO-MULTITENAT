@@ -44,7 +44,7 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>{{trans('file.Currency Position')}} *</label><br>
-                                        @if($lims_general_setting_data->currency_position == 'prefix')
+                                        @if($lims_general_setting_data && $lims_general_setting_data->currency_position == 'prefix')
                                         <label class="radio-inline">
                                             <input type="radio" name="currency_position" value="prefix" checked> {{trans('file.Prefix')}}
                                         </label>
@@ -122,7 +122,7 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>{{trans('file.Alert Expiration Days')}} *</label>
-                                        <input data-suffix="Dias" type="number" name="alert_expiration" value="{{$lims_general_setting_data->alert_expiration}}" min="0" max="1800" step="15"/>
+                                        <input data-suffix="Dias" type="number" name="alert_expiration" value="{{ $lims_general_setting_data ? $lims_general_setting_data->alert_expiration : 0 }}" min="0" max="1800" step="15"/>
                                     </div>
                                 </div>        
                             </div>
