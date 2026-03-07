@@ -219,6 +219,24 @@
                         </div>
                     </div>
                 </div>
+                <!-- modal: HRM no configurado -->
+                <div id="hrm-config-modal" tabindex="-1" role="dialog" aria-hidden="true" class="modal fade text-left">
+                    <div role="document" class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning">
+                                <h5 class="modal-title"><i class="dripicons-warning"></i> Configuración requerida</h5>
+                                <button type="button" data-dismiss="modal" aria-label="Cerrar" class="close"><span aria-hidden="true">&times;</span></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Para registrar asistencia debes configurar primero los horarios de entrada y salida en <strong>Configuración HRM</strong>.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                                <a id="hrm-config-link" href="{{ route('setting.hrm') }}" class="btn btn-primary"><i class="dripicons-gear"></i> Ir a Configuración HRM</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- order_discount modal -->
                 <div id="order-discount" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true"
                     class="modal fade text-left">
@@ -1019,6 +1037,11 @@
         $('.attendance-img').on('click', function () {
             var id = $(this).data('employee');
             $.get('attendance/checked/' + id, function (data) {
+                if (data.type === 'no_hrm_config') {
+                    $('#hrm-config-link').attr('href', data.redirect);
+                    $('#hrm-config-modal').modal('show');
+                    return;
+                }
                 if (data.status) {
                     if (data.type == 'checkin') {
                         $(`#emp_tab_${id}`).attr("style",

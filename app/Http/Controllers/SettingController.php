@@ -134,19 +134,12 @@ class SettingController extends Controller
 
     public function moduleQr()
     {
-        $tables = DB::select('SHOW TABLES');
-        $str = 'Tables_in_' . env('DB_DATABASE');
-        foreach ($tables as $table) {
-            if ($table->$str != 'accounts' && $table->$str != 'general_settings' && $table->$str != 'hrm_settings' && $table->$str != 'languages' && $table->$str != 'migrations' && $table->$str != 'password_resets' && $table->$str != 'permissions' && $table->$str != 'pos_setting' && $table->$str != 'roles' && $table->$str != 'role_has_permissions' && $table->$str != 'users') {
-                DB::table($table->$str)->truncate();
-            }
-        }
-        return redirect()->back()->with('message', 'Database cleared successfully');
+        return view('setting.siat_setting');
     }
 
     public function generalSetting()
     {
-        $lims_general_setting_data = GeneralSetting::latest()->first();
+        $lims_general_setting_data = GeneralSetting::firstOrNew(['id' => 1]);
         $lims_account_list = Account::where('is_active', true)->get();
         $zones_array = array();
         $timestamp = time();
@@ -172,8 +165,7 @@ class SettingController extends Controller
 
         file_put_contents($path, str_replace($searchArray, $replaceArray, file_get_contents($path)));
 
-        $general_setting = GeneralSetting::latest()->first();
-        $general_setting->id = 1;
+        $general_setting = GeneralSetting::firstOrNew(['id' => 1]);
         $general_setting->site_title = $data['site_title'];
         $general_setting->currency = $data['currency'];
         $general_setting->currency_position = $data['currency_position'];
@@ -192,7 +184,7 @@ class SettingController extends Controller
 
     public function changeTheme($theme)
     {
-        $lims_general_setting_data = GeneralSetting::latest()->first();
+        $lims_general_setting_data = GeneralSetting::firstOrNew(['id' => 1]);
         $lims_general_setting_data->theme = $theme;
         $lims_general_setting_data->save();
     }
@@ -294,7 +286,8 @@ class SettingController extends Controller
     public function hrmSettingStore(Request $request)
     {
         $data = $request->all();
-        $lims_hrm_setting_data = HrmSetting::firstOrNew(['id' => 1]);
+        $companyId = auth()->user()->company_id;
+        $lims_hrm_setting_data = HrmSetting::firstOrNew(['company_id' => $companyId]);
         $lims_hrm_setting_data->checkin = $data['checkin'];
         $lims_hrm_setting_data->checkout = $data['checkout'];
         $lims_hrm_setting_data->save();
@@ -329,16 +322,18 @@ class SettingController extends Controller
         $tipo_emision_list[1]['name'] = "Masivo";
         $lims_biller_list = Biller::where('is_active', true)->get();
         $lims_printer_list = PrinterConfig::where('status', true)->get();
-        $lims_pos_setting_data = PosSetting::latest()->first();
+        $companyId = auth()->user()->company_id;
+        $lims_pos_setting_data = PosSetting::firstOrNew(['company_id' => $companyId]);
 
         return view('setting.pos_setting', compact('lims_customer_list', 'tipo_emision_list', 'lims_warehouse_list', 'lims_biller_list', 'lims_formatprint_list', 'lims_pos_setting_data', 'lims_printer_list'));
     }
 
     public function posSettingJSON()
     {
-        $lims_pos_setting_data = PosSetting::latest()->first();
+        $companyId = auth()->user()->company_id;
+        $lims_pos_setting_data = PosSetting::where('company_id', $companyId)->latest()->first();
 
-        return $lims_pos_setting_data;
+        return $lims_pos_setting_data ?? new PosSetting();
     }
 
     public function posSettingUpdate(Request $request)
@@ -476,7 +471,8 @@ class SettingController extends Controller
                 $item = collect($value);
                 $registro = SiatCufd::where('sucursal', $value->sucursal)->where('codigo_punto_venta', $value->codigo_punto_venta)->where('estado', true)->first();
                 if (isset($registro->fecha_vigencia)) {
-                    $formato_fecha = GeneralSetting::first()->date_format;
+                    $generalSetting = GeneralSetting::first();
+                    $formato_fecha = $generalSetting ? $generalSetting->date_format : 'd/m/Y';
                     $fecha = new Carbon($registro->fecha_vigencia);
                     $fecha = $fecha->format("$formato_fecha H:i");
                     $item->put('fecha_vencimiento', $fecha);

@@ -175,7 +175,7 @@ class AttendanceController extends Controller
         $data = $request->all();
         $employee_id = $data['employee_id'];
         $lims_hrm_setting_data = HrmSetting::latest()->first();
-        $checkin = $lims_hrm_setting_data->checkin;
+        $checkin = $lims_hrm_setting_data ? $lims_hrm_setting_data->checkin : '09:00am';
             foreach ($employee_id as $id) {
             $data['date'] = date('Y-m-d', strtotime(str_replace('/', '-', $data['date'])));
             $data['user_id'] = Auth::id();
@@ -203,6 +203,9 @@ class AttendanceController extends Controller
         $data['checkout'] = null;
         $data['user_id'] = Auth::id();
         $lims_hrm_setting_data = HrmSetting::latest()->first();
+        if (!$lims_hrm_setting_data) {
+            return array('status' => false, 'type' => 'no_hrm_config', 'redirect' => route('setting.hrm'));
+        }
         $checkin = $lims_hrm_setting_data->checkin;
         $lims_attendance_data = Attendance::whereDate('date', $data['date'])->where('employee_id', $id)->first();
         if (!$lims_attendance_data) {
@@ -216,6 +219,7 @@ class AttendanceController extends Controller
                 $data['status'] = 0;
             }
 
+            unset($data['checkout']); // no enviar checkout null al hacer checkin
             $result = Attendance::create($data);
             $data['status'] = 1;
             $last = ShiftEmployee::whereDate('created_at', $data['date'])->max('position');

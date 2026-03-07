@@ -2430,40 +2430,39 @@ class SaleController extends Controller
     public function getProductByFilter($category_id, $brand_id)
     {
         $data = [];
+        $companyId = Auth::user()->company_id;
+
         if (($category_id != 0) && ($brand_id != 0)) {
-            $lims_product_list = DB::table('products')
-                ->join('categories', 'products.category_id', '=', 'categories.id')
-                ->where([
-                    ['products.is_active', true],
-                    ['products.category_id', $category_id],
-                    ['brand_id', $brand_id],
-                    ['products.type', '!=', 'insumo'],
-                ])->orWhere([
-                    ['categories.parent_id', $category_id],
-                    ['products.is_active', true],
-                    ['brand_id', $brand_id],
-                ])->select('products.name', 'products.code', 'products.image')->orderBy('products.name', 'asc')->get();
+            $lims_product_list = Product::join('categories', 'products.category_id', '=', 'categories.id')
+                ->where('products.is_active', true)
+                ->where('products.type', '!=', 'insumo')
+                ->where(function ($q) use ($category_id) {
+                    $q->where('products.category_id', $category_id)
+                      ->orWhere('categories.parent_id', $category_id);
+                })
+                ->where('products.brand_id', $brand_id)
+                ->select('products.id', 'products.name', 'products.code', 'products.image', 'products.is_variant')
+                ->orderBy('products.name', 'asc')->get();
         } elseif (($category_id != 0) && ($brand_id == 0)) {
-            $lims_product_list = DB::table('products')
-                ->join('categories', 'products.category_id', '=', 'categories.id')
-                ->where([
-                    ['products.is_active', true],
-                    ['products.category_id', $category_id],
-                    ['products.type', '!=', 'insumo'],
-                ])->orWhere([
-                    ['categories.parent_id', $category_id],
-                    ['products.is_active', true],
-                ])->select('products.id', 'products.name', 'products.code', 'products.image', 'products.is_variant')->orderBy('products.name', 'asc')->get();
+            $lims_product_list = Product::join('categories', 'products.category_id', '=', 'categories.id')
+                ->where('products.is_active', true)
+                ->where('products.type', '!=', 'insumo')
+                ->where(function ($q) use ($category_id) {
+                    $q->where('products.category_id', $category_id)
+                      ->orWhere('categories.parent_id', $category_id);
+                })
+                ->select('products.id', 'products.name', 'products.code', 'products.image', 'products.is_variant')
+                ->orderBy('products.name', 'asc')->get();
         } elseif (($category_id == 0) && ($brand_id != 0)) {
             $lims_product_list = Product::where([
                 ['brand_id', $brand_id],
                 ['is_active', true],
                 ['type', '!=', 'insumo'],
-            ])
-                ->select('products.id', 'products.name', 'products.code', 'products.image', 'products.is_variant')
-                ->get();
+            ])->select('id', 'name', 'code', 'image', 'is_variant')->get();
         } else {
-            $lims_product_list = Product::where([['is_active', true], ['type', '!=', 'insumo']])->orderBy('products.name', 'asc')->get();
+            $lims_product_list = Product::where([['is_active', true], ['type', '!=', 'insumo']])
+                ->select('id', 'name', 'code', 'image', 'is_variant')
+                ->orderBy('name', 'asc')->get();
         }
 
         $index = 0;
