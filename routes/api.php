@@ -33,6 +33,15 @@ Route::get('/whatsapp/qr', [WhatsAppSessionController::class, 'qr'])
 Route::get('/whatsapp/status', [WhatsAppSessionController::class, 'status'])
     ->name('whatsapp.session.status');
 
+Route::post('/whatsapp/logout', [WhatsAppSessionController::class, 'logout'])
+    ->name('whatsapp.session.logout');
+
+Route::delete('/whatsapp/session', [WhatsAppSessionController::class, 'deleteSession'])
+    ->name('whatsapp.session.delete');
+
+Route::post('/whatsapp/update-session-name', [WhatsAppSessionController::class, 'updateSessionName'])
+    ->name('whatsapp.session.update-name');
+
 // ==================== WhatsApp Messaging Endpoints ====================
 // Mensajes de texto
 Route::post('/v1/messages/text', [WhatsAppMessageController::class, 'sendText'])
@@ -97,3 +106,11 @@ Route::get('/register-customer', [CustomerController::class, 'apiRegister']);
 Route::get('/send-otp', [CustomerController::class, 'apiSendOtp']);
 // Ruta pública GET para verificar OTP: /api/verify-otp?phone=...&code=...
 Route::get('/verify-otp', [CustomerController::class, 'apiVerifyOtp']);
+Route::post('/whatsapp/logout', [WhatsAppSessionController::class, 'logout'])
+    ->name('whatsapp.session.logout');
+
+Route::delete('/whatsapp/session', [WhatsAppSessionController::class, 'deleteSession'])
+    ->name('whatsapp.session.delete');
+
+Route::post('/whatsapp/update-session-name', [WhatsAppSessionController::class, 'updateSessionName'])
+    ->name('whatsapp.session.update-name');

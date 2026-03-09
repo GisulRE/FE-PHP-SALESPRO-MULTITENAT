@@ -251,27 +251,27 @@ class SaleController extends Controller
                 }
 
                 if ($sale->sale_status == 1) {
-                    $nestedData['sale_status'] = '<div class="badge badge-success">' . trans('file.Completed') . '</div>';
+                    $nestedData['sale_status'] = '<span class="badge badge-success">' . trans('file.Completed') . '</span>';
                     $sale_status = trans('file.Completed');
                 } elseif ($sale->sale_status == 2) {
-                    $nestedData['sale_status'] = '<div class="badge badge-danger">' . trans('file.Pending') . '</div>';
+                    $nestedData['sale_status'] = '<span class="badge badge-danger">' . trans('file.Pending') . '</span>';
                     $sale_status = trans('file.Pending');
                 } elseif ($sale->sale_status == 4) {
-                    $nestedData['sale_status'] = '<div class="badge badge-info">' . trans('file.Receivable') . '</div>';
+                    $nestedData['sale_status'] = '<span class="badge badge-info">' . trans('file.Receivable') . '</span>';
                     $sale_status = trans('file.Receivable');
                 } else {
-                    $nestedData['sale_status'] = '<div class="badge badge-warning">' . trans('file.Draft') . '</div>';
+                    $nestedData['sale_status'] = '<span class="badge badge-warning">' . trans('file.Draft') . '</span>';
                     $sale_status = trans('file.Draft');
                 }
 
                 if ($sale->payment_status == 1) {
-                    $nestedData['payment_status'] = '<div class="badge badge-danger">' . trans('file.Pending') . '</div>';
+                    $nestedData['payment_status'] = '<span class="badge badge-danger">' . trans('file.Pending') . '</span>';
                 } elseif ($sale->payment_status == 2) {
-                    $nestedData['payment_status'] = '<div class="badge badge-danger">' . trans('file.Due') . '</div>';
+                    $nestedData['payment_status'] = '<span class="badge badge-danger">' . trans('file.Due') . '</span>';
                 } elseif ($sale->payment_status == 3) {
-                    $nestedData['payment_status'] = '<div class="badge badge-warning">' . trans('file.Partial') . '</div>';
+                    $nestedData['payment_status'] = '<span class="badge badge-warning">' . trans('file.Partial') . '</span>';
                 } else {
-                    $nestedData['payment_status'] = '<div class="badge badge-success">' . trans('file.Paid') . '</div>';
+                    $nestedData['payment_status'] = '<span class="badge badge-success">' . trans('file.Paid') . '</span>';
                 }
 
                 $nestedData['grand_total'] = number_format($sale->grand_total, 2);
@@ -604,6 +604,7 @@ class SaleController extends Controller
 
     public function store(Request $request)
     {
+        $is_ajax = $request->input('_ajax_flag') === '1';
         try {
             DB::beginTransaction();
             $data = $request->all();
@@ -885,6 +886,9 @@ class SaleController extends Controller
             if ($stock_outsale) {
                 //$lims_sale_data->delete();
                 $this->destroy($lims_sale_data->id);
+                if ($is_ajax) {
+                    return response()->json(['status' => false, 'message' => 'Venta Anulada, Revertido por insuficiente stock en uno o mas productos!']);
+                }
                 return redirect()->to('pos')->with('not_permitted', "Venta Anulada, Revertido por insuficiente stock en uno o mas productos!");
             }
             $account_id = null;
@@ -1091,21 +1095,13 @@ class SaleController extends Controller
                     $pago_tranferencia_bancaria->save();
                 }
                 if ($data['monto_deposito'] != null) {
-                    $paying_method = 'Deposito';
-                    $account_field = 'account_id_deposito';
+                    // Determinar QR vs Depósito: primero por tipo_pago_btn (enviado desde el botón POS),
+                    // luego por paid_by_id como fallback (IDs 6 y 11 = QR simple; 7 = Depósito)
+                    $tipo_btn = $data['tipo_pago_btn'] ?? '';
+                    $is_qr = ($tipo_btn === 'qr') || (!$tipo_btn && in_array($data['paid_by_id'] ?? null, [6, 11]));
+                    $paying_method = $is_qr ? 'Qr_simple' : 'Deposito';
+                    $account_field = $is_qr ? 'account_id_qr' : 'account_id_deposito';
                     $payment_method_id = $data['paid_by_id'] ?? 7;
-                    
-                    if ($data['bandera_factura_hidden']) {
-                        $account_field = 'account_id_deposito';
-                    } else {
-                        if ($data['paid_by_id'] == 7) {
-                            $paying_method = 'Deposito';
-                            $account_field = 'account_id_qr'; // Usar QR para depósito sin factura
-                        } else if ($data['paid_by_id'] == 6 || $data['paid_by_id'] == 11) {
-                            $paying_method = 'Qr_simple';
-                            $account_field = 'account_id_qr';
-                        }
-                    }
                     
                     $account_id = $getAccountId($account_field, $payment_method_id);
 
@@ -1482,6 +1478,20 @@ class SaleController extends Controller
                 $obj_cliente->codigo_punto_venta = $data_p_venta->codigo_punto_venta;
                 $obj_cliente->save();
 
+                // En modo AJAX: guardamos la venta y datos del cliente, pero no generamos el DFe aún.
+                // El frontend llama al endpoint finalize-ajax para generar el DFe.
+                if ($is_ajax) {
+                    $update_p_venta->save();
+                    DB::commit();
+                    $print_url = url('sales/gen_invoice/' . $lims_sale_data->id);
+                    $print_html = '<iframe src="' . $print_url . '" style="width:100%; height:500px; border:none;"></iframe>';
+                    return response()->json([
+                        'status'     => true,
+                        'sale_id'    => $lims_sale_data->id,
+                        'print_html' => $print_html,
+                    ]);
+                }
+
                 if ($data['codigo_emision_hidden'] == 3) {
                     $message = $message . '\n Venta facturada en modo masiva. ';
                 } else {
@@ -1556,6 +1566,16 @@ class SaleController extends Controller
                 }
             }
             DB::commit();
+            // Respuesta AJAX para flujo no-SIAT
+            if ($is_ajax) {
+                $print_url = url('sales/gen_invoice/' . $lims_sale_data->id);
+                $print_html = '<iframe src="' . $print_url . '" style="width:100%; height:500px; border:none;"></iframe>';
+                return response()->json([
+                    'status'     => true,
+                    'sale_id'    => $lims_sale_data->id,
+                    'print_html' => $print_html,
+                ]);
+            }
             if ($lims_sale_data->sale_status == '1' || $lims_sale_data->sale_status == '4') {
                 $data['pos'] = $lims_pos_setting_data->print;
                 if ($data['pos']) {
@@ -1578,14 +1598,271 @@ class SaleController extends Controller
             $error_message = 'Falló al registrar la venta';
             
             // Si es petición AJAX, retornar JSON
-            if ($request->ajax() || $request->wantsJson() || (isset($request->ajax_preview) && $request->ajax_preview)) {
+            if ($is_ajax || $request->ajax() || $request->wantsJson() || (isset($request->ajax_preview) && $request->ajax_preview)) {
                 return response()->json([
                     'status' => false,
-                    'message' => $error_message
+                    'message' => $error_message . ': ' . $e->getMessage()
                 ], 500);
             }
             
             return redirect()->to('sales')->with('not_permitted', $error_message);
+        }
+    }
+
+    /**
+     * Endpoint AJAX del POS para crear una venta sin redirigir.
+     * El frontend recibe {status, sale_id, print_html} como JSON.
+     */
+    public function storeAjax(Request $request)
+    {
+        $request->merge(['_ajax_flag' => '1']);
+        return $this->store($request);
+    }
+
+    /**
+     * Endpoint AJAX para finalizar la facturación SIAT de una venta ya guardada.
+     * El frontend llama a este endpoint en el tercer paso del modal.
+     */
+    public function finalizeAjax(Request $request)
+    {
+        try {
+            DB::beginTransaction();
+
+            $sale_id = $request->input('sale_id');
+            if (!$sale_id) {
+                return response()->json(['status' => false, 'message' => 'sale_id requerido']);
+            }
+            $lims_sale_data = Sale::find($sale_id);
+            if (!$lims_sale_data) {
+                return response()->json(['status' => false, 'message' => 'Venta no encontrada']);
+            }
+
+            $data = $request->all();
+
+            // ─── Normalizar campos cuyo hidden nunca es seteado por JS ──────────
+            $tipo_documento_val = max(1, (int) ($data['sales_tipo_documento'] ?? $data['sales_tipo_documento_hidden'] ?? 1));
+            $caso_especial_val  = (int) ($data['sales_caso_especial'] ?? $data['sales_caso_especial_hidden'] ?? 1);
+            $sector_val         = (int) ($data['bandera_codigo_documento_sector_hidden'] ?? 1);
+            $excepcion_val      = (int) ($data['bandera_codigo_excepcion_hidden'] ?? 0);
+            $metodo_pago_val    = max(1, (int) ($data['paid_by_id'] ?? 1));
+
+            // ─── Eliminar CustomerSale previo si existe (reintento) ───────────
+            CustomerSale::where('sale_id', $sale_id)->delete();
+
+            // ─── Complemento documento ────────────────────────────────────────
+            $text_complemento_documento = ($tipo_documento_val == 1)
+                ? ($data['sales_complemento_documento'] ?? null)
+                : null;
+
+            // ─── CustomerNit (upsert) ─────────────────────────────────────────
+            if ($caso_especial_val == 1) {
+                $fecha_hora_actual = new Carbon();
+                $nit_data = CustomerNit::where('tipo_documento', $tipo_documento_val)
+                    ->where('valor_documento', $data['sales_valor_documento'] ?? '')->first();
+                if ($nit_data) {
+                    DB::table('customer_nit')
+                        ->where('tipo_documento', $tipo_documento_val)
+                        ->where('valor_documento', $data['sales_valor_documento'])
+                        ->update([
+                            'razon_social'          => $data['sales_razon_social'] ?? '',
+                            'email'                 => $data['sales_email'] ?? null,
+                            'complemento_documento' => $text_complemento_documento,
+                            'updated_at'            => $fecha_hora_actual,
+                        ]);
+                } else {
+                    DB::table('customer_nit')->insert([
+                        'tipo_documento'        => $tipo_documento_val,
+                        'valor_documento'       => $data['sales_valor_documento'] ?? '',
+                        'complemento_documento' => $text_complemento_documento,
+                        'razon_social'          => $data['sales_razon_social'] ?? '',
+                        'email'                 => $data['sales_email'] ?? null,
+                        'created_at'            => $fecha_hora_actual,
+                        'updated_at'            => $fecha_hora_actual,
+                    ]);
+                }
+            }
+
+            // ─── CustomerSale ─────────────────────────────────────────────────
+            $obj_cliente = new CustomerSale();
+            $obj_cliente->sale_id     = $sale_id;
+            $obj_cliente->customer_id = $data['customer_id'] ?? 1;
+            $obj_cliente->razon_social = $data['sales_razon_social'] ?? 'S/N';
+            $obj_cliente->email        = $data['sales_email'] ?? null;
+            $obj_cliente->codigofijo   = !empty($data['codigo_fijo']) ? $data['codigo_fijo'] : ($data['customer_id'] ?? 1);
+
+            $obj_cliente->tipo_documento          = $tipo_documento_val;
+            $obj_cliente->valor_documento         = $data['sales_valor_documento'] ?? '0';
+            $obj_cliente->complemento_documento   = $text_complemento_documento;
+            $obj_cliente->codigo_excepcion        = $excepcion_val;
+            $obj_cliente->codigo_documento_sector = $sector_val;
+            $obj_cliente->glosa_periodo_facturado = $data['glosa_periodo_facturado'] ?? null;
+            $obj_cliente->usuario                 = Auth::user()->name;
+            $obj_cliente->tipo_caso_especial      = $caso_especial_val;
+            $obj_cliente->tipo_metodo_pago        = $metodo_pago_val;
+
+            // Tarjeta de crédito/débito – enmascarar número
+            if (!empty($data['number_card'])) {
+                $nro_tarjeta    = Str::of($data['number_card'])->replaceMatches('/[^A-Za-z0-9]++/', '');
+                $nro_completo   = Str::substr($nro_tarjeta, 0, 4) . "00000000" . Str::substr($nro_tarjeta, 12, 4);
+                $obj_cliente->numero_tarjeta_credito_debito = $nro_completo;
+            }
+
+            // ─── Punto de venta y correlativo de factura ──────────────────────
+            $biller_id_val = $data['biller_id'] ?? $lims_sale_data->biller_id;
+            $data_biller   = Biller::find($biller_id_val);
+            if (!$data_biller) {
+                DB::rollback();
+                return response()->json(['status' => false, 'message' => 'Biller no encontrado (id: ' . $biller_id_val . ')']);
+            }
+            $data_p_venta = SiatPuntoVenta::where([
+                'sucursal'           => $data_biller->sucursal,
+                'codigo_punto_venta' => $data_biller->punto_venta_siat,
+            ])->first();
+            if (!$data_p_venta) {
+                DB::rollback();
+                return response()->json(['status' => false, 'message' => 'Punto de venta SIAT no encontrado para sucursal ' . $data_biller->sucursal]);
+            }
+            $update_p_venta = SiatPuntoVenta::where([
+                'sucursal'           => $data_biller->sucursal,
+                'codigo_punto_venta' => $data_biller->punto_venta_siat,
+            ])->first();
+
+            if (($data['codigo_emision_hidden'] ?? 0) == 1 && !empty($data['nro_factura_manual'])) {
+                $obj_cliente->nro_factura_manual = $data['nro_factura_manual'];
+                $obj_cliente->fecha_manual       = $data['fecha_manual'];
+                $data_credencial_cafc = CredencialCafc::where('sucursal', $data_p_venta->sucursal)
+                    ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                    ->where('codigo_documento_sector', $obj_cliente->codigo_documento_sector)
+                    ->where('is_active', true)->first();
+                if ($data_credencial_cafc) {
+                    $data_credencial_cafc->correlativo_factura += 1;
+                    $data_credencial_cafc->save();
+                }
+            } else {
+                if ($obj_cliente->codigo_documento_sector == 1) {
+                    $obj_cliente->nro_factura = $data_p_venta->correlativo_factura;
+                    $update_p_venta->correlativo_factura += 1;
+                } elseif ($obj_cliente->codigo_documento_sector == 2) {
+                    $obj_cliente->nro_factura = $data_p_venta->correlativo_alquiler;
+                    $update_p_venta->correlativo_alquiler += 1;
+                } elseif ($obj_cliente->codigo_documento_sector == 13) {
+                    $obj_cliente->nro_factura = $data_p_venta->correlativo_servicios_basicos;
+                    $update_p_venta->correlativo_servicios_basicos += 1;
+                    // Campos exclusivos de servicios básicos
+                    $obj_cliente->gestion                  = $data['gestion'] ?? null;
+                    $obj_cliente->mes                      = $data['mes'] ?? null;
+                    $obj_cliente->ciudad                   = $data['ciudad'] ?? null;
+                    $obj_cliente->zona                     = $data['zona'] ?? null;
+                    $obj_cliente->domicilio_cliente        = $data['domicilio_cliente'] ?? null;
+                    $obj_cliente->consumo_periodo          = $data['consumo_periodo'] ?? null;
+                    $obj_cliente->numero_medidor           = $data['numero_medidor'] ?? null;
+                    $obj_cliente->lectura_medidor_actual   = $data['lectura_medidor_actual'] ?? null;
+                    $obj_cliente->lectura_medidor_anterior = $data['lectura_medidor_anterior'] ?? null;
+                    $obj_cliente->tasa_aseo                = $data['tasa_aseo'] ?? null;
+                    $obj_cliente->tasa_alumbrado           = $data['tasa_alumbrado'] ?? null;
+                    $obj_cliente->otras_tasas              = $data['otras_tasas'] ?? null;
+                    // Ajustes IVA / No IVA
+                    $ajusteDetalleIva = []; $ajusteDetalleNoIva = []; $otrosPagosDetallesNoIva = [];
+                    $ajusteNoSujetoIva = 0; $ajusteSujetoIva = 0; $otrosPagosNoSujetoIva = 0;
+                    if (!empty($data['montoItemIva'])) {
+                        foreach ($data['montoItemIva'] as $key => $montoIva) {
+                            if ($montoIva > 0) { $ajusteSujetoIva += $montoIva; $ajusteDetalleIva[] = [$data["descripcionItemIva"][$key] => floatval($montoIva)]; }
+                        }
+                    }
+                    if (!empty($data['montoItemNoIva'])) {
+                        foreach ($data['montoItemNoIva'] as $key => $montoNoIva) {
+                            if ($montoNoIva > 0) { $ajusteNoSujetoIva += $montoNoIva; $ajusteDetalleNoIva[] = [$data["descripcionItemNoIva"][$key] => floatval($montoNoIva)]; }
+                        }
+                    }
+                    if (!empty($data['otrosMontoItemNoIva'])) {
+                        foreach ($data['otrosMontoItemNoIva'] as $key => $otroMontoNoIva) {
+                            if ($otroMontoNoIva > 0) { $otrosPagosNoSujetoIva += $otroMontoNoIva; $otrosPagosDetallesNoIva[] = [$data["descripcionOtroItemNoIva"][$key] => floatval($otroMontoNoIva)]; }
+                        }
+                    }
+                    $fmtJson = function ($arr) { $j = json_encode($arr); $j = trim($j, "[]"); return str_replace("},{", ",", $j); };
+                    $obj_cliente->ajuste_sujeto_iva                      = (float) $ajusteSujetoIva;
+                    $obj_cliente->detalle_ajuste_sujeto_iva              = $fmtJson($ajusteDetalleIva);
+                    $obj_cliente->ajuste_no_sujeto_iva                   = (float) $ajusteNoSujetoIva;
+                    $obj_cliente->detalle_ajuste_no_sujeto_iva           = $fmtJson($ajusteDetalleNoIva);
+                    $obj_cliente->otros_pagos_no_sujeto_iva              = (float) $otrosPagosNoSujetoIva;
+                    $obj_cliente->detalle_otros_pagos_no_sujeto_iva      = $fmtJson($otrosPagosDetallesNoIva);
+                    if (!empty($data['montoLey1886_hidden']) && $data['montoLey1886_hidden'] > 0) {
+                        $obj_cliente->monto_descuento_ley_1886  = $data['montoLey1886_hidden'];
+                        $obj_cliente->beneficiario_ley_1886     = $data['sales_valor_documento'];
+                    } else { $obj_cliente->monto_descuento_ley_1886 = 0; $obj_cliente->beneficiario_ley_1886 = 0; }
+                    $obj_cliente->monto_descuento_tarifa_dignidad = (!empty($data['montoTasaDignidad_hidden']) && $data['montoTasaDignidad_hidden'] > 0) ? $data['montoTasaDignidad_hidden'] : 0;
+                }
+            }
+
+            // Estado factura según modo emisión
+            if (($data['codigo_emision_hidden'] ?? 0) == 1) $obj_cliente->estado_factura = "CONTINGENCIA";
+            if (($data['codigo_emision_hidden'] ?? 0) == 3) $obj_cliente->estado_factura = "MASIVO";
+
+            $obj_cliente->sucursal           = $data_p_venta->sucursal;
+            $obj_cliente->codigo_punto_venta = $data_p_venta->codigo_punto_venta;
+            $obj_cliente->save();
+
+            // ─── Generación del DFe ───────────────────────────────────────────
+            $respuesta = null;
+
+            if (($data['codigo_emision_hidden'] ?? 0) == 3) {
+                // Modo masivo: no genera DFe en línea
+                $update_p_venta->save();
+                DB::commit();
+                return response()->json([
+                    'status'    => true,
+                    'sale_id'   => $sale_id,
+                    'message'   => 'Venta facturada en modo masiva.',
+                    'print_url' => url('sales/imprimir_factura/' . $sale_id),
+                ]);
+            }
+
+            if ($data_p_venta->modo_contingencia) {
+                $codigoEvento = $this->getTipoEventoContingenciaPuntoVenta($data['biller_id']);
+                if ($obj_cliente->codigo_documento_sector == 1)
+                    $respuesta = $this->generarFacturaIndividualOffline($sale_id, $codigoEvento);
+                elseif ($obj_cliente->codigo_documento_sector == 13)
+                    $respuesta = $this->generarFacturaServicioBasicoOffline($sale_id, $codigoEvento);
+                elseif ($obj_cliente->codigo_documento_sector == 2)
+                    $respuesta = $this->generarFacturaAlquilerOffline($sale_id, $codigoEvento);
+            } else {
+                $lims_pos_setting_data = PosSetting::latest()->first();
+                if ($obj_cliente->codigo_documento_sector == 1) {
+                    if (($lims_pos_setting_data->cufd_centralizado ?? 0) != 0) {
+                        $respuesta = $this->generarFacturaIndividualComisionista($sale_id);
+                    } else {
+                        $respuesta = $this->generarFacturaIndividual($sale_id);
+                    }
+                } elseif ($obj_cliente->codigo_documento_sector == 2) {
+                    $respuesta = $this->generarFacturaIndividualAlquiler($sale_id);
+                } elseif ($obj_cliente->codigo_documento_sector == 13) {
+                    $respuesta = $this->generarFacturaServicioBasico($sale_id);
+                }
+            }
+
+            if ($respuesta && $respuesta['status']) {
+                $update_p_venta->save();
+                DB::commit();
+                return response()->json([
+                    'status'    => true,
+                    'sale_id'   => $sale_id,
+                    'message'   => $respuesta['mensaje'] ?? 'Factura generada correctamente',
+                    'print_url' => url('sales/imprimir_factura/' . $sale_id),
+                ]);
+            }
+
+            // DFe falló: revertir CustomerSale pero mantener la venta
+            $obj_cliente->delete();
+            DB::rollback();
+            return response()->json([
+                'status'  => false,
+                'message' => ($respuesta['mensaje'] ?? 'Error al generar la factura'),
+            ]);
+
+        } catch (\Throwable $e) {
+            DB::rollback();
+            \Log::error("finalizeAjax error: " . $e->getMessage() . " line:" . $e->getLine());
+            return response()->json(['status' => false, 'message' => 'Error: ' . $e->getMessage()]);
         }
     }
 
@@ -3691,7 +3968,16 @@ class SaleController extends Controller
             //$response = $provider->setExpressCheckout($paypal_data);
             $response['paypal_link'] = "#";
             return redirect($response['paypal_link']);
+        } elseif ($data['edit_paid_by_id'] == 6 || $data['edit_paid_by_id'] == 11) {
+            // QR simple — no modifica el campo expense del cliente
+            $lims_payment_data->paying_method = 'Qr_simple';
+        } elseif ($data['edit_paid_by_id'] == 7) {
+            // Depósito explícito
+            $lims_payment_data->paying_method = 'Deposito';
+            $lims_customer_data->expense += $data['edit_amount'];
+            $lims_customer_data->save();
         } else {
+            // Fallback: cualquier otro ID no reconocido
             $lims_payment_data->paying_method = 'Deposito';
             $lims_customer_data->expense += $data['edit_amount'];
             $lims_customer_data->save();

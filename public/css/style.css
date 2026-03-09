@@ -1,3 +1,17 @@
+/* Header fijo */
+header.header {
+	position: fixed;
+	top: 0;
+	right: 0;
+	left: 0;
+	z-index: 1030;
+	width: 100%;
+}
+
+.page {
+	padding-top: 75px;
+}
+
 .logo-container {
 	width: 100px;
 }

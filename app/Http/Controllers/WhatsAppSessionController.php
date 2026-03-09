@@ -290,6 +290,145 @@ class WhatsAppSessionController extends Controller
         }
     }
 
+    /**
+     * Actualiza el nombre/ID de sesión almacenado en PosSetting.
+     * No realiza llamada upstream; solo actualiza la referencia local.
+     *
+     * Endpoint: POST /api/whatsapp/update-session-name
+     */
+    public function updateSessionName(Request $request)
+    {
+        $name = trim((string) $request->input('session_name', ''));
+
+        if ($name === '') {
+            return response()->json([
+                'ok' => false,
+                'message' => 'El nombre de sesión no puede estar vacío.',
+            ], 422);
+        }
+
+        if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $name)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Solo se permiten letras, números, guiones (-) y guiones bajos (_).',
+            ], 422);
+        }
+
+        $posSetting = PosSetting::first();
+        if (!$posSetting) {
+            return response()->json(['ok' => false, 'message' => 'No existe configuración POS.'], 500);
+        }
+
+        $posSetting->whatsapp_session_id = $name;
+        $posSetting->save();
+
+        return response()->json([
+            'ok' => true,
+            'data' => [
+                'message' => 'Nombre de sesión actualizado correctamente.',
+                'session_name' => $name,
+            ],
+        ]);
+    }
+
+    /**
+     * Cierra sesión (logout) en el upstream.
+     *
+     * Endpoint: POST /api/whatsapp/logout
+     */
+    public function logout(Request $request)
+    {
+        $posSetting = PosSetting::first();
+        if (!$posSetting) {
+            return response()->json(['ok' => false, 'message' => 'No existe configuración POS.'], 500);
+        }
+
+        $sessionId = (string) ($posSetting->whatsapp_session_id ?? '');
+        if ($sessionId === '') {
+            return response()->json(['ok' => false, 'message' => 'No hay sesión activa configurada.'], 400);
+        }
+
+        $base = $this->resolveWhatsAppBaseUrl($posSetting);
+        $logoutUrl = rtrim($base, '/') . '/sessions/' . $sessionId . '/logout';
+
+        try {
+            $upstream = Http::timeout(15)->post($logoutUrl);
+            $body = $this->safeJsonOrString($upstream->body());
+
+            Log::info('WhatsApp logout', [
+                'sessionId' => $sessionId,
+                'url' => $logoutUrl,
+                'status' => $upstream->status(),
+            ]);
+
+            return response()->json([
+                'ok' => $upstream->successful(),
+                'data' => [
+                    'message' => $upstream->successful()
+                        ? 'Sesión cerrada exitosamente'
+                        : 'Error al cerrar la sesión en el servicio.',
+                ],
+                'upstreamStatus' => $upstream->status(),
+                'upstreamBody' => $body,
+            ], $upstream->successful() ? 200 : $upstream->status());
+        } catch (\Throwable $e) {
+            Log::error('WhatsApp logout error', ['sessionId' => $sessionId, 'error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'No se pudo cerrar la sesión.'], 502);
+        }
+    }
+
+    /**
+     * Elimina la sesión en el upstream y limpia el registro local.
+     *
+     * Endpoint: DELETE /api/whatsapp/session
+     */
+    public function deleteSession(Request $request)
+    {
+        $posSetting = PosSetting::first();
+        if (!$posSetting) {
+            return response()->json(['ok' => false, 'message' => 'No existe configuración POS.'], 500);
+        }
+
+        $sessionId = (string) ($posSetting->whatsapp_session_id ?? '');
+        if ($sessionId === '') {
+            return response()->json(['ok' => false, 'message' => 'No hay sesión activa configurada.'], 400);
+        }
+
+        $base = $this->resolveWhatsAppBaseUrl($posSetting);
+        $deleteUrl = rtrim($base, '/') . '/sessions/' . $sessionId;
+
+        try {
+            $upstream = Http::timeout(15)->delete($deleteUrl);
+            $body = $this->safeJsonOrString($upstream->body());
+
+            Log::info('WhatsApp deleteSession', [
+                'sessionId' => $sessionId,
+                'url' => $deleteUrl,
+                'status' => $upstream->status(),
+            ]);
+
+            if ($upstream->successful()) {
+                $posSetting->whatsapp_session_id = null;
+                $posSetting->whatsapp_session_last_started_at = null;
+                $posSetting->save();
+            }
+
+            return response()->json([
+                'ok' => $upstream->successful(),
+                'data' => [
+                    'message' => $upstream->successful()
+                        ? 'Sesión eliminada exitosamente'
+                        : 'Error al eliminar la sesión en el servicio.',
+                ],
+                'upstreamStatus' => $upstream->status(),
+                'upstreamBody' => $body,
+            ], $upstream->successful() ? 200 : $upstream->status());
+        } catch (\Throwable $e) {
+            Log::error('WhatsApp deleteSession error', ['sessionId' => $sessionId, 'error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'No se pudo eliminar la sesión.'], 502);
+        }
+    }
+
     private function generateSessionId(): string
     {
         // Evita caracteres especiales: solo alfanumérico

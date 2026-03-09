@@ -317,46 +317,83 @@
     </section>
 
     <!-- Modal WhatsApp -->
-    <div id="modal-whatsapp" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true"
+    <div id="modal-whatsapp" tabindex="-1" role="dialog" aria-labelledby="waModalLabel" aria-hidden="true"
         class="modal fade text-left">
-        <div role="document" class="modal-dialog">
+        <div role="document" class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 id="exampleModalLabel" class="modal-title">Información WhatsApp</h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
+                <div class="modal-header align-items-center">
+                    <h5 id="waModalLabel" class="modal-title mr-2">Información WhatsApp</h5>
+                    <span id="wa-status-badge" class="badge badge-secondary" style="font-size:0.85em;">Sin sesión</span>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close ml-auto"><span
                             aria-hidden="true"><i class="dripicons-cross"></i></span></button>
                 </div>
                 <div class="modal-body">
-                    <p class="italic">
-                        <small>
-                            Este proceso consiste en vincular el numero de WhatsApp al sistema.
-                        </small>
-                    </p>
-                    <div class="row justify-content-center">
-                        <div class="col">
-                            <button type="button" class="iniciar-servicio-whatsapp btn btn-success">Iniciar
-                                Servicio</button>
+
+                    {{-- Nombre de sesión --}}
+                    <div class="form-group mb-2">
+                        <label class="font-weight-bold mb-1" style="font-size:0.9em;">
+                            <i class="dripicons-tag mr-1"></i> Nombre de Sesión
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" id="wa-session-name-input" class="form-control"
+                                placeholder="Ej: mi-sesion-1"
+                                value="{{ $lims_pos_setting_data->whatsapp_session_id ?? '' }}"
+                                pattern="[a-zA-Z0-9_\-]+" maxlength="64">
+                            <div class="input-group-append">
+                                <button type="button" class="guardar-session-name btn btn-outline-primary btn-sm">
+                                    <i class="dripicons-checkmark"></i> Guardar
+                                </button>
+                            </div>
                         </div>
-                        <div class="col">
-                            <button type="button" class="obtener-qr btn btn-success">Obtener QR</button>
+                        <small class="text-muted">Solo letras, números, <code>-</code> y <code>_</code>. Este nombre identifica la sesión en el servicio.</small>
+                    </div>
+
+                    <hr class="mt-2 mb-3">
+
+                    {{-- Botones de acción --}}
+                    <div class="row">
+                        <div class="col-6 col-md-3 mb-2">
+                            <button type="button" class="iniciar-servicio-whatsapp btn btn-success btn-sm btn-block">
+                                <i class="dripicons-power"></i> Iniciar Servicio
+                            </button>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <button type="button" class="obtener-qr btn btn-info btn-sm btn-block">
+                                <i class="dripicons-camera"></i> Obtener QR
+                            </button>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <button type="button" class="logout-whatsapp btn btn-warning btn-sm btn-block">
+                                <i class="dripicons-exit"></i> Cerrar Sesión
+                            </button>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <button type="button" class="eliminar-session-whatsapp btn btn-danger btn-sm btn-block">
+                                <i class="dripicons-trash"></i> Eliminar Sesión
+                            </button>
                         </div>
                     </div>
 
-                    <div id="results" class="hidden mt-3" style="display: none;">
-                        <p class="text-center">Escanee el codigo QR acontinuacion para habilitar el servicio de WhatsApp.
-                        </p>
-                        <p class="text-center">El codigo QR tiene limite de tiempo, con la opcion Obtener QR se puede
-                            obtener el mas reciente.</p>
-                        <p id="whatsappStatus" class="text-center small text-muted" style="margin-bottom: 6px;"></p>
+                    {{-- Panel de estado --}}
+                    <div id="wa-status-panel" class="alert alert-secondary d-flex align-items-center mt-2 mb-0 py-2" style="display:none !important; font-size:0.88em;">
+                        <span class="mr-2" style="font-size:1.1em;">&#9679;</span>
+                        <strong class="mr-1">Estado:</strong>
+                        <span id="whatsappStatus" class="text-muted">—</span>
+                    </div>
+
+                    {{-- QR panel --}}
+                    <div id="results" class="mt-3" style="display: none;">
+                        <p class="text-center small text-muted mb-1">Escanee el código QR para vincular WhatsApp.</p>
+                        <p class="text-center small text-muted mb-2">El código QR tiene límite de tiempo. Use <strong>Obtener QR</strong> para actualizarlo.</p>
                         <div class="text-center">
-                            <img id="resultImage" src="" class="img-fluid" alt="QR code">
+                            <img id="resultImage" src="" class="img-fluid rounded border" alt="QR code" style="max-width:240px;">
                         </div>
                     </div>
 
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-danger"
-                            data-dismiss="modal">{{ __('file.Close') }}</button>
-                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm"
+                        data-dismiss="modal">{{ __('file.Close') }}</button>
                 </div>
             </div>
         </div>
@@ -534,161 +571,59 @@
             });
         });
 
-        // Botón ajax para la iniciación del servicio de WhatsApp.
-        $(document).on("click", ".iniciar-servicio-whatsapp", function(event) {
-            // var url_data = "{{ env('API_BASE_URL') }}/start-client";
-            var url_data = "{{ route('whatsapp.session.start', [], false) }}";
-
-            $("#spinner-div").show(); //Mostrar icon spinner de cargando
-            fetch(url_data, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    // 'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                // body: JSON.stringify({
-                //     image_url: imageUrl
-                // })
-            })
-            .then(async (response) => {
-                let data = null;
-                try {
-                    data = await response.json();
-                } catch (e) {
-                    // ignore json parse errors
-                }
-
-                if (!response.ok) {
-                    const msg = (data && (data.message || data.error)) ? (data.message || data.error) : ("Error iniciando servicio (HTTP " + response.status + ")");
-                    throw new Error(msg);
-                }
-
-                console.log(data);
-                // swal('Servicio de WhatsApp', 'El servicio de WhatsApp esta iniciando, en un momento estara disponible con la opcion: Obtener QR.');
-                startWhatsAppPolling();
-                return downloadQR();
-            })
-            .catch(err => {
-                document.getElementById('results').style.display = 'none';
-                swal('Servicio de WhatsApp', err.message);
-                })
-                .finally(() => {
-                    // loading.classList.add('hidden');
-                    // loadBtn.disabled = false;
-                    $("#spinner-div").hide();
-                });
-        });
-
-        // Botón ajax para obtener qr img file.
-        $(document).on("click", ".obtener-qr", function(event) {
-            startWhatsAppPolling();
-            downloadQR();
-        });
-
-        function downloadQR(silent) {
-            // var url_data = "{{ env('API_BASE_URL') }}/qr";
-            var url_data = "{{ route('whatsapp.session.qr', [], false) }}";
-
-            if (!silent) $("#spinner-div").show();
-            return fetch(url_data, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                })
-                .then(response => {
-                    if (response.status == 404) throw new Error("WhatsApp esta generando el QR, en un momento estara diponible con la opcion: Obtener QR.");
-                    else if (response.status == 400) throw new Error("Servicio WhatsApp requiere la opcion: Iniciar Servicio.");
-                    else if (!response.ok) throw new Error("Error obteniendo QR (HTTP " + response.status + ")");
-                    else if (response.status == 400) throw new Error(
-                        "Servicio WhatsApp requiere la opcion: Iniciar Servicio.");
-                    else return response.blob();
-                })
-                .then(imageBlob => {
-                    const url = URL.createObjectURL(imageBlob);
-                    if (imageBlob != null) this.showResults(url);
-                    // const a = document.createElement('a');
-                    // a.href = url;
-                    // a.download = 'downloaded_image.jpg'; // Specify the desired filename
-                    // document.body.appendChild(a); // Append to body to make it clickable
-                    // a.click(); // Programmatically click the link
-                    // document.body.removeChild(a); // Remove the link
-                    // URL.revokeObjectURL(url); // Release the object URL
-                })
-                .catch(err => {
-                    document.getElementById('results').style.display = 'none';
-                    if (!silent) swal('Servicio de WhatsApp', err.message);
-                })
-                .finally(() => {
-                    if (!silent) $("#spinner-div").hide();
-                });
-        }
-
-        function downloadStatus() {
-            var url_data = "{{ route('whatsapp.session.status', [], false) }}";
-            return fetch(url_data, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(async (response) => {
-                var data = null;
-                try {
-                    data = await response.json();
-                } catch (e) {
-                    data = null;
-                }
-
-                if (!response.ok) {
-                    var msg = (data && (data.message || data.error)) ? (data.message || data.error) : ("Error consultando status (HTTP " + response.status + ")");
-                    throw new Error(msg);
-                }
-
-                var status = data ? (data.status || (data.upstreamBody && data.upstreamBody.data && data.upstreamBody.data.status)) : null;
-                if (status) {
-                    if (isWhatsAppAuthenticated(status)) {
-                        setWhatsAppStatusText('Estado: ' + status + ' (Sesión iniciada)', true);
-                        stopWhatsAppPolling();
-                    } else {
-                        setWhatsAppStatusText('Estado: ' + status, null);
-                    }
-                } else {
-                    setWhatsAppStatusText('Estado: (sin datos)', null);
-                }
-
-                return data;
-            })
-            .catch(err => {
-                setWhatsAppStatusText(err.message, false);
-            });
-        }
-
-        var whatsappTimers = {
-            qr: null,
-            status: null,
+        // ─── WhatsApp: URLs de los endpoints ────────────────────────────────────
+        var waUrls = {
+            start:          "{{ route('whatsapp.session.start', [], false) }}",
+            qr:             "{{ route('whatsapp.session.qr', [], false) }}",
+            status:         "{{ route('whatsapp.session.status', [], false) }}",
+            logout:         "{{ route('whatsapp.session.logout', [], false) }}",
+            deleteSession:  "{{ route('whatsapp.session.delete', [], false) }}",
+            updateName:     "{{ route('whatsapp.session.update-name', [], false) }}",
         };
 
+        // ─── Timers de polling ────────────────────────────────────────────────
+        var whatsappTimers = { qr: null, status: null };
+
         function stopWhatsAppPolling() {
-            if (whatsappTimers.qr) {
-                clearInterval(whatsappTimers.qr);
-                whatsappTimers.qr = null;
-            }
-            if (whatsappTimers.status) {
-                clearInterval(whatsappTimers.status);
-                whatsappTimers.status = null;
-            }
+            if (whatsappTimers.qr)     { clearInterval(whatsappTimers.qr);     whatsappTimers.qr = null; }
+            if (whatsappTimers.status) { clearInterval(whatsappTimers.status); whatsappTimers.status = null; }
         }
 
-        function setWhatsAppStatusText(text, isOk) {
-            var el = document.getElementById('whatsappStatus');
-            if (!el) return;
+        function startWhatsAppPolling() {
+            if (whatsappTimers.status) return; // ya corriendo
+            downloadStatus();
+            whatsappTimers.status = setInterval(downloadStatus, 5000);
+            whatsappTimers.qr = setInterval(function() {
+                if (document.getElementById('results').style.display === 'block') {
+                    downloadQR(true);
+                }
+            }, 60000);
+        }
 
-            el.textContent = text || '';
-            el.classList.remove('text-muted', 'text-success', 'text-danger');
-            if (isOk === true) el.classList.add('text-success');
-            else if (isOk === false) el.classList.add('text-danger');
-            else el.classList.add('text-muted');
+        // ─── Actualizar badge e indicador de estado ───────────────────────────
+        function setWhatsAppStatusText(text, isOk) {
+            var el  = document.getElementById('whatsappStatus');
+            var badge = document.getElementById('wa-status-badge');
+            var panel = document.getElementById('wa-status-panel');
+
+            if (el) {
+                el.textContent = text || '—';
+                el.className = '';
+                if (isOk === true)  el.classList.add('text-success');
+                else if (isOk === false) el.classList.add('text-danger');
+                else el.classList.add('text-muted');
+            }
+
+            // Mostrar/ocultar panel de estado
+            if (panel) panel.style.display = (text && text !== '—') ? 'flex' : 'none';
+
+            if (badge) {
+                badge.textContent = text || 'Sin sesión';
+                badge.className = 'badge';
+                if (isOk === true)       badge.classList.add('badge-success');
+                else if (isOk === false) badge.classList.add('badge-danger');
+                else                     badge.classList.add('badge-warning');
+            }
         }
 
         function isWhatsAppAuthenticated(status) {
@@ -697,26 +632,189 @@
             return (s === 'authenticated' || s === 'connected' || s === 'open' || s === 'ready');
         }
 
-        function startWhatsAppPolling() {
-            if (whatsappTimers.qr || whatsappTimers.status) return;
-
-            whatsappTimers.status = setInterval(function() {
-                downloadStatus();
-            }, 5000);
-
-            whatsappTimers.qr = setInterval(function() {
-                if (document.getElementById('results').style.display === 'block') {
-                    downloadQR(true);
-                }
-            }, 60000);
-
-            downloadStatus();
-        }
+        // ─── Abrir modal → iniciar polling de estado ──────────────────────────
+        $('#modal-whatsapp').on('show.bs.modal', function() {
+            startWhatsAppPolling();
+        });
 
         $('#modal-whatsapp').on('hidden.bs.modal', function() {
             stopWhatsAppPolling();
             setWhatsAppStatusText('', null);
+            document.getElementById('results').style.display = 'none';
         });
+
+        // ─── Iniciar Servicio ─────────────────────────────────────────────────
+        $(document).on("click", ".iniciar-servicio-whatsapp", function() {
+            $("#spinner-div").show();
+            fetch(waUrls.start, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+            .then(async function(response) {
+                var data = null;
+                try { data = await response.json(); } catch(e) {}
+                if (!response.ok) {
+                    var msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('Error iniciando servicio (HTTP ' + response.status + ')');
+                    throw new Error(msg);
+                }
+                // Si devuelve un sessionId nuevo, actualizar el input
+                if (data && data.sessionId) {
+                    document.getElementById('wa-session-name-input').value = data.sessionId;
+                }
+                startWhatsAppPolling();
+                return downloadQR();
+            })
+            .catch(function(err) {
+                document.getElementById('results').style.display = 'none';
+                swal('Servicio de WhatsApp', err.message);
+            })
+            .finally(function() { $("#spinner-div").hide(); });
+        });
+
+        // ─── Obtener QR ───────────────────────────────────────────────────────
+        $(document).on("click", ".obtener-qr", function() {
+            startWhatsAppPolling();
+            downloadQR();
+        });
+
+        // ─── Guardar nombre de sesión ─────────────────────────────────────────
+        $(document).on("click", ".guardar-session-name", function() {
+            var name = $.trim($('#wa-session-name-input').val());
+            if (!name) { swal('Nombre de sesión', 'El nombre no puede estar vacío.'); return; }
+            if (!/^[a-zA-Z0-9_\-]+$/.test(name)) {
+                swal('Nombre de sesión', 'Solo se permiten letras, números, guiones (-) y guiones bajos (_).');
+                return;
+            }
+            $("#spinner-div").show();
+            fetch(waUrls.updateName, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_name: name })
+            })
+            .then(async function(response) {
+                var data = null;
+                try { data = await response.json(); } catch(e) {}
+                if (!response.ok) {
+                    var msg = (data && data.message) ? data.message : ('Error (HTTP ' + response.status + ')');
+                    throw new Error(msg);
+                }
+                swal('Nombre de sesión', (data && data.data && data.data.message) ? data.data.message : 'Guardado correctamente.');
+            })
+            .catch(function(err) { swal('Nombre de sesión', err.message); })
+            .finally(function() { $("#spinner-div").hide(); });
+        });
+
+        // ─── Cerrar Sesión (logout) ───────────────────────────────────────────
+        $(document).on("click", ".logout-whatsapp", function() {
+            swal({
+                title: '¿Cerrar sesión?',
+                text: 'Se cerrará la sesión de WhatsApp en el servicio. Necesitará escanear el QR nuevamente.',
+                icon: 'warning',
+                buttons: {
+                    cancel: { text: 'Cancelar', value: null, visible: true },
+                    confirm: { text: 'Sí, cerrar sesión', value: true, visible: true, className: 'btn-warning' },
+                },
+                dangerMode: false,
+            }).then(function(confirmed) {
+                if (!confirmed) return;
+                $("#spinner-div").show();
+                fetch(waUrls.logout, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                })
+                .then(async function(response) {
+                    var data = null;
+                    try { data = await response.json(); } catch(e) {}
+                    if (!response.ok) {
+                        var msg = (data && data.message) ? data.message : ('Error (HTTP ' + response.status + ')');
+                        throw new Error(msg);
+                    }
+                    var msg = (data && data.data && data.data.message) ? data.data.message : 'Sesión cerrada.';
+                    swal('WhatsApp', msg);
+                    document.getElementById('results').style.display = 'none';
+                    setWhatsAppStatusText('Sesión cerrada', null);
+                    stopWhatsAppPolling();
+                })
+                .catch(function(err) { swal('Error', err.message); })
+                .finally(function() { $("#spinner-div").hide(); });
+            });
+        });
+
+        // ─── Eliminar Sesión ──────────────────────────────────────────────────
+        $(document).on("click", ".eliminar-session-whatsapp", function() {
+            swal({
+                title: '¿Eliminar sesión?',
+                text: 'Se eliminará la sesión permanentemente del servicio y se limpiará la configuración local.',
+                icon: 'warning',
+                buttons: {
+                    cancel: { text: 'Cancelar', value: null, visible: true },
+                    confirm: { text: 'Sí, eliminar', value: true, visible: true, className: 'btn-danger' },
+                },
+                dangerMode: true,
+            }).then(function(confirmed) {
+                if (!confirmed) return;
+                $("#spinner-div").show();
+                fetch(waUrls.deleteSession, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                })
+                .then(async function(response) {
+                    var data = null;
+                    try { data = await response.json(); } catch(e) {}
+                    if (!response.ok) {
+                        var msg = (data && data.message) ? data.message : ('Error (HTTP ' + response.status + ')');
+                        throw new Error(msg);
+                    }
+                    var msg = (data && data.data && data.data.message) ? data.data.message : 'Sesión eliminada.';
+                    swal('WhatsApp', msg);
+                    document.getElementById('wa-session-name-input').value = '';
+                    document.getElementById('results').style.display = 'none';
+                    setWhatsAppStatusText('Sin sesión', null);
+                    stopWhatsAppPolling();
+                })
+                .catch(function(err) { swal('Error', err.message); })
+                .finally(function() { $("#spinner-div").hide(); });
+            });
+        });
+
+        // ─── Descargar QR ─────────────────────────────────────────────────────
+        function downloadQR(silent) {
+            if (!silent) $("#spinner-div").show();
+            return fetch(waUrls.qr, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+            .then(function(response) {
+                if (response.status === 404) throw new Error("WhatsApp está generando el QR, en un momento estará disponible con la opción: Obtener QR.");
+                if (response.status === 400) throw new Error("Servicio WhatsApp requiere la opción: Iniciar Servicio.");
+                if (!response.ok) throw new Error("Error obteniendo QR (HTTP " + response.status + ")");
+                return response.blob();
+            })
+            .then(function(imageBlob) {
+                if (imageBlob) showResults(URL.createObjectURL(imageBlob));
+            })
+            .catch(function(err) {
+                document.getElementById('results').style.display = 'none';
+                if (!silent) swal('Servicio de WhatsApp', err.message);
+            })
+            .finally(function() { if (!silent) $("#spinner-div").hide(); });
+        }
+
+        // ─── Consultar estado en el upstream ─────────────────────────────────
+        function downloadStatus() {
+            fetch(waUrls.status, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+            .then(async function(response) {
+                var data = null;
+                try { data = await response.json(); } catch(e) {}
+                if (!response.ok) {
+                    var msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('Error status (HTTP ' + response.status + ')');
+                    throw new Error(msg);
+                }
+                var status = data ? (data.status || (data.upstreamBody && data.upstreamBody.data && data.upstreamBody.data.status)) : null;
+                if (status) {
+                    var authenticated = isWhatsAppAuthenticated(status);
+                    setWhatsAppStatusText(status + (authenticated ? ' ✓' : ''), authenticated ? true : null);
+                    if (authenticated) stopWhatsAppPolling();
+                } else {
+                    setWhatsAppStatusText('(sin datos)', null);
+                }
+            })
+            .catch(function(err) { setWhatsAppStatusText(err.message, false); });
+        }
 
         function showResults(objectURL) {
             document.getElementById('resultImage').src = objectURL;

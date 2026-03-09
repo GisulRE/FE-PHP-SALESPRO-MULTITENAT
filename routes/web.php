@@ -174,6 +174,8 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::post('importsale', 'SaleController@importSale')->name('sale.import');
 	// WhatsApp: Enviar factura por WhatsApp
 	Route::post('sales/send-invoice-whatsapp', 'SaleController@sendInvoiceWhatsApp')->name('sales.send-invoice-whatsapp');
+	Route::post('sales/store-ajax', 'SaleController@storeAjax')->name('sales.store-ajax');
+	Route::post('sales/finalize-ajax', 'SaleController@finalizeAjax')->name('sales.finalize-ajax');
 	Route::get('pos', 'SaleController@posSale')->name('sale.pos');
 	// Endpoint para obtener datos de factura por CUF (SIAT / local fallback)
 	Route::get('factura.venta/datos-factura', 'SaleController@datosFactura');

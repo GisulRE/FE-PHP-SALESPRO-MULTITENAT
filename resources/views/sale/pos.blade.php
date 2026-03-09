@@ -1544,6 +1544,7 @@
                                                     {{-- listaMetodoDePagos --}}
                                                     <div class="col-md-6 mt-1">
                                                         <input type="hidden" name="paid_by_id">
+                                                        <input type="hidden" name="tipo_pago_btn">
                                                         <input type="hidden" name="monto_efectivo">
                                                         <input type="hidden" name="monto_tarjeta">
                                                         <input type="hidden" name="monto_cheque">
@@ -2727,6 +2728,16 @@
     @include('sale.partials-sale-modal-tabla-coincidencia-nit')
 
     <style>
+        /* Header del POS: sticky dentro de su columna, no fixed en todo el viewport */
+        header.header {
+            position: sticky;
+            top: 0;
+            left: auto;
+            right: auto;
+            width: 100%;
+            z-index: 1030;
+        }
+
         /* Estilos para modal de pago #add-payment */
         #add-payment label {
             font-size: 0.875rem;
@@ -3918,6 +3929,7 @@
 
         $("#deposit-btn").on("click", function() {
             $("#number_card").prop("required", false)
+            $('input[name="tipo_pago_btn"]').val('deposito');
             if (bandera_siat == 1)
                 $('select[name="paid_by_id_select"]').val(8);
             else
@@ -3931,6 +3943,7 @@
 
         $("#qrsimple-btn").on("click", function() {
             $("#number_card").prop("required", false)
+            $('input[name="tipo_pago_btn"]').val('qr');
             if (bandera_siat == 1)
                 $('select[name="paid_by_id_select"]').val(8);
             else
@@ -3943,6 +3956,7 @@
 
         $("#qrcash-btn").on("click", function() {
             $("#number_card").prop("required", false)
+            $('input[name="tipo_pago_btn"]').val('qrcash');
             if (bandera_siat == 1)
                 $('select[name="paid_by_id_select"]').val(14);
             else
@@ -3955,7 +3969,167 @@
             bloqueoSegundoTabs();
         });
 
+        // stepper: cuando se abre el modal, forzar primer paso y gestionar textos
+        $('#add-payment').on('shown.bs.modal', function() {
+            // activar primer paso
+            $('#myTab a[href="#primerTab"]').tab('show');
+            // re-deshabilitar tabs de pasos siguientes para un inicio limpio
+            $('#tab_preview, #tab_billing, #tab_final').addClass('disabled');
+            // siempre iniciar el switch de facturar en OFF
+            if ($('#toggle-event').length) {
+                try { $('#toggle-event').bootstrapToggle('off'); } catch(e) {
+                    $('#toggle-event').prop('checked', false);
+                }
+            }
+            // si existe la pestaña de facturación, mostrar 'Siguiente'
+            if ($('#segundoTab').length) {
+                $('#submit-btn').text('Siguiente');
+            } else {
+                $('#submit-btn').text('Confirmar Venta');
+            }
+        });
+
+        // actualizar texto del botón según pestaña activa
+        $('#myTab a').on('shown.bs.tab', function(e) {
+            var target = $(e.target).attr('href');
+            if (target == '#primerTab') {
+                if ($('#segundoTab').length) $('#submit-btn').text('Siguiente');
+                else $('#submit-btn').text('Confirmar Venta');
+            } else if (target == '#segundoTab') {
+                $('#submit-btn').text('Siguiente');
+            } else if (target == '#tercerTab') {
+                $('#submit-btn').text('Finalizar e Imprimir');
+            } else if (target == '#cuartoTab') {
+                $('#submit-btn').text('Cerrar');
+            }
+        });
+
+        // botón confirmarVenta / avanzar entre pasos (con AJAX preview y finalize)
         $("#submit-btn").on("click", function(e) {
+            // 0) Si estamos en cuarto paso -> simplemente cerrar el modal
+            if ($('.tab-pane#cuartoTab').hasClass('show')) {
+                e.preventDefault();
+                $('#add-payment').modal('hide');
+                return;
+            }
+
+            // 1) Sin SIAT: interceptar, crear venta via AJAX y abrir recibo en la misma página
+            if (!$('#segundoTab').length) {
+                e.preventDefault();
+                $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
+                var formData = $('#formPayment').serializeArray();
+                formData.push({ name: 'ajax_preview', value: 1 });
+                formData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
+                try { $('#spinner-div').show(); } catch (err) {}
+                $.post('{{ url("sales/store-ajax") }}', formData)
+                    .done(function(res) {
+                        try { $('#spinner-div').hide(); } catch (err) {}
+                        if (res.status) {
+                            window.location.href = '{{ url("sales/gen_invoice") }}/' + res.sale_id;
+                        } else {
+                            Swal.fire('Error', res.message || 'Error al procesar la venta', 'error');
+                        }
+                    }).fail(function() {
+                        try { $('#spinner-div').hide(); } catch (err) {}
+                        Swal.fire('Error', 'Error de red', 'error');
+                    });
+                return;
+            }
+
+            // 1b) Con SIAT: primer paso -> crear venta en modo preview via AJAX y mostrar imprimible
+            if ($('#segundoTab').length && $('.tab-pane#primerTab').hasClass('show')) {
+                e.preventDefault();
+                $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
+                var formData = $('#formPayment').serializeArray();
+                formData.push({ name: 'ajax_preview', value: 1 });
+                formData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
+                try { $('#spinner-div').show(); } catch (err) {}
+                $.post('{{ url("sales/store-ajax") }}', formData)
+                    .done(function(res) {
+                        try { $('#spinner-div').hide(); } catch (err) {}
+                        if (res.status) {
+                            $('input[name="ajax_sale_id"]').val(res.sale_id);
+                            $('#print_preview_container').html(res.print_html);
+                            // habilitar pestañas siguientes
+                            $('#tab_preview').removeClass('disabled');
+                            $('#tab_billing').removeClass('disabled');
+                            $('#tab_final').removeClass('disabled');
+                            $('#myTab a[href="#segundoTab"]').tab('show');
+                        } else {
+                            Swal.fire('Error', res.message || 'Error al generar vista previa', 'error');
+                        }
+                    }).fail(function() {
+                        try { $('#spinner-div').hide(); } catch (err) {}
+                        Swal.fire('Error', 'Error de red', 'error');
+                    });
+                return;
+            }
+
+            // 2) Si estamos en segundo paso (preview) -> avanzar a datos de facturación
+            if ($('#segundoTab').length && $('.tab-pane#segundoTab').hasClass('show')) {
+                e.preventDefault();
+                $('#myTab a[href="#tercerTab"]').tab('show');
+                return;
+            }
+
+            // 3) Si estamos en tercer paso -> finalizar facturación via AJAX y mostrar resultado
+            if ($('.tab-pane#tercerTab').hasClass('show')) {
+                e.preventDefault();
+                var finalizeData = $('#formPayment').serializeArray();
+                finalizeData.push({ name: 'sale_id', value: $('input[name="ajax_sale_id"]').val() });
+                finalizeData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
+                try { $('#spinner-div').show(); } catch (err) {}
+                $.post('{{ url("sales/finalize-ajax") }}', finalizeData)
+                    .done(function(res) {
+                        try { $('#spinner-div').hide(); } catch (err) {}
+                        if (res.status) {
+                            $('#final_print_message').text(res.message || 'Facturación completada');
+                            if (res.print_url) {
+                                $.get(res.print_url, function(html) {
+                                    $('#final_print_container').html(html);
+                                }).fail(function() {
+                                    $('#final_print_link').attr('href', res.print_url).show();
+                                    $('#final_print_message').text('Error al cargar vista previa. Use el botón para abrir la factura.');
+                                });
+                                $('#final_print_link').attr('href', res.print_url).text('Abrir en nueva ventana').show();
+                            }
+                            $('#tab_final').removeClass('disabled');
+                            $('#myTab a[href="#cuartoTab"]').tab('show');
+                            $('#submit-btn').text('Cerrar');
+                            try {
+                                product_price = [];
+                                product_discount = [];
+                                tax_rate = [];
+                                tax_name = [];
+                                tax_method = [];
+                                unit_name = [];
+                                unit_operator = [];
+                                unit_operation_value = [];
+                                product_description = [];
+                                $('table.order-list tbody').empty();
+                                $('input[name="total_qty"]').val(0);
+                                $('input[name="total_price"]').val('0.00');
+                                $('input[name="grand_total"]').val('0.00');
+                                $('#item').text(0);
+                                $('#subtotal').text('0.00');
+                                $('#grand-total').text('0.00');
+                                $('#tips').text('0.00');
+                                $('#discount').text('0.00');
+                                $('#tax').text('0.00');
+                                $('#shipping-cost').text('0.00');
+                                $('#coupon-text').text('0.00');
+                                emp_temp = false;
+                            } catch (err) {}
+                        } else {
+                            Swal.fire('Error', res.message || 'Error al finalizar facturación', 'error');
+                        }
+                    }).fail(function() {
+                        try { $('#spinner-div').hide(); } catch (err) {}
+                        Swal.fire('Error', 'Error de red', 'error');
+                    });
+                return;
+            }
+
             if ($("#number_card").prop('required') == true && ($("#number_card").val() == null || $("#number_card")
                     .val() == '' || $("#number_card").val().length < 19)) {
                 Swal.fire('Error Validación', 'Campo Tarjeta de Credito/Debito Nulo ó Incompleto, Ingrese un valor',
