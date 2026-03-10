@@ -329,66 +329,285 @@
                 </div>
                 <div class="modal-body">
 
-                    {{-- Nombre de sesión --}}
-                    <div class="form-group mb-2">
-                        <label class="font-weight-bold mb-1" style="font-size:0.9em;">
-                            <i class="dripicons-tag mr-1"></i> Nombre de Sesión
-                        </label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" id="wa-session-name-input" class="form-control"
-                                placeholder="Ej: mi-sesion-1"
-                                value="{{ $lims_pos_setting_data->whatsapp_session_id ?? '' }}"
-                                pattern="[a-zA-Z0-9_\-]+" maxlength="64">
-                            <div class="input-group-append">
-                                <button type="button" class="guardar-session-name btn btn-outline-primary btn-sm">
-                                    <i class="dripicons-checkmark"></i> Guardar
+                    {{-- ══════════════════════════════════════════════════ --}}
+                    {{-- PANEL DE AUTENTICACIÓN (registro / login de cuenta) --}}
+                    {{-- ══════════════════════════════════════════════════ --}}
+                    <div id="wa-auth-panel" style="{{ $lims_pos_setting_data->whatsapp_access_token ? 'display:none' : '' }}">
+                        <p class="text-muted small mb-3">
+                            <i class="dripicons-information mr-1"></i>
+                            Crea o inicia sesión en tu cuenta del servicio WhatsApp para gestionar instancias de tu empresa.
+                        </p>
+
+                        <ul class="nav nav-tabs mb-3" id="waAuthTabs" role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link active" id="wa-tab-login-link" data-toggle="tab"
+                                    href="#wa-tab-login" role="tab">
+                                    <i class="dripicons-enter mr-1"></i> Iniciar Sesión
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="wa-tab-register-link" data-toggle="tab"
+                                    href="#wa-tab-register" role="tab">
+                                    <i class="dripicons-user-group mr-1"></i> Registrar Cuenta
+                                </a>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            {{-- Tab: Login --}}
+                            <div id="wa-tab-login" class="tab-pane fade show active" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Usuario</label>
+                                            <input type="text" id="wa-login-username" class="form-control form-control-sm"
+                                                placeholder="username" autocomplete="off">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Contraseña</label>
+                                            <input type="password" id="wa-login-password" class="form-control form-control-sm"
+                                                placeholder="••••••••" autocomplete="current-password">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-primary btn-sm btn-block wa-btn-login">
+                                    <i class="dripicons-enter"></i> Iniciar Sesión
+                                </button>
+                            </div>
+
+                            {{-- Tab: Registro --}}
+                            <div id="wa-tab-register" class="tab-pane fade" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">NIT / RUC</label>
+                                            <input type="text" id="wa-reg-nit" class="form-control form-control-sm"
+                                                placeholder="900123456-7">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Nombre empresa</label>
+                                            <input type="text" id="wa-reg-businessName" class="form-control form-control-sm"
+                                                placeholder="Mi Empresa S.A.">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Sucursal</label>
+                                            <input type="text" id="wa-reg-sucursal" class="form-control form-control-sm"
+                                                placeholder="Principal">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Dirección</label>
+                                            <input type="text" id="wa-reg-address" class="form-control form-control-sm"
+                                                placeholder="Calle 123 #45-67">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Teléfono</label>
+                                            <input type="text" id="wa-reg-phone" class="form-control form-control-sm"
+                                                placeholder="+591 7xxxxxxx">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Correo empresa</label>
+                                            <input type="email" id="wa-reg-companyEmail" class="form-control form-control-sm"
+                                                placeholder="contacto@empresa.com">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Usuario admin</label>
+                                            <input type="text" id="wa-reg-username" class="form-control form-control-sm"
+                                                placeholder="admin">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Nombre</label>
+                                            <input type="text" id="wa-reg-firstName" class="form-control form-control-sm"
+                                                placeholder="Juan">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Apellido</label>
+                                            <input type="text" id="wa-reg-lastName" class="form-control form-control-sm"
+                                                placeholder="Pérez">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold">Correo admin</label>
+                                            <input type="email" id="wa-reg-email" class="form-control form-control-sm"
+                                                placeholder="admin@empresa.com">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <div class="form-group mb-3">
+                                            <label class="small font-weight-bold">Contraseña</label>
+                                            <input type="password" id="wa-reg-password" class="form-control form-control-sm"
+                                                placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-success btn-sm btn-block wa-btn-register">
+                                    <i class="dripicons-user-group"></i> Registrar Cuenta
                                 </button>
                             </div>
                         </div>
-                        <small class="text-muted">Solo letras, números, <code>-</code> y <code>_</code>. Este nombre identifica la sesión en el servicio.</small>
                     </div>
 
-                    <hr class="mt-2 mb-3">
+                    {{-- ══════════════════════════════════════════════════ --}}
+                    {{-- PANEL DE SESIÓN (gestión de instancias WhatsApp) --}}
+                    {{-- ══════════════════════════════════════════════════ --}}
+                    <div id="wa-session-wrapper" style="{{ $lims_pos_setting_data->whatsapp_access_token ? '' : 'display:none' }}">
 
-                    {{-- Botones de acción --}}
-                    <div class="row">
-                        <div class="col-6 col-md-3 mb-2">
-                            <button type="button" class="iniciar-servicio-whatsapp btn btn-success btn-sm btn-block">
-                                <i class="dripicons-power"></i> Iniciar Servicio
-                            </button>
-                        </div>
-                        <div class="col-6 col-md-3 mb-2">
-                            <button type="button" class="obtener-qr btn btn-info btn-sm btn-block">
-                                <i class="dripicons-camera"></i> Obtener QR
-                            </button>
-                        </div>
-                        <div class="col-6 col-md-3 mb-2">
-                            <button type="button" class="logout-whatsapp btn btn-warning btn-sm btn-block">
-                                <i class="dripicons-exit"></i> Cerrar Sesión
-                            </button>
-                        </div>
-                        <div class="col-6 col-md-3 mb-2">
-                            <button type="button" class="eliminar-session-whatsapp btn btn-danger btn-sm btn-block">
-                                <i class="dripicons-trash"></i> Eliminar Sesión
-                            </button>
-                        </div>
-                    </div>
+                        {{-- ── Vista: lista de sesiones ── --}}
+                        <div id="wa-sessions-list-view">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong style="font-size:0.9em;"><i class="dripicons-list mr-1"></i> Sesiones activas</strong>
+                                <button type="button" class="btn btn-link btn-sm p-0 wa-reload-sessions" title="Recargar">
+                                    <i class="dripicons-clockwise"></i>
+                                </button>
+                            </div>
 
-                    {{-- Panel de estado --}}
-                    <div id="wa-status-panel" class="alert alert-secondary d-flex align-items-center mt-2 mb-0 py-2" style="display:none !important; font-size:0.88em;">
-                        <span class="mr-2" style="font-size:1.1em;">&#9679;</span>
-                        <strong class="mr-1">Estado:</strong>
-                        <span id="whatsappStatus" class="text-muted">—</span>
-                    </div>
+                            {{-- Tabla de sesiones --}}
+                            <div id="wa-sessions-table-wrap" style="max-height:180px;overflow-y:auto;">
+                                <table class="table table-sm table-hover mb-0" style="font-size:0.82em;">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th>Sesión</th>
+                                            <th class="text-center">Estado</th>
+                                            <th class="text-center">Principal</th>
+                                            <th class="text-center">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="wa-sessions-tbody">
+                                        <tr><td colspan="3" class="text-center text-muted py-2">Cargando…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
 
-                    {{-- QR panel --}}
-                    <div id="results" class="mt-3" style="display: none;">
-                        <p class="text-center small text-muted mb-1">Escanee el código QR para vincular WhatsApp.</p>
-                        <p class="text-center small text-muted mb-2">El código QR tiene límite de tiempo. Use <strong>Obtener QR</strong> para actualizarlo.</p>
-                        <div class="text-center">
-                            <img id="resultImage" src="" class="img-fluid rounded border" alt="QR code" style="max-width:240px;">
+                            <hr class="my-3">
+
+                            {{-- Nueva sesión --}}
+                            <div class="form-group mb-2">
+                                <label class="font-weight-bold mb-1" style="font-size:0.88em;">
+                                    <i class="dripicons-plus mr-1"></i> Nueva sesión
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" id="wa-new-session-name" class="form-control"
+                                        placeholder="Ej: sucursal-1"
+                                        pattern="[a-zA-Z0-9_\-]+" maxlength="64">
+                                    <div class="input-group-append">
+                                        <button type="button" id="wa-btn-start-new" class="btn btn-success btn-sm">
+                                            <i class="dripicons-power"></i> Iniciar
+                                        </button>
+                                    </div>
+                                </div>
+                                <small class="text-muted">Solo letras, números, <code>-</code> y <code>_</code>.</small>
+                            </div>
+                        </div>{{-- /wa-sessions-list-view --}}
+
+                        {{-- ── Vista: detalle de una sesión ── --}}
+                        <div id="wa-session-detail-view" style="display:none;">
+                            <div class="d-flex align-items-center mb-2">
+                                <button type="button" id="wa-btn-back-list" class="btn btn-link btn-sm p-0 mr-2">
+                                    <i class="dripicons-arrow-thin-left"></i> Volver
+                                </button>
+                                <strong id="wa-detail-session-name" style="font-size:0.9em;"></strong>
+                            </div>
+
+                            {{-- Botones de acción --}}
+                            <div class="row mb-2">
+                                <div class="col-6 col-md-3 mb-2">
+                                    <button type="button" class="obtener-qr btn btn-info btn-sm btn-block">
+                                        <i class="dripicons-camera"></i> Obtener QR
+                                    </button>
+                                </div>
+                                <div class="col-6 col-md-3 mb-2">
+                                    <button type="button" class="logout-whatsapp btn btn-warning btn-sm btn-block">
+                                        <i class="dripicons-exit"></i> Cerrar Sesión
+                                    </button>
+                                </div>
+                                <div class="col-6 col-md-3 mb-2">
+                                    <button type="button" class="eliminar-session-whatsapp btn btn-danger btn-sm btn-block">
+                                        <i class="dripicons-trash"></i> Eliminar
+                                    </button>
+                                </div>
+                                <div class="col-6 col-md-3 mb-2">
+                                    <button type="button" class="wa-btn-set-primary btn btn-outline-primary btn-sm btn-block">
+                                        <i class="dripicons-star"></i> Principal
+                                    </button>
+                                </div>
+                            </div>
+
+                            {{-- Panel de estado --}}
+                            <div id="wa-status-panel" class="alert alert-secondary d-flex align-items-center mb-0 py-2" style="display:none !important; font-size:0.88em;">
+                                <span class="mr-2" style="font-size:1.1em;">&#9679;</span>
+                                <strong class="mr-1">Estado:</strong>
+                                <span id="whatsappStatus" class="text-muted">—</span>
+                            </div>
+
+                            {{-- QR panel --}}
+                            <div id="results" class="mt-3" style="display: none;">
+                                <p class="text-center small text-muted mb-1">Escanee el código QR para vincular WhatsApp.</p>
+                                <p class="text-center small text-muted mb-2">El código QR tiene límite de tiempo. Use <strong>Obtener QR</strong> para actualizarlo.</p>
+                                <div class="text-center">
+                                    <img id="resultImage" src="" class="img-fluid rounded border" alt="QR code" style="max-width:240px;">
+                                </div>
+                            </div>
+
+                            {{-- Panel API Key (Session Token) --}}
+                            <div class="mt-3 border rounded p-2" style="background:#f8f9fa;">
+                                <p class="mb-1" style="font-size:0.85em;font-weight:600;">
+                                    <i class="dripicons-lock"></i> API Key (Session Token)
+                                </p>
+                                <p class="text-muted mb-2" style="font-size:0.78em;">
+                                    Genera un token JWT para enviar mensajes de WhatsApp desde integraciones externas.
+                                    Úsalo como cabecera <code>Authorization: Bearer &lt;token&gt;</code>.
+                                </p>
+                                <div class="d-flex mb-2">
+                                    <button type="button" id="wa-btn-gen-token" class="btn btn-success btn-sm mr-2">
+                                        <i class="dripicons-plus"></i> Generar API Key
+                                    </button>
+                                    <button type="button" id="wa-btn-revoke-token" class="btn btn-outline-danger btn-sm">
+                                        <i class="dripicons-minus"></i> Revocar
+                                    </button>
+                                </div>
+                                <div id="wa-token-result" style="display:none;">
+                                    <div class="input-group input-group-sm">
+                                        <textarea id="wa-token-value" class="form-control form-control-sm font-monospace"
+                                               readonly rows="4" style="font-size:0.72em;background:#fff;resize:none;"></textarea>
+                                        <div class="input-group-append">
+                                            <button type="button" id="wa-btn-copy-token" class="btn btn-outline-secondary btn-sm">
+                                                <i class="dripicons-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="text-muted mt-1 mb-0" style="font-size:0.72em;">
+                                        Guarda este token en un lugar seguro. No se mostrará de nuevo hasta que generes uno nuevo.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>{{-- /wa-session-detail-view --}}
+
+                        {{-- Desconectar cuenta --}}
+                        <div class="text-right mt-3">
+                            <button type="button" class="btn btn-link btn-sm text-danger p-0 wa-btn-auth-logout">
+                                <i class="dripicons-exit"></i> Desconectar cuenta del servicio
+                            </button>
                         </div>
-                    </div>
+
+                    </div>{{-- /wa-session-wrapper --}}
 
                 </div>
                 <div class="modal-footer py-2">
@@ -572,14 +791,23 @@
         });
 
         // ─── WhatsApp: URLs de los endpoints ────────────────────────────────────
+        var waSessionsLocalBase = "{{ url('/api/whatsapp/sessions') }}";
         var waUrls = {
+            authRegister:   "{{ route('whatsapp.auth.register', [], false) }}",
+            authLogin:      "{{ route('whatsapp.auth.login', [], false) }}",
+            authLogout:     "{{ route('whatsapp.auth.logout', [], false) }}",
+            authRefresh:    "{{ route('whatsapp.auth.refresh', [], false) }}",
             start:          "{{ route('whatsapp.session.start', [], false) }}",
             qr:             "{{ route('whatsapp.session.qr', [], false) }}",
             status:         "{{ route('whatsapp.session.status', [], false) }}",
             logout:         "{{ route('whatsapp.session.logout', [], false) }}",
             deleteSession:  "{{ route('whatsapp.session.delete', [], false) }}",
-            updateName:     "{{ route('whatsapp.session.update-name', [], false) }}",
+            listSessions:   "{{ route('whatsapp.sessions.list', [], false) }}",
+            activateSess:   "{{ route('whatsapp.sessions.activate', [], false) }}",
         };
+
+        // ─── Estado multi-sesión ─────────────────────────────────────────────
+        var waSelectedSession = null;
 
         // ─── Timers de polling ────────────────────────────────────────────────
         var whatsappTimers = { qr: null, status: null };
@@ -599,6 +827,261 @@
                 }
             }, 60000);
         }
+
+        // ─── Lista de sesiones ────────────────────────────────────────────────
+        function loadWaSessions() {
+            fetch(waUrls.listSessions, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+            .then(async function(r) {
+                var data = null;
+                try { data = await r.json(); } catch(e) {}
+                if (data && data.sessions) renderWaSessions(data.sessions);
+                else document.getElementById('wa-sessions-tbody').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-2">Sin sesiones registradas.</td></tr>';
+            })
+            .catch(function() {
+                document.getElementById('wa-sessions-tbody').innerHTML = '<tr><td colspan="3" class="text-center text-danger py-2">Error al cargar sesiones.</td></tr>';
+            });
+        }
+
+        function renderWaSessions(sessions) {
+            var tbody = document.getElementById('wa-sessions-tbody');
+            if (!sessions || sessions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-2">Sin sesiones. Crea una nueva abajo.</td></tr>';
+                return;
+            }
+            var statusMap = {
+                'connected': '<span class="badge badge-success">connected</span>',
+                'authenticated': '<span class="badge badge-success">authenticated</span>',
+                'connecting': '<span class="badge badge-warning">connecting</span>',
+                'starting': '<span class="badge badge-info">starting</span>',
+            };
+            var html = '';
+            sessions.forEach(function(s) {
+                var upStatus = s.upstream_status || null;
+                var statusBadge = upStatus
+                    ? (statusMap[upStatus.toLowerCase()] || '<span class="badge badge-secondary">' + upStatus + '</span>')
+                    : '<span class="badge badge-light text-muted">—</span>';
+                var primaryBadge = s.is_active
+                    ? '<span class="badge badge-success"><i class="dripicons-star"></i> Principal</span>'
+                    : '<button type="button" class="btn btn-outline-secondary btn-xs wa-set-primary-btn" data-name="' + s.session_name + '" style="font-size:0.75em;padding:1px 5px;">Activar</button>';
+                html += '<tr data-id="' + s.id + '" data-name="' + s.session_name + '">' +
+                    '<td><a href="#" class="wa-open-session-link" data-name="' + s.session_name + '">' + s.session_name + '</a></td>' +
+                    '<td class="text-center">' + statusBadge + '</td>' +
+                    '<td class="text-center">' + primaryBadge + '</td>' +
+                    '<td class="text-center" style="white-space:nowrap;">' +
+                        '<button type="button" class="btn btn-link btn-sm p-0 text-primary wa-open-session-btn mr-2" data-name="' + s.session_name + '" title="Gestionar"><i class="dripicons-settings"></i></button>' +
+                        '<button type="button" class="btn btn-link btn-sm p-0 text-danger wa-delete-local-btn" data-id="' + s.id + '" data-name="' + s.session_name + '" title="Eliminar de BD"><i class="dripicons-trash"></i></button>' +
+                    '</td>' +
+                '</tr>';
+            });
+            tbody.innerHTML = html;
+        }
+
+        function openWaSession(name) {
+            waSelectedSession = name;
+            document.getElementById('wa-detail-session-name').textContent = name;
+            document.getElementById('wa-sessions-list-view').style.display = 'none';
+            document.getElementById('wa-session-detail-view').style.display = '';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('wa-token-result').style.display = 'none';
+            document.getElementById('wa-token-value').value = '';
+            setWhatsAppStatusText('', null);
+            stopWhatsAppPolling();
+            startWhatsAppPolling();
+        }
+
+        function backToSessionList() {
+            stopWhatsAppPolling();
+            setWhatsAppStatusText('', null);
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('wa-token-result').style.display = 'none';
+            document.getElementById('wa-token-value').value = '';
+            waSelectedSession = null;
+            document.getElementById('wa-session-detail-view').style.display = 'none';
+            document.getElementById('wa-sessions-list-view').style.display = '';
+            loadWaSessions();
+        }
+
+        // ─── Handlers de lista ────────────────────────────────────────────────
+        $(document).on('click', '.wa-open-session-link, .wa-open-session-btn', function(e) {
+            e.preventDefault();
+            openWaSession($(this).data('name'));
+        });
+
+        $(document).on('click', '.wa-set-primary-btn', function() {
+            var name = $(this).data('name');
+            $("#spinner-div").show();
+            fetch(waUrls.activateSess, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                body: JSON.stringify({ session_name: name })
+            })
+            .then(async function(r) {
+                var data = null;
+                try { data = await r.json(); } catch(e) {}
+                swal('WhatsApp', (data && data.message) ? data.message : 'Sesión principal actualizada.');
+                loadWaSessions();
+            })
+            .catch(function() { swal('Error', 'No se pudo activar la sesión.'); })
+            .finally(function() { $("#spinner-div").hide(); });
+        });
+
+        $(document).on('click', '.wa-reload-sessions', function() { loadWaSessions(); });
+
+        // ─── Eliminar sesión de BD local ──────────────────────────────────────
+        $(document).on('click', '.wa-delete-local-btn', function(e) {
+            e.stopPropagation();
+            var id   = $(this).data('id');
+            var name = $(this).data('name');
+            swal({
+                title: '¿Eliminar registro?',
+                text: 'Se eliminará "' + name + '" del registro local (BD). La sesión en el servicio NO se eliminará.',
+                icon: 'warning',
+                buttons: {
+                    cancel:  { text: 'Cancelar', value: null, visible: true },
+                    confirm: { text: 'Sí, eliminar', value: true, visible: true, className: 'btn-danger' },
+                },
+                dangerMode: true,
+            }).then(function(confirmed) {
+                if (!confirmed) return;
+                $("#spinner-div").show();
+                fetch(waSessionsLocalBase + '/' + id + '/local', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': $("meta[name='csrf-token']").attr('content') },
+                })
+                .then(async function(r) {
+                    var data = null;
+                    try { data = await r.json(); } catch(e) {}
+                    if (!r.ok) throw new Error((data && data.message) ? data.message : 'Error al eliminar.');
+                    $('tr[data-id="' + id + '"]').fadeOut(300, function() { $(this).remove(); });
+                    swal('WhatsApp', data.message || 'Registro eliminado.');
+                })
+                .catch(function(err) { swal('Error', err.message); })
+                .finally(function() { $("#spinner-div").hide(); });
+            });
+        });
+
+        $(document).on('click', '#wa-btn-back-list', function() { backToSessionList(); });
+
+        // ─── Marcar como principal desde detalle ──────────────────────────────
+        $(document).on('click', '.wa-btn-set-primary', function() {
+            if (!waSelectedSession) return;
+            $("#spinner-div").show();
+            fetch(waUrls.activateSess, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                body: JSON.stringify({ session_name: waSelectedSession })
+            })
+            .then(async function(r) {
+                var data = null;
+                try { data = await r.json(); } catch(e) {}
+                swal('WhatsApp', (data && data.message) ? data.message : 'Sesión marcada como principal.');
+            })
+            .catch(function() { swal('Error', 'No se pudo activar la sesión.'); })
+            .finally(function() { $("#spinner-div").hide(); });
+        });
+
+        // ─── Generar API Key (session token) ─────────────────────────────────
+        $(document).on('click', '#wa-btn-gen-token', function() {
+            if (!waSelectedSession) return;
+            $("#spinner-div").show();
+            var url = waSessionsLocalBase.replace(/\/$/, '') + '/../sessions/' + encodeURIComponent(waSelectedSession) + '/token';
+            // Construimos la URL limpiamente
+            url = '/api/whatsapp/sessions/' + encodeURIComponent(waSelectedSession) + '/token';
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                }
+            })
+            .then(async function(r) {
+                var data = null;
+                try { data = await r.json(); } catch(e) {}
+                if (!r.ok) {
+                    var errMsg = (data && (data.message || data.error)) ? (data.message || data.error) : ('Error HTTP ' + r.status);
+                    throw new Error(errMsg);
+                }
+                // Mostrar el JSON completo tal como lo retorna el servidor
+                $('#wa-token-value').val(JSON.stringify(data, null, 2));
+                $('#wa-token-result').show();
+            })
+            .catch(function(err) { swal('API Key', 'Error: ' + err.message); })
+            .finally(function() { $("#spinner-div").hide(); });
+        });
+
+        // ─── Revocar API Key (session token) ─────────────────────────────────
+        $(document).on('click', '#wa-btn-revoke-token', function() {
+            if (!waSelectedSession) return;
+            swal({
+                title: '¿Revocar API Key?',
+                text: 'El token actual dejará de funcionar inmediatamente.',
+                icon: 'warning',
+                buttons: ['Cancelar', 'Revocar'],
+                dangerMode: true,
+            }).then(function(confirmed) {
+                if (!confirmed) return;
+                $("#spinner-div").show();
+                var url = '/api/whatsapp/sessions/' + encodeURIComponent(waSelectedSession) + '/token';
+                fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    }
+                })
+                .then(async function(r) {
+                    var data = null;
+                    try { data = await r.json(); } catch(e) {}
+                    $('#wa-token-result').hide();
+                    $('#wa-token-value').val('');
+                    swal('API Key', (data && data.message) ? data.message : 'Token revocado correctamente.');
+                })
+                .catch(function() { swal('Error', 'No se pudo revocar el token.'); })
+                .finally(function() { $("#spinner-div").hide(); });
+            });
+        });
+
+        // ─── Copiar API Key al portapapeles ───────────────────────────────────
+        $(document).on('click', '#wa-btn-copy-token', function() {
+            var val = $('#wa-token-value').val();
+            if (!val) return;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(val).then(function() {
+                    swal('Copiado', 'Token copiado al portapapeles.', 'success');
+                });
+            } else {
+                var el = document.getElementById('wa-token-value');
+                el.select();
+                document.execCommand('copy');
+                swal('Copiado', 'Token copiado al portapapeles.', 'success');
+            }
+        });
+
+        // ─── Iniciar nueva sesión ─────────────────────────────────────────────
+        $(document).on('click', '#wa-btn-start-new', function() {
+            var name = $.trim($('#wa-new-session-name').val());
+            if (name && !/^[a-zA-Z0-9_\-]+$/.test(name)) {
+                swal('Nueva sesión', 'Solo letras, números, guiones (-) y guiones bajos (_).');
+                return;
+            }
+            $("#spinner-div").show();
+            var url = waUrls.start + (name ? '?session_name=' + encodeURIComponent(name) : '');
+            fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+            .then(async function(response) {
+                var data = null;
+                try { data = await response.json(); } catch(e) {}
+                if (!response.ok) {
+                    var msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('Error (HTTP ' + response.status + ')');
+                    throw new Error(msg);
+                }
+                var sessionId = (data && data.sessionId) ? data.sessionId : (name || '');
+                $('#wa-new-session-name').val('');
+                openWaSession(sessionId);
+                return downloadQR();
+            })
+            .catch(function(err) { swal('Iniciar sesión', err.message); })
+            .finally(function() { $("#spinner-div").hide(); });
+        });
 
         // ─── Actualizar badge e indicador de estado ───────────────────────────
         function setWhatsAppStatusText(text, isOk) {
@@ -632,9 +1115,132 @@
             return (s === 'authenticated' || s === 'connected' || s === 'open' || s === 'ready');
         }
 
-        // ─── Abrir modal → iniciar polling de estado ──────────────────────────
+        // ─── Mostrar/ocultar paneles de auth vs sesión ───────────────────────
+        function showWaAuthPanel() {
+            document.getElementById('wa-auth-panel').style.display = '';
+            document.getElementById('wa-session-wrapper').style.display = 'none';
+            setWhatsAppStatusText('', null);
+            stopWhatsAppPolling();
+        }
+
+        function showWaSessionPanel() {
+            document.getElementById('wa-auth-panel').style.display = 'none';
+            document.getElementById('wa-session-wrapper').style.display = '';
+            // Mostrar lista de sesiones al entrar al panel
+            document.getElementById('wa-sessions-list-view').style.display = '';
+            document.getElementById('wa-session-detail-view').style.display = 'none';
+            loadWaSessions();
+        }
+
+        // ─── Login de cuenta ──────────────────────────────────────────────────
+        $(document).on('click', '.wa-btn-login', function() {
+            var username = $.trim($('#wa-login-username').val());
+            var password = $('#wa-login-password').val();
+            if (!username || !password) { swal('Iniciar Sesión', 'Ingresa usuario y contraseña.'); return; }
+            $("#spinner-div").show();
+            fetch(waUrls.authLogin, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                body: JSON.stringify({ username: username, password: password })
+            })
+            .then(async function(response) {
+                var data = null;
+                try { data = await response.json(); } catch(e) {}
+                if (!response.ok) {
+                    var msg = (data && data.message) ? data.message : ('Error al iniciar sesión (HTTP ' + response.status + ')');
+                    throw new Error(msg);
+                }
+                swal('WhatsApp', data.message || 'Sesión de cuenta iniciada.');
+                showWaSessionPanel();
+                startWhatsAppPolling();
+            })
+            .catch(function(err) { swal('Error', err.message); })
+            .finally(function() { $("#spinner-div").hide(); });
+        });
+
+        // ─── Registro de cuenta ───────────────────────────────────────────────
+        $(document).on('click', '.wa-btn-register', function() {
+            var payload = {
+                nit:          $.trim($('#wa-reg-nit').val()),
+                businessName: $.trim($('#wa-reg-businessName').val()),
+                sucursal:     $.trim($('#wa-reg-sucursal').val()),
+                address:      $.trim($('#wa-reg-address').val()),
+                phone:        $.trim($('#wa-reg-phone').val()),
+                companyEmail: $.trim($('#wa-reg-companyEmail').val()),
+                username:     $.trim($('#wa-reg-username').val()),
+                email:        $.trim($('#wa-reg-email').val()),
+                password:     $('#wa-reg-password').val(),
+                firstName:    $.trim($('#wa-reg-firstName').val()),
+                lastName:     $.trim($('#wa-reg-lastName').val()),
+            };
+            for (var key in payload) {
+                if (!payload[key]) {
+                    swal('Registrar Cuenta', 'Completa todos los campos del formulario.');
+                    return;
+                }
+            }
+            if (payload.password.length < 8) {
+                swal('Registrar Cuenta', 'La contraseña debe tener al menos 8 caracteres.');
+                return;
+            }
+            $("#spinner-div").show();
+            fetch(waUrls.authRegister, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                body: JSON.stringify(payload)
+            })
+            .then(async function(response) {
+                var data = null;
+                try { data = await response.json(); } catch(e) {}
+                if (!response.ok) {
+                    var msg = (data && data.message) ? data.message : ('Error al registrar (HTTP ' + response.status + ')');
+                    throw new Error(msg);
+                }
+                swal('WhatsApp', data.message || 'Cuenta registrada exitosamente.');
+                showWaSessionPanel();
+                startWhatsAppPolling();
+            })
+            .catch(function(err) { swal('Error', err.message); })
+            .finally(function() { $("#spinner-div").hide(); });
+        });
+
+        // ─── Desconectar cuenta del servicio ─────────────────────────────────
+        $(document).on('click', '.wa-btn-auth-logout', function() {
+            swal({
+                title: '¿Desconectar cuenta?',
+                text: 'Se eliminarán los tokens de acceso guardados. Tendrás que volver a iniciar sesión.',
+                icon: 'warning',
+                buttons: { cancel: { text: 'Cancelar', value: null, visible: true }, confirm: { text: 'Sí, desconectar', value: true, visible: true, className: 'btn-danger' } },
+                dangerMode: true,
+            }).then(function(confirmed) {
+                if (!confirmed) return;
+                $("#spinner-div").show();
+                fetch(waUrls.authLogout, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                })
+                .then(async function(response) {
+                    var data = null;
+                    try { data = await response.json(); } catch(e) {}
+                    if (!response.ok) throw new Error((data && data.message) ? data.message : 'Error');
+                    document.getElementById('results').style.display = 'none';
+                    showWaAuthPanel();
+                    swal('WhatsApp', data.message || 'Cuenta desconectada.');
+                })
+                .catch(function(err) { swal('Error', err.message); })
+                .finally(function() { $("#spinner-div").hide(); });
+            });
+        });
+
+        // ─── Abrir modal → cargar lista si hay cuenta autenticada ────────────
         $('#modal-whatsapp').on('show.bs.modal', function() {
-            startWhatsAppPolling();
+            var hasAccount = document.getElementById('wa-session-wrapper').style.display !== 'none';
+            if (hasAccount) {
+                // Asegurar que empieza en la vista de lista
+                document.getElementById('wa-sessions-list-view').style.display = '';
+                document.getElementById('wa-session-detail-view').style.display = 'none';
+                loadWaSessions();
+            }
         });
 
         $('#modal-whatsapp').on('hidden.bs.modal', function() {
@@ -643,66 +1249,15 @@
             document.getElementById('results').style.display = 'none';
         });
 
-        // ─── Iniciar Servicio ─────────────────────────────────────────────────
-        $(document).on("click", ".iniciar-servicio-whatsapp", function() {
-            $("#spinner-div").show();
-            fetch(waUrls.start, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
-            .then(async function(response) {
-                var data = null;
-                try { data = await response.json(); } catch(e) {}
-                if (!response.ok) {
-                    var msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('Error iniciando servicio (HTTP ' + response.status + ')');
-                    throw new Error(msg);
-                }
-                // Si devuelve un sessionId nuevo, actualizar el input
-                if (data && data.sessionId) {
-                    document.getElementById('wa-session-name-input').value = data.sessionId;
-                }
-                startWhatsAppPolling();
-                return downloadQR();
-            })
-            .catch(function(err) {
-                document.getElementById('results').style.display = 'none';
-                swal('Servicio de WhatsApp', err.message);
-            })
-            .finally(function() { $("#spinner-div").hide(); });
-        });
-
-        // ─── Obtener QR ───────────────────────────────────────────────────────
+        // ─── Obtener QR (desde detalle de sesión) ────────────────────────────
         $(document).on("click", ".obtener-qr", function() {
             startWhatsAppPolling();
             downloadQR();
         });
 
-        // ─── Guardar nombre de sesión ─────────────────────────────────────────
-        $(document).on("click", ".guardar-session-name", function() {
-            var name = $.trim($('#wa-session-name-input').val());
-            if (!name) { swal('Nombre de sesión', 'El nombre no puede estar vacío.'); return; }
-            if (!/^[a-zA-Z0-9_\-]+$/.test(name)) {
-                swal('Nombre de sesión', 'Solo se permiten letras, números, guiones (-) y guiones bajos (_).');
-                return;
-            }
-            $("#spinner-div").show();
-            fetch(waUrls.updateName, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_name: name })
-            })
-            .then(async function(response) {
-                var data = null;
-                try { data = await response.json(); } catch(e) {}
-                if (!response.ok) {
-                    var msg = (data && data.message) ? data.message : ('Error (HTTP ' + response.status + ')');
-                    throw new Error(msg);
-                }
-                swal('Nombre de sesión', (data && data.data && data.data.message) ? data.data.message : 'Guardado correctamente.');
-            })
-            .catch(function(err) { swal('Nombre de sesión', err.message); })
-            .finally(function() { $("#spinner-div").hide(); });
-        });
-
         // ─── Cerrar Sesión (logout) ───────────────────────────────────────────
         $(document).on("click", ".logout-whatsapp", function() {
+            if (!waSelectedSession) { swal('WhatsApp', 'Selecciona primero una sesión.'); return; }
             swal({
                 title: '¿Cerrar sesión?',
                 text: 'Se cerrará la sesión de WhatsApp en el servicio. Necesitará escanear el QR nuevamente.',
@@ -715,9 +1270,9 @@
             }).then(function(confirmed) {
                 if (!confirmed) return;
                 $("#spinner-div").show();
-                fetch(waUrls.logout, {
+                fetch(waUrls.logout + '?session_name=' + encodeURIComponent(waSelectedSession), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                 })
                 .then(async function(response) {
                     var data = null;
@@ -739,9 +1294,10 @@
 
         // ─── Eliminar Sesión ──────────────────────────────────────────────────
         $(document).on("click", ".eliminar-session-whatsapp", function() {
+            if (!waSelectedSession) { swal('WhatsApp', 'Selecciona primero una sesión.'); return; }
             swal({
                 title: '¿Eliminar sesión?',
-                text: 'Se eliminará la sesión permanentemente del servicio y se limpiará la configuración local.',
+                text: 'Se eliminará la sesión "' + waSelectedSession + '" permanentemente del servicio.',
                 icon: 'warning',
                 buttons: {
                     cancel: { text: 'Cancelar', value: null, visible: true },
@@ -751,9 +1307,9 @@
             }).then(function(confirmed) {
                 if (!confirmed) return;
                 $("#spinner-div").show();
-                fetch(waUrls.deleteSession, {
+                fetch(waUrls.deleteSession + '?session_name=' + encodeURIComponent(waSelectedSession), {
                     method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                 })
                 .then(async function(response) {
                     var data = null;
@@ -764,10 +1320,7 @@
                     }
                     var msg = (data && data.data && data.data.message) ? data.data.message : 'Sesión eliminada.';
                     swal('WhatsApp', msg);
-                    document.getElementById('wa-session-name-input').value = '';
-                    document.getElementById('results').style.display = 'none';
-                    setWhatsAppStatusText('Sin sesión', null);
-                    stopWhatsAppPolling();
+                    backToSessionList();
                 })
                 .catch(function(err) { swal('Error', err.message); })
                 .finally(function() { $("#spinner-div").hide(); });
@@ -777,7 +1330,8 @@
         // ─── Descargar QR ─────────────────────────────────────────────────────
         function downloadQR(silent) {
             if (!silent) $("#spinner-div").show();
-            return fetch(waUrls.qr, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+            var qrUrl = waUrls.qr + (waSelectedSession ? '?session_name=' + encodeURIComponent(waSelectedSession) : '');
+            return fetch(qrUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
             .then(function(response) {
                 if (response.status === 404) throw new Error("WhatsApp está generando el QR, en un momento estará disponible con la opción: Obtener QR.");
                 if (response.status === 400) throw new Error("Servicio WhatsApp requiere la opción: Iniciar Servicio.");
@@ -796,7 +1350,8 @@
 
         // ─── Consultar estado en el upstream ─────────────────────────────────
         function downloadStatus() {
-            fetch(waUrls.status, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+            var statusUrl = waUrls.status + (waSelectedSession ? '?session_name=' + encodeURIComponent(waSelectedSession) : '');
+            fetch(statusUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
             .then(async function(response) {
                 var data = null;
                 try { data = await response.json(); } catch(e) {}

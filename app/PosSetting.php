@@ -46,6 +46,8 @@ class PosSetting extends Model
         "url_whatsapp",
         "whatsapp_session_id",
         "whatsapp_session_last_started_at",
+        "whatsapp_access_token",
+        "whatsapp_refresh_token",
         "require_transfer_authorization",
         "company_id"
     ];

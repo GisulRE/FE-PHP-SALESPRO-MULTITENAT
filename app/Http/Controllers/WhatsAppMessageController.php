@@ -1,8 +1,9 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers;
 
 use App\PosSetting;
+use App\WhatsAppSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -44,7 +45,7 @@ class WhatsAppMessageController extends Controller
         $url = "{$baseUrl}/messages/text";
 
         try {
-            $response = Http::timeout(30)->post($url, [
+            $response = $this->authorizedHttp(30)->post($url, [
                 'sessionId' => $sessionId,
                 'to' => $request->input('to'),
                 'text' => $request->input('text'),
@@ -129,7 +130,7 @@ class WhatsAppMessageController extends Controller
                 $payload['caption'] = $request->input('caption');
             }
 
-            $response = Http::timeout(60)->post($url, $payload);
+            $response = $this->authorizedHttp(60)->post($url, $payload);
             $body = $this->safeJsonOrString($response->body());
 
             Log::info('WhatsApp sendDocument', [
@@ -207,7 +208,7 @@ class WhatsAppMessageController extends Controller
                 $multipart[] = ['name' => 'caption', 'contents' => $request->input('caption')];
             }
 
-            $response = Http::timeout(60)->asMultipart()->post($url, $multipart);
+            $response = $this->authorizedHttp(60)->asMultipart()->post($url, $multipart);
             $body = $this->safeJsonOrString($response->body());
 
             Log::info('WhatsApp sendDocumentUpload', [
@@ -279,7 +280,7 @@ class WhatsAppMessageController extends Controller
                 $payload['caption'] = $request->input('caption');
             }
 
-            $response = Http::timeout(60)->post($url, $payload);
+            $response = $this->authorizedHttp(60)->post($url, $payload);
             $body = $this->safeJsonOrString($response->body());
 
             Log::info('WhatsApp sendImage', [
@@ -357,7 +358,7 @@ class WhatsAppMessageController extends Controller
                 $multipart[] = ['name' => 'caption', 'contents' => $request->input('caption')];
             }
 
-            $response = Http::timeout(60)->asMultipart()->post($url, $multipart);
+            $response = $this->authorizedHttp(60)->asMultipart()->post($url, $multipart);
             $body = $this->safeJsonOrString($response->body());
 
             Log::info('WhatsApp sendImageUpload', [
@@ -430,7 +431,7 @@ class WhatsAppMessageController extends Controller
                 $payload['ptt'] = filter_var($request->input('ptt'), FILTER_VALIDATE_BOOLEAN);
             }
 
-            $response = Http::timeout(60)->post($url, $payload);
+            $response = $this->authorizedHttp(60)->post($url, $payload);
             $body = $this->safeJsonOrString($response->body());
 
             Log::info('WhatsApp sendAudio', [
@@ -509,7 +510,7 @@ class WhatsAppMessageController extends Controller
                 $multipart[] = ['name' => 'ptt', 'contents' => $ptt ? 'true' : 'false'];
             }
 
-            $response = Http::timeout(60)->asMultipart()->post($url, $multipart);
+            $response = $this->authorizedHttp(60)->asMultipart()->post($url, $multipart);
             $body = $this->safeJsonOrString($response->body());
 
             Log::info('WhatsApp sendAudioUpload', [
@@ -586,7 +587,7 @@ class WhatsAppMessageController extends Controller
                 $payload['gifPlayback'] = filter_var($request->input('gifPlayback'), FILTER_VALIDATE_BOOLEAN);
             }
 
-            $response = Http::timeout(90)->post($url, $payload);
+            $response = $this->authorizedHttp(90)->post($url, $payload);
             $body = $this->safeJsonOrString($response->body());
 
             Log::info('WhatsApp sendVideo', [
@@ -670,7 +671,7 @@ class WhatsAppMessageController extends Controller
                 $multipart[] = ['name' => 'gifPlayback', 'contents' => $gifPlayback ? 'true' : 'false'];
             }
 
-            $response = Http::timeout(90)->asMultipart()->post($url, $multipart);
+            $response = $this->authorizedHttp(90)->asMultipart()->post($url, $multipart);
             $body = $this->safeJsonOrString($response->body());
 
             Log::info('WhatsApp sendVideoUpload', [
@@ -697,7 +698,308 @@ class WhatsAppMessageController extends Controller
         }
     }
 
+    /**
+     * Envía una ubicación.
+     *
+     * POST /api/v1/messages/location
+     * Body: { sessionId, to, latitude, longitude, name?, address? }
+     */
+    public function sendLocation(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'sessionId' => 'nullable|string',
+            'to'        => 'required|string',
+            'latitude'  => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'name'      => 'nullable|string|max:255',
+            'address'   => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'ok'      => false,
+                'message' => 'Datos inválidos.',
+                'errors'  => $validator->errors(),
+            ], 400);
+        }
+
+        $sessionId = $this->resolveSessionId($request->input('sessionId'));
+        if (!$sessionId) {
+            return response()->json(['ok' => false, 'message' => 'No hay sesión de WhatsApp activa.'], 400);
+        }
+
+        $payload = [
+            'sessionId' => $sessionId,
+            'to'        => $request->input('to'),
+            'latitude'  => (float) $request->input('latitude'),
+            'longitude' => (float) $request->input('longitude'),
+        ];
+        if ($request->filled('name'))    { $payload['name']    = $request->input('name'); }
+        if ($request->filled('address')) { $payload['address'] = $request->input('address'); }
+
+        try {
+            $response = $this->authorizedHttp(30)->post("{$this->getWhatsAppBaseUrl()}/messages/location", $payload);
+            $body = $this->safeJsonOrString($response->body());
+            Log::info('WhatsApp sendLocation', ['sessionId' => $sessionId, 'to' => $request->input('to'), 'status' => $response->status()]);
+            return response()->json(['ok' => $response->successful(), 'upstreamStatus' => $response->status(), 'upstreamBody' => $body], $response->status());
+        } catch (\Throwable $e) {
+            Log::error('WhatsApp sendLocation error', ['error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'Error al enviar ubicación.', 'error' => $e->getMessage()], 502);
+        }
+    }
+
+    /**
+     * Envía un contacto (vCard).
+     *
+     * POST /api/v1/messages/contact
+     * Body: { sessionId, to, vcard }
+     */
+    public function sendContact(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'sessionId' => 'nullable|string',
+            'to'        => 'required|string',
+            'vcard'     => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['ok' => false, 'message' => 'Datos inválidos.', 'errors' => $validator->errors()], 400);
+        }
+
+        $sessionId = $this->resolveSessionId($request->input('sessionId'));
+        if (!$sessionId) {
+            return response()->json(['ok' => false, 'message' => 'No hay sesión de WhatsApp activa.'], 400);
+        }
+
+        try {
+            $response = $this->authorizedHttp(30)->post("{$this->getWhatsAppBaseUrl()}/messages/contact", [
+                'sessionId' => $sessionId,
+                'to'        => $request->input('to'),
+                'vcard'     => $request->input('vcard'),
+            ]);
+            $body = $this->safeJsonOrString($response->body());
+            Log::info('WhatsApp sendContact', ['sessionId' => $sessionId, 'to' => $request->input('to'), 'status' => $response->status()]);
+            return response()->json(['ok' => $response->successful(), 'upstreamStatus' => $response->status(), 'upstreamBody' => $body], $response->status());
+        } catch (\Throwable $e) {
+            Log::error('WhatsApp sendContact error', ['error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'Error al enviar contacto.', 'error' => $e->getMessage()], 502);
+        }
+    }
+
+    /**
+     * Envía un mensaje con botones interactivos.
+     *
+     * POST /api/v1/messages/buttons
+     * Body: { sessionId, to, text, buttons: [{id, text},...], footer? }
+     */
+    public function sendButtons(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'sessionId'      => 'nullable|string',
+            'to'             => 'required|string',
+            'text'           => 'required|string',
+            'buttons'        => 'required|array|min:1|max:3',
+            'buttons.*.id'   => 'required|string',
+            'buttons.*.text' => 'required|string',
+            'footer'         => 'nullable|string|max:60',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['ok' => false, 'message' => 'Datos inválidos.', 'errors' => $validator->errors()], 400);
+        }
+
+        $sessionId = $this->resolveSessionId($request->input('sessionId'));
+        if (!$sessionId) {
+            return response()->json(['ok' => false, 'message' => 'No hay sesión de WhatsApp activa.'], 400);
+        }
+
+        $payload = [
+            'sessionId' => $sessionId,
+            'to'        => $request->input('to'),
+            'text'      => $request->input('text'),
+            'buttons'   => $request->input('buttons'),
+        ];
+        if ($request->filled('footer')) { $payload['footer'] = $request->input('footer'); }
+
+        try {
+            $response = $this->authorizedHttp(30)->post("{$this->getWhatsAppBaseUrl()}/messages/buttons", $payload);
+            $body = $this->safeJsonOrString($response->body());
+            Log::info('WhatsApp sendButtons', ['sessionId' => $sessionId, 'to' => $request->input('to'), 'status' => $response->status()]);
+            return response()->json(['ok' => $response->successful(), 'upstreamStatus' => $response->status(), 'upstreamBody' => $body], $response->status());
+        } catch (\Throwable $e) {
+            Log::error('WhatsApp sendButtons error', ['error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'Error al enviar mensaje con botones.', 'error' => $e->getMessage()], 502);
+        }
+    }
+
+    /**
+     * Envía un mensaje con lista interactiva.
+     *
+     * POST /api/v1/messages/list
+     * Body: { sessionId, to, text, title, buttonText, sections: [{title, rows:[{id,title,description?}]}], footer? }
+     */
+    public function sendList(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'sessionId'                        => 'nullable|string',
+            'to'                               => 'required|string',
+            'text'                             => 'required|string',
+            'title'                            => 'required|string|max:60',
+            'buttonText'                       => 'required|string|max:20',
+            'sections'                         => 'required|array|min:1',
+            'sections.*.title'                 => 'nullable|string',
+            'sections.*.rows'                  => 'required|array|min:1',
+            'sections.*.rows.*.id'             => 'required|string',
+            'sections.*.rows.*.title'          => 'required|string',
+            'sections.*.rows.*.description'    => 'nullable|string',
+            'footer'                           => 'nullable|string|max:60',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['ok' => false, 'message' => 'Datos inválidos.', 'errors' => $validator->errors()], 400);
+        }
+
+        $sessionId = $this->resolveSessionId($request->input('sessionId'));
+        if (!$sessionId) {
+            return response()->json(['ok' => false, 'message' => 'No hay sesión de WhatsApp activa.'], 400);
+        }
+
+        $payload = [
+            'sessionId'  => $sessionId,
+            'to'         => $request->input('to'),
+            'text'       => $request->input('text'),
+            'title'      => $request->input('title'),
+            'buttonText' => $request->input('buttonText'),
+            'sections'   => $request->input('sections'),
+        ];
+        if ($request->filled('footer')) { $payload['footer'] = $request->input('footer'); }
+
+        try {
+            $response = $this->authorizedHttp(30)->post("{$this->getWhatsAppBaseUrl()}/messages/list", $payload);
+            $body = $this->safeJsonOrString($response->body());
+            Log::info('WhatsApp sendList', ['sessionId' => $sessionId, 'to' => $request->input('to'), 'status' => $response->status()]);
+            return response()->json(['ok' => $response->successful(), 'upstreamStatus' => $response->status(), 'upstreamBody' => $body], $response->status());
+        } catch (\Throwable $e) {
+            Log::error('WhatsApp sendList error', ['error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'Error al enviar lista interactiva.', 'error' => $e->getMessage()], 502);
+        }
+    }
+
+    /**
+     * Envío masivo de mensajes (bulk).
+     *
+     * POST /api/v1/messages/bulk
+     * Body: { messages: [...], delay? (ms between each) }
+     */
+    public function sendBulk(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'messages'         => 'required|array|min:1',
+            'messages.*.to'    => 'required|string',
+            'messages.*.text'  => 'required|string',
+            'messages.*.sessionId' => 'nullable|string',
+            'delay'            => 'nullable|integer|min:0|max:60000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['ok' => false, 'message' => 'Datos inválidos.', 'errors' => $validator->errors()], 400);
+        }
+
+        $defaultSessionId = $this->resolveSessionId(null);
+
+        // Asegurar que cada mensaje tenga sessionId
+        $messages = collect($request->input('messages'))->map(function ($msg) use ($defaultSessionId) {
+            if (empty($msg['sessionId'])) {
+                $msg['sessionId'] = $defaultSessionId;
+            }
+            return $msg;
+        })->values()->all();
+
+        $payload = ['messages' => $messages];
+        if ($request->filled('delay')) {
+            $payload['delay'] = (int) $request->input('delay');
+        }
+
+        try {
+            $response = $this->authorizedHttp(120)->post("{$this->getWhatsAppBaseUrl()}/messages/bulk", $payload);
+            $body = $this->safeJsonOrString($response->body());
+            Log::info('WhatsApp sendBulk', ['count' => count($messages), 'status' => $response->status()]);
+            return response()->json(['ok' => $response->successful(), 'upstreamStatus' => $response->status(), 'upstreamBody' => $body], $response->status());
+        } catch (\Throwable $e) {
+            Log::error('WhatsApp sendBulk error', ['error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'Error en envío masivo.', 'error' => $e->getMessage()], 502);
+        }
+    }
+
+    /**
+     * Verifica si un número está registrado en WhatsApp.
+     *
+     * GET /api/v1/sessions/{sessionId}/check-number/{phone}
+     */
+    public function checkNumber(Request $request, string $phone)
+    {
+        $sessionId = $this->resolveSessionId($request->query('sessionId'));
+        if (!$sessionId) {
+            return response()->json(['ok' => false, 'message' => 'No hay sesión de WhatsApp activa.'], 400);
+        }
+
+        // Sanitizar: solo dígitos y +
+        $phone = preg_replace('/[^\d+]/', '', $phone);
+        if (empty($phone)) {
+            return response()->json(['ok' => false, 'message' => 'Número de teléfono inválido.'], 400);
+        }
+
+        $baseUrl = $this->getWhatsAppBaseUrl();
+        // La URL base ya es .../api/v1 — necesitamos /sessions/{id}/check-number/{phone}
+        // Removemos /messages para subir al nivel base si fuera necesario
+        $apiBase = preg_replace('#/messages$#', '', $baseUrl);
+        $url = "{$apiBase}/sessions/{$sessionId}/check-number/{$phone}";
+
+        try {
+            $response = $this->authorizedHttp(20)->get($url);
+            $body = $this->safeJsonOrString($response->body());
+            Log::info('WhatsApp checkNumber', ['sessionId' => $sessionId, 'phone' => $phone, 'status' => $response->status()]);
+            return response()->json(['ok' => $response->successful(), 'upstreamStatus' => $response->status(), 'upstreamBody' => $body], $response->status());
+        } catch (\Throwable $e) {
+            Log::error('WhatsApp checkNumber error', ['error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'Error al verificar número.', 'error' => $e->getMessage()], 502);
+        }
+    }
+
     // ==================== MÉTODOS AUXILIARES ====================
+
+    /**
+     * Retorna un PendingRequest de Http ya configurado con el timeout indicado
+     * y el Bearer token de la sesión activa (si existe en BD).
+     */
+    private function authorizedHttp(int $timeout = 30): \Illuminate\Http\Client\PendingRequest
+    {
+        $http = Http::timeout($timeout);
+        $token = $this->resolveSessionToken();
+        if ($token) {
+            $http = $http->withHeaders(['Authorization' => 'Bearer ' . $token]);
+        }
+        return $http;
+    }
+
+    /**
+     * Obtiene el session token (API key) de la sesión activa desde la BD.
+     */
+    private function resolveSessionToken(): ?string
+    {
+        $sessionId = $this->resolveSessionId(null);
+        if (!$sessionId) {
+            return null;
+        }
+        $posSetting = PosSetting::first();
+        $companyId  = $posSetting ? $posSetting->company_id : null;
+
+        $session = WhatsAppSession::where('session_name', $sessionId)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->first();
+
+        return $session ? $session->session_token : null;
+    }
 
     /**
      * Resuelve el sessionId: si se proporciona lo usa, si no, busca en la BD.
