@@ -25,6 +25,27 @@ use App\Http\Controllers\WhatsAppMessageController;
 });*/
 
 // WhatsApp UI flow (POS Ajustes → Información de WhatsApp)
+Route::post('/whatsapp/auth/register', [WhatsAppSessionController::class, 'register'])
+    ->name('whatsapp.auth.register');
+Route::post('/whatsapp/auth/login', [WhatsAppSessionController::class, 'authLogin'])
+    ->name('whatsapp.auth.login');
+Route::post('/whatsapp/auth/logout', [WhatsAppSessionController::class, 'authLogout'])
+    ->name('whatsapp.auth.logout');
+Route::post('/whatsapp/auth/refresh', [WhatsAppSessionController::class, 'authRefresh'])
+    ->name('whatsapp.auth.refresh');
+
+// Multi-session management
+Route::get('/whatsapp/sessions', [WhatsAppSessionController::class, 'listSessions'])
+    ->name('whatsapp.sessions.list');
+Route::delete('/whatsapp/sessions/{id}/local', [WhatsAppSessionController::class, 'destroyLocalSession'])
+    ->name('whatsapp.sessions.local.destroy');
+Route::post('/whatsapp/sessions/activate', [WhatsAppSessionController::class, 'activateSession'])
+    ->name('whatsapp.sessions.activate');
+Route::post('/whatsapp/sessions/{sessionName}/token', [WhatsAppSessionController::class, 'createSessionToken'])
+    ->name('whatsapp.sessions.token.create');
+Route::delete('/whatsapp/sessions/{sessionName}/token', [WhatsAppSessionController::class, 'revokeSessionToken'])
+    ->name('whatsapp.sessions.token.revoke');
+
 Route::get('/whatsapp/start-client', [WhatsAppSessionController::class, 'startClient'])
     ->name('whatsapp.session.start');
 Route::get('/whatsapp/qr', [WhatsAppSessionController::class, 'qr'])
@@ -70,6 +91,30 @@ Route::post('/v1/messages/video', [WhatsAppMessageController::class, 'sendVideo'
     ->name('whatsapp.messages.video');
 Route::post('/v1/messages/video/upload', [WhatsAppMessageController::class, 'sendVideoUpload'])
     ->name('whatsapp.messages.video.upload');
+
+// Ubicación
+Route::post('/v1/messages/location', [WhatsAppMessageController::class, 'sendLocation'])
+    ->name('whatsapp.messages.location');
+
+// Contacto
+Route::post('/v1/messages/contact', [WhatsAppMessageController::class, 'sendContact'])
+    ->name('whatsapp.messages.contact');
+
+// Botones interactivos
+Route::post('/v1/messages/buttons', [WhatsAppMessageController::class, 'sendButtons'])
+    ->name('whatsapp.messages.buttons');
+
+// Lista interactiva
+Route::post('/v1/messages/list', [WhatsAppMessageController::class, 'sendList'])
+    ->name('whatsapp.messages.list');
+
+// Envío masivo
+Route::post('/v1/messages/bulk', [WhatsAppMessageController::class, 'sendBulk'])
+    ->name('whatsapp.messages.bulk');
+
+// Verificar número
+Route::get('/v1/sessions/check-number/{phone}', [WhatsAppMessageController::class, 'checkNumber'])
+    ->name('whatsapp.sessions.check-number');
 
 Route::any('/whatsapp/{path}', [ProxyController::class, 'handle'])
     ->where('path', '.*')
