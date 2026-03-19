@@ -3463,6 +3463,10 @@
                     id_warehouse: $('select[name="warehouse_id"]').val(),  
                 }, 
                 function(res) {
+                    if (!res || res.length === 0) {
+                        Swal.fire('Aviso', 'Producto no encontrado o sin stock en el almacén seleccionado.', 'warning');
+                        return;
+                    }
                     filter.push(data[0]);
                     filter.push(customer_id);
                     product_code.push(res[0].code);
@@ -4580,6 +4584,10 @@
                                 id_warehouse: $('select[name="warehouse_id"]').val(),  
                             }, 
                             function(res) {
+                                if (!res || res.length === 0) {
+                                    Swal.fire('Aviso', 'Producto cortesía no encontrado o sin stock.', 'warning');
+                                    return;
+                                }
                                 filter.push($(this).val());
                                 filter.push(customer_id);
                                 product_code.push(res[0].code);
@@ -5518,6 +5526,7 @@
                                 id_warehouse: $('select[name="warehouse_id"]').val(),  
                             }, 
                             function(res) {
+                                if (!res || res.length === 0) return;
                                 filter.push(element.code);
                                 filter.push(customer_id);
                                 product_code.push(res[0].code);

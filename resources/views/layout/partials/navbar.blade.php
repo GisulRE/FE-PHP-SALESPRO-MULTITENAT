@@ -200,6 +200,10 @@
                                         href="{{ route('setting.backupDatabase') }}"><i class="dripicons-stack"></i>
                                         {{ trans('file.Backup Database') }}</a>
                                 </li>
+                                <li>
+                                    <a href="{{ route('setting.restoreCompanyData') }}"><i class="dripicons-upload"></i>
+                                        Restaurar Datos POS</a>
+                                </li>
                             @endif
                             <li>
                                 <a href="{{ route('logout') }}" onclick="event.preventDefault();

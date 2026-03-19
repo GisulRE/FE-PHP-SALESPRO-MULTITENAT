@@ -15,6 +15,8 @@ class CreateReturnsTable extends Migration
     {
         Schema::create('returns', function (Blueprint $table) {
             $table->increments('id');
+            $table->boolean('is_active')->default(1);
+            $table->unsignedInteger('company_id')->nullable();
             $table->string('reference_no');
             $table->integer('customer_id');
             $table->integer('warehouse_id');
