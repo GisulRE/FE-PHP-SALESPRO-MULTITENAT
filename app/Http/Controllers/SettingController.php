@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Config;
 use DB;
 use App\Biller;
+use App\Company;
 
 use App\Account;
 use App\Customer;
@@ -21,11 +22,13 @@ use App\SiatPuntoVenta;
 use Log;
 use PDO;
 use PDOException;
+use Auth;
 use Twilio\Rest\Client;
 use Illuminate\Http\Request;
 use App\Http\Traits\CufdTrait;
 use Clickatell\ClickatellException;
 use Illuminate\Support\Facades\Artisan;
+use Spatie\Permission\Models\Role;
 
 class SettingController extends Controller
 {
@@ -130,6 +133,459 @@ class SettingController extends Controller
         flush();
         readfile($file_name);
         unlink($file_name);
+    }
+
+    public function restoreCompanyData()
+    {
+        $role = Role::find(Auth::user()->role_id);
+        if (!$role || !$role->hasPermissionTo('backup_database')) {
+            return redirect()->back()->with('not_permitted', '¡Lo sentimos! No tienes permiso para acceder a este módulo');
+        }
+
+        $companyId = null;
+        $companies = Company::orderBy('name')->get();
+        return view('setting.restore_company_data', compact('companies', 'companyId'));
+    }
+
+    public function restoreCompanyDataPreview(Request $request)
+    {
+        $role = Role::find(Auth::user()->role_id);
+        if (!$role || !$role->hasPermissionTo('backup_database')) {
+            return redirect()->back()->with('not_permitted', '¡Lo sentimos! No tienes permiso para acceder a este módulo');
+        }
+
+        $this->validate($request, [
+            'company_id'   => 'required|exists:companies,id',
+            'restore_file' => 'required|file|mimes:sql,txt|max:204800',
+        ]);
+
+        $companyId = (int) $request->company_id;
+        $tempPath = $request->file('restore_file')->store('restore_preview', 'local');
+
+        $sqlContent = file_get_contents(storage_path('app/' . $tempPath));
+        $sqlContent = preg_replace('/^\xEF\xBB\xBF/', '', $sqlContent);
+        $statements = $this->splitSqlStatements($sqlContent);
+
+        $insertsByTable = [];
+        foreach ($statements as $statement) {
+            $trimmed = trim($statement);
+            if (!preg_match('/^INSERT\s+(?:IGNORE\s+)?INTO\s+`?([a-zA-Z0-9_]+)`?\s*\(([^)]+)\)/i', $trimmed, $matches)) {
+                continue;
+            }
+
+            $table = $matches[1];
+            $columns = array_map(function ($column) {
+                return trim(str_replace('`', '', $column));
+            }, explode(',', $matches[2]));
+
+            if (!isset($insertsByTable[$table])) {
+                $insertsByTable[$table] = ['columns' => $columns, 'row_count' => 0];
+            }
+
+            $valuePos = stripos($trimmed, 'VALUES');
+            if ($valuePos !== false) {
+                $tuples = $this->extractValueTuples(substr($trimmed, $valuePos + 6));
+                $insertsByTable[$table]['row_count'] += count($tuples);
+            }
+        }
+
+        $comparison = [];
+        $dbName = config('database.connections.mysql.database');
+
+        foreach ($insertsByTable as $table => $tableInfo) {
+            $dbColumns = DB::select(
+                "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+                 ORDER BY ORDINAL_POSITION",
+                [$dbName, $table]
+            );
+
+            $dbColumnNames = [];
+            foreach ($dbColumns as $column) {
+                $dbColumnNames[] = $column->COLUMN_NAME;
+            }
+
+            $colDetails = [];
+            foreach ($dbColumns as $column) {
+                $inSql = in_array($column->COLUMN_NAME, $tableInfo['columns'], true);
+                $isCritical = !$inSql
+                    && $column->IS_NULLABLE === 'NO'
+                    && $column->COLUMN_DEFAULT === null
+                    && $column->EXTRA !== 'auto_increment';
+
+                $colDetails[] = [
+                    'name'      => $column->COLUMN_NAME,
+                    'type'      => $column->DATA_TYPE,
+                    'full_type' => $column->COLUMN_TYPE,
+                    'nullable'  => $column->IS_NULLABLE === 'YES',
+                    'default'   => $column->COLUMN_DEFAULT,
+                    'key'       => $column->COLUMN_KEY,
+                    'extra'     => $column->EXTRA,
+                    'in_sql'    => $inSql,
+                    'critical'  => $isCritical,
+                ];
+            }
+
+            $extraSqlColumns = array_values(array_diff($tableInfo['columns'], $dbColumnNames));
+            $criticalCount = count(array_filter($colDetails, function ($column) {
+                return $column['critical'];
+            }));
+
+            $comparison[$table] = [
+                'exists'         => !empty($dbColumns),
+                'row_count'      => $tableInfo['row_count'],
+                'sql_cols'       => $tableInfo['columns'],
+                'col_details'    => $colDetails,
+                'extra_sql_cols' => $extraSqlColumns,
+                'critical_count' => $criticalCount,
+                'has_company_id' => in_array('company_id', $tableInfo['columns'], true),
+            ];
+        }
+
+        $companies = Company::orderBy('name')->get();
+        return view('setting.restore_company_data', compact('companies', 'comparison', 'companyId', 'tempPath'));
+    }
+
+    public function restoreCompanyDataStore(Request $request)
+    {
+        $role = Role::find(Auth::user()->role_id);
+        if (!$role || !$role->hasPermissionTo('backup_database')) {
+            return redirect()->back()->with('not_permitted', '¡Lo sentimos! No tienes permiso para acceder a este módulo');
+        }
+
+        $this->validate($request, [
+            'company_id' => 'required|exists:companies,id',
+        ]);
+
+        $companyId = (int) $request->company_id;
+        $tempToDelete = null;
+
+        if ($request->hasFile('restore_file')) {
+            $this->validate($request, [
+                'restore_file' => 'required|file|mimes:sql,txt|max:204800',
+            ]);
+            $sqlContent = file_get_contents($request->file('restore_file')->getRealPath());
+        } elseif ($request->filled('temp_file')) {
+            $tempPath = $request->input('temp_file');
+            if (!preg_match('/^restore_preview\/[a-zA-Z0-9_\-\.]+$/', $tempPath)) {
+                return redirect()->back()->with('not_permitted', 'Ruta de archivo temporal inválida.');
+            }
+
+            $fullPath = storage_path('app/' . $tempPath);
+            if (!file_exists($fullPath)) {
+                return redirect()->back()->with('not_permitted', 'El archivo temporal ha expirado. Analiza el archivo nuevamente.');
+            }
+
+            $sqlContent = file_get_contents($fullPath);
+            $tempToDelete = $fullPath;
+        } else {
+            return redirect()->back()->with('not_permitted', 'Debes subir un archivo SQL o analizar primero.');
+        }
+
+        $sqlContent = preg_replace('/^\xEF\xBB\xBF/', '', $sqlContent);
+        $statements = $this->splitSqlStatements($sqlContent);
+
+        $executed = 0;
+        $skipped = 0;
+        $failed = 0;
+        $errors = [];
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        DB::statement("SET SESSION sql_mode = ''");
+
+        try {
+            foreach ($statements as $statement) {
+                $trimmed = trim($statement);
+                if ($trimmed === '') {
+                    continue;
+                }
+
+                if (!preg_match('/^INSERT\s+(?:IGNORE\s+)?INTO\s+/i', $trimmed)) {
+                    $skipped++;
+                    continue;
+                }
+
+                $preparedSql = $this->forceCompanyIdInInsert($trimmed, $companyId);
+
+                try {
+                    DB::unprepared($preparedSql);
+                    $executed++;
+                } catch (\Throwable $e) {
+                    $failed++;
+                    $errorMsg = $e->getMessage();
+                    if (count($errors) < 10) {
+                        preg_match('/INSERT\s+INTO\s+`?([a-zA-Z0-9_]+)`?/i', $preparedSql, $tableMatch);
+                        $table = $tableMatch[1] ?? '?';
+                        $errors[] = "[{$table}] " . substr($errorMsg, 0, 120);
+                    }
+
+                    Log::warning('Restauración: sentencia INSERT omitida', [
+                        'company_id' => $companyId,
+                        'error'      => $errorMsg,
+                    ]);
+                }
+            }
+        } finally {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            if ($tempToDelete && file_exists($tempToDelete)) {
+                @unlink($tempToDelete);
+            }
+        }
+
+        $message = "Restauración completada. Ejecutadas: {$executed} | Omitidas (no INSERT): {$skipped} | Fallidas: {$failed}.";
+        if (!empty($errors)) {
+            $message .= ' Primeros errores: ' . implode(' / ', $errors);
+        }
+
+        $sessionKey = $failed > 0 ? 'not_permitted' : 'message';
+        if ($executed > 0 && $failed > 0) {
+            $sessionKey = 'message';
+        }
+
+        return redirect()->back()->with($sessionKey, $message);
+    }
+
+    private function splitSqlStatements($sql)
+    {
+        $statements = [];
+        $buffer = '';
+        $inSingle = false;
+        $inDouble = false;
+        $length = strlen($sql);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $sql[$i];
+            $prev = $i > 0 ? $sql[$i - 1] : '';
+
+            if ($char === "'" && !$inDouble && $prev !== '\\\\') {
+                $inSingle = !$inSingle;
+            } elseif ($char === '"' && !$inSingle && $prev !== '\\\\') {
+                $inDouble = !$inDouble;
+            }
+
+            if ($char === ';' && !$inSingle && !$inDouble) {
+                $statements[] = $buffer;
+                $buffer = '';
+                continue;
+            }
+
+            $buffer .= $char;
+        }
+
+        if (trim($buffer) !== '') {
+            $statements[] = $buffer;
+        }
+
+        return $statements;
+    }
+
+    private function forceCompanyIdInInsert($sql, $companyId)
+    {
+        if (!preg_match('/^INSERT\s+(?:IGNORE\s+)?INTO\s+(`?[a-zA-Z0-9_]+`?(?:\.`?[a-zA-Z0-9_]+`?)?)\s*(?:\((.*?)\))?\s*VALUES\s*(.+)$/is', $sql, $matches)) {
+            return $sql;
+        }
+
+        $tableNameRaw = $matches[1];
+        $columnSection = isset($matches[2]) ? trim((string) $matches[2]) : '';
+        $valuesSection = trim($matches[3]);
+
+        // Si viene calificado como db.table, tomar solo table para consultar esquema
+        $tableParts = explode('.', str_replace('`', '', $tableNameRaw));
+        $tableName = end($tableParts);
+
+        $columns = [];
+        if ($columnSection !== '') {
+            $columns = array_map(function ($column) {
+                return trim(str_replace('`', '', $column));
+            }, explode(',', $columnSection));
+        } else {
+            $dbName = config('database.connections.mysql.database');
+            $dbColumns = DB::select(
+                'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION',
+                [$dbName, $tableName]
+            );
+            foreach ($dbColumns as $dbColumn) {
+                $columns[] = $dbColumn->COLUMN_NAME;
+            }
+        }
+
+        if (empty($columns)) {
+            return $sql;
+        }
+
+        $dbName = config('database.connections.mysql.database');
+        static $autoIncrementColumnCache = [];
+        if (!isset($autoIncrementColumnCache[$tableName])) {
+            $autoIncrementColumnCache[$tableName] = [];
+            $autoIncrementColumns = DB::select(
+                'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND EXTRA LIKE "%auto_increment%"',
+                [$dbName, $tableName]
+            );
+            foreach ($autoIncrementColumns as $autoIncrementColumn) {
+                $autoIncrementColumnCache[$tableName][] = strtolower($autoIncrementColumn->COLUMN_NAME);
+            }
+        }
+
+        $autoIncrementIndexes = [];
+        foreach ($columns as $index => $columnName) {
+            if (in_array(strtolower($columnName), $autoIncrementColumnCache[$tableName], true)) {
+                $autoIncrementIndexes[] = $index;
+            }
+        }
+
+        // Si el INSERT trae lista de columnas y no incluye company_id, la agregamos
+        $companyIndex = false;
+        foreach ($columns as $idx => $columnName) {
+            if (strtolower($columnName) === 'company_id') {
+                $companyIndex = $idx;
+                break;
+            }
+        }
+
+        $shouldAppendCompanyColumn = false;
+        if ($companyIndex === false && $columnSection !== '') {
+            $columns[] = 'company_id';
+            $companyIndex = count($columns) - 1;
+            $shouldAppendCompanyColumn = true;
+        }
+
+        if (!empty($autoIncrementIndexes)) {
+            rsort($autoIncrementIndexes);
+            foreach ($autoIncrementIndexes as $indexToRemove) {
+                if (isset($columns[$indexToRemove])) {
+                    unset($columns[$indexToRemove]);
+                }
+            }
+            $columns = array_values($columns);
+
+            $companyIndex = false;
+            foreach ($columns as $idx => $columnName) {
+                if (strtolower($columnName) === 'company_id') {
+                    $companyIndex = $idx;
+                    break;
+                }
+            }
+            $shouldAppendCompanyColumn = false;
+        }
+
+        if ($companyIndex === false) {
+            return $sql;
+        }
+
+        $tuples = $this->extractValueTuples($valuesSection);
+        if (empty($tuples)) {
+            return $sql;
+        }
+
+        $updatedTuples = [];
+        foreach ($tuples as $tuple) {
+            $values = $this->splitCsvSql($tuple);
+
+            if (!empty($autoIncrementIndexes)) {
+                foreach ($autoIncrementIndexes as $indexToRemove) {
+                    if (isset($values[$indexToRemove])) {
+                        unset($values[$indexToRemove]);
+                    }
+                }
+                $values = array_values($values);
+            }
+
+            if ($shouldAppendCompanyColumn) {
+                $values[] = (string) $companyId;
+            } else {
+                if (isset($values[$companyIndex])) {
+                    $values[$companyIndex] = (string) $companyId;
+                } else {
+                    $values[] = (string) $companyId;
+                }
+            }
+            $updatedTuples[] = '(' . implode(',', $values) . ')';
+        }
+
+        $insertKeyword = stripos($sql, 'INSERT IGNORE INTO') === 0 ? 'INSERT IGNORE INTO ' : 'INSERT INTO ';
+        $newColumnSection = '(' . implode(', ', $columns) . ')';
+
+        return $insertKeyword . $tableNameRaw . ' ' . $newColumnSection . ' VALUES ' . implode(',', $updatedTuples) . ';';
+    }
+
+    private function extractValueTuples($valuesSection)
+    {
+        $tuples = [];
+        $buffer = '';
+        $depth = 0;
+        $inSingle = false;
+        $inDouble = false;
+        $length = strlen($valuesSection);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $valuesSection[$i];
+            $prev = $i > 0 ? $valuesSection[$i - 1] : '';
+
+            if ($char === "'" && !$inDouble && $prev !== '\\\\') {
+                $inSingle = !$inSingle;
+            } elseif ($char === '"' && !$inSingle && $prev !== '\\\\') {
+                $inDouble = !$inDouble;
+            }
+
+            if (!$inSingle && !$inDouble) {
+                if ($char === '(') {
+                    if ($depth === 0) {
+                        $buffer = '';
+                    }
+                    $depth++;
+                    continue;
+                }
+                if ($char === ')') {
+                    $depth--;
+                    if ($depth === 0) {
+                        $tuples[] = $buffer;
+                        $buffer = '';
+                        continue;
+                    }
+                }
+            }
+
+            if ($depth > 0) {
+                $buffer .= $char;
+            }
+        }
+
+        return $tuples;
+    }
+
+    private function splitCsvSql($tuple)
+    {
+        $parts = [];
+        $buffer = '';
+        $inSingle = false;
+        $inDouble = false;
+        $length = strlen($tuple);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $tuple[$i];
+            $prev = $i > 0 ? $tuple[$i - 1] : '';
+
+            if ($char === "'" && !$inDouble && $prev !== '\\\\') {
+                $inSingle = !$inSingle;
+            } elseif ($char === '"' && !$inSingle && $prev !== '\\\\') {
+                $inDouble = !$inDouble;
+            }
+
+            if ($char === ',' && !$inSingle && !$inDouble) {
+                $parts[] = trim($buffer);
+                $buffer = '';
+                continue;
+            }
+
+            $buffer .= $char;
+        }
+
+        if ($buffer !== '') {
+            $parts[] = trim($buffer);
+        }
+
+        return $parts;
     }
 
     public function moduleQr()

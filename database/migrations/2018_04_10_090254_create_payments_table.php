@@ -25,6 +25,7 @@ class CreatePaymentsTable extends Migration
             $table->double('change')->default(0);
             $table->string('paying_method');
             $table->text('payment_note')->nullable();
+            $table->unsignedInteger('company_id')->nullable();
             $table->timestamps();
         });
     }

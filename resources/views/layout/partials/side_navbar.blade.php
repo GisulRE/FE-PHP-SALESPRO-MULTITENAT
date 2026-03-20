@@ -745,6 +745,10 @@
                                 <li id="hrm-setting-menu"><a href="{{ route('setting.hrm') }}">
                                         {{ trans('file.HRM Setting') }}</a></li>
                             @endif
+                            @if (in_array('backup_database', $permissions))
+                                <li id="restore-company-data-menu"><a
+                                        href="{{ route('setting.restoreCompanyData') }}">Restaurar Datos POS</a></li>
+                            @endif
                             @if (in_array('pos_setting', $permissions))
                                 <li id="printer-menu"><a href="{{ route('printer.index') }}">{{ trans('file.Printers') }}</a>
                                 </li>

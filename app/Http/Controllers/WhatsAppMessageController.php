@@ -1,5 +1,4 @@
-﻿<?php
-
+<?php
 namespace App\Http\Controllers;
 
 use App\PosSetting;
@@ -77,12 +76,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía un documento por URL.
-     *
-     * POST /api/v1/messages/document
-     * Body: { sessionId, to, documentUrl, fileName, mimetype, caption }
-     */
     public function sendDocument(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -157,12 +150,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía un documento por upload (multipart).
-     *
-     * POST /api/v1/messages/document/upload
-     * Form data: sessionId, to, caption, document (file)
-     */
     public function sendDocumentUpload(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -193,7 +180,6 @@ class WhatsAppMessageController extends Controller
 
         try {
             $file = $request->file('document');
-            
             $multipart = [
                 ['name' => 'sessionId', 'contents' => $sessionId],
                 ['name' => 'to', 'contents' => $request->input('to')],
@@ -235,12 +221,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía una imagen por URL.
-     *
-     * POST /api/v1/messages/image
-     * Body: { sessionId, to, imageUrl, caption }
-     */
     public function sendImage(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -307,12 +287,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía una imagen por upload (multipart).
-     *
-     * POST /api/v1/messages/image/upload
-     * Form data: sessionId, to, caption, image (file)
-     */
     public function sendImageUpload(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -343,7 +317,6 @@ class WhatsAppMessageController extends Controller
 
         try {
             $file = $request->file('image');
-            
             $multipart = [
                 ['name' => 'sessionId', 'contents' => $sessionId],
                 ['name' => 'to', 'contents' => $request->input('to')],
@@ -385,12 +358,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía un audio por URL.
-     *
-     * POST /api/v1/messages/audio
-     * Body: { sessionId, to, audioUrl, ptt }
-     */
     public function sendAudio(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -426,7 +393,6 @@ class WhatsAppMessageController extends Controller
                 'audioUrl' => $request->input('audioUrl'),
             ];
 
-            // ptt = Push To Talk (nota de voz)
             if ($request->has('ptt')) {
                 $payload['ptt'] = filter_var($request->input('ptt'), FILTER_VALIDATE_BOOLEAN);
             }
@@ -458,12 +424,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía un audio por upload (multipart).
-     *
-     * POST /api/v1/messages/audio/upload
-     * Form data: sessionId, to, ptt, audio (file)
-     */
     public function sendAudioUpload(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -494,7 +454,6 @@ class WhatsAppMessageController extends Controller
 
         try {
             $file = $request->file('audio');
-            
             $multipart = [
                 ['name' => 'sessionId', 'contents' => $sessionId],
                 ['name' => 'to', 'contents' => $request->input('to')],
@@ -537,12 +496,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía un video por URL.
-     *
-     * POST /api/v1/messages/video
-     * Body: { sessionId, to, videoUrl, caption, gifPlayback }
-     */
     public function sendVideo(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -614,12 +567,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía un video por upload (multipart).
-     *
-     * POST /api/v1/messages/video/upload
-     * Form data: sessionId, to, caption, gifPlayback, video (file)
-     */
     public function sendVideoUpload(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -651,7 +598,6 @@ class WhatsAppMessageController extends Controller
 
         try {
             $file = $request->file('video');
-            
             $multipart = [
                 ['name' => 'sessionId', 'contents' => $sessionId],
                 ['name' => 'to', 'contents' => $request->input('to')],
@@ -698,12 +644,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía una ubicación.
-     *
-     * POST /api/v1/messages/location
-     * Body: { sessionId, to, latitude, longitude, name?, address? }
-     */
     public function sendLocation(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -734,8 +674,12 @@ class WhatsAppMessageController extends Controller
             'latitude'  => (float) $request->input('latitude'),
             'longitude' => (float) $request->input('longitude'),
         ];
-        if ($request->filled('name'))    { $payload['name']    = $request->input('name'); }
-        if ($request->filled('address')) { $payload['address'] = $request->input('address'); }
+        if ($request->filled('name')) {
+            $payload['name'] = $request->input('name');
+        }
+        if ($request->filled('address')) {
+            $payload['address'] = $request->input('address');
+        }
 
         try {
             $response = $this->authorizedHttp(30)->post("{$this->getWhatsAppBaseUrl()}/messages/location", $payload);
@@ -748,12 +692,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía un contacto (vCard).
-     *
-     * POST /api/v1/messages/contact
-     * Body: { sessionId, to, vcard }
-     */
     public function sendContact(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -786,12 +724,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía un mensaje con botones interactivos.
-     *
-     * POST /api/v1/messages/buttons
-     * Body: { sessionId, to, text, buttons: [{id, text},...], footer? }
-     */
     public function sendButtons(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -819,7 +751,9 @@ class WhatsAppMessageController extends Controller
             'text'      => $request->input('text'),
             'buttons'   => $request->input('buttons'),
         ];
-        if ($request->filled('footer')) { $payload['footer'] = $request->input('footer'); }
+        if ($request->filled('footer')) {
+            $payload['footer'] = $request->input('footer');
+        }
 
         try {
             $response = $this->authorizedHttp(30)->post("{$this->getWhatsAppBaseUrl()}/messages/buttons", $payload);
@@ -832,27 +766,21 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envía un mensaje con lista interactiva.
-     *
-     * POST /api/v1/messages/list
-     * Body: { sessionId, to, text, title, buttonText, sections: [{title, rows:[{id,title,description?}]}], footer? }
-     */
     public function sendList(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'sessionId'                        => 'nullable|string',
-            'to'                               => 'required|string',
-            'text'                             => 'required|string',
-            'title'                            => 'required|string|max:60',
-            'buttonText'                       => 'required|string|max:20',
-            'sections'                         => 'required|array|min:1',
-            'sections.*.title'                 => 'nullable|string',
-            'sections.*.rows'                  => 'required|array|min:1',
-            'sections.*.rows.*.id'             => 'required|string',
-            'sections.*.rows.*.title'          => 'required|string',
-            'sections.*.rows.*.description'    => 'nullable|string',
-            'footer'                           => 'nullable|string|max:60',
+            'sessionId'                     => 'nullable|string',
+            'to'                            => 'required|string',
+            'text'                          => 'required|string',
+            'title'                         => 'required|string|max:60',
+            'buttonText'                    => 'required|string|max:20',
+            'sections'                      => 'required|array|min:1',
+            'sections.*.title'              => 'nullable|string',
+            'sections.*.rows'               => 'required|array|min:1',
+            'sections.*.rows.*.id'          => 'required|string',
+            'sections.*.rows.*.title'       => 'required|string',
+            'sections.*.rows.*.description' => 'nullable|string',
+            'footer'                        => 'nullable|string|max:60',
         ]);
 
         if ($validator->fails()) {
@@ -872,7 +800,9 @@ class WhatsAppMessageController extends Controller
             'buttonText' => $request->input('buttonText'),
             'sections'   => $request->input('sections'),
         ];
-        if ($request->filled('footer')) { $payload['footer'] = $request->input('footer'); }
+        if ($request->filled('footer')) {
+            $payload['footer'] = $request->input('footer');
+        }
 
         try {
             $response = $this->authorizedHttp(30)->post("{$this->getWhatsAppBaseUrl()}/messages/list", $payload);
@@ -885,20 +815,14 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Envío masivo de mensajes (bulk).
-     *
-     * POST /api/v1/messages/bulk
-     * Body: { messages: [...], delay? (ms between each) }
-     */
     public function sendBulk(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'messages'         => 'required|array|min:1',
-            'messages.*.to'    => 'required|string',
-            'messages.*.text'  => 'required|string',
+            'messages'             => 'required|array|min:1',
+            'messages.*.to'        => 'required|string',
+            'messages.*.text'      => 'required|string',
             'messages.*.sessionId' => 'nullable|string',
-            'delay'            => 'nullable|integer|min:0|max:60000',
+            'delay'                => 'nullable|integer|min:0|max:60000',
         ]);
 
         if ($validator->fails()) {
@@ -906,8 +830,6 @@ class WhatsAppMessageController extends Controller
         }
 
         $defaultSessionId = $this->resolveSessionId(null);
-
-        // Asegurar que cada mensaje tenga sessionId
         $messages = collect($request->input('messages'))->map(function ($msg) use ($defaultSessionId) {
             if (empty($msg['sessionId'])) {
                 $msg['sessionId'] = $defaultSessionId;
@@ -931,11 +853,6 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    /**
-     * Verifica si un número está registrado en WhatsApp.
-     *
-     * GET /api/v1/sessions/{sessionId}/check-number/{phone}
-     */
     public function checkNumber(Request $request, string $phone)
     {
         $sessionId = $this->resolveSessionId($request->query('sessionId'));
@@ -943,15 +860,12 @@ class WhatsAppMessageController extends Controller
             return response()->json(['ok' => false, 'message' => 'No hay sesión de WhatsApp activa.'], 400);
         }
 
-        // Sanitizar: solo dígitos y +
         $phone = preg_replace('/[^\d+]/', '', $phone);
         if (empty($phone)) {
             return response()->json(['ok' => false, 'message' => 'Número de teléfono inválido.'], 400);
         }
 
         $baseUrl = $this->getWhatsAppBaseUrl();
-        // La URL base ya es .../api/v1 — necesitamos /sessions/{id}/check-number/{phone}
-        // Removemos /messages para subir al nivel base si fuera necesario
         $apiBase = preg_replace('#/messages$#', '', $baseUrl);
         $url = "{$apiBase}/sessions/{$sessionId}/check-number/{$phone}";
 
@@ -966,13 +880,7 @@ class WhatsAppMessageController extends Controller
         }
     }
 
-    // ==================== MÉTODOS AUXILIARES ====================
-
-    /**
-     * Retorna un PendingRequest de Http ya configurado con el timeout indicado
-     * y el Bearer token de la sesión activa (si existe en BD).
-     */
-    private function authorizedHttp(int $timeout = 30): \Illuminate\Http\Client\PendingRequest
+    private function authorizedHttp($timeout = 30)
     {
         $http = Http::timeout($timeout);
         $token = $this->resolveSessionToken();
@@ -982,29 +890,26 @@ class WhatsAppMessageController extends Controller
         return $http;
     }
 
-    /**
-     * Obtiene el session token (API key) de la sesión activa desde la BD.
-     */
-    private function resolveSessionToken(): ?string
+    private function resolveSessionToken()
     {
         $sessionId = $this->resolveSessionId(null);
         if (!$sessionId) {
             return null;
         }
+
         $posSetting = PosSetting::first();
-        $companyId  = $posSetting ? $posSetting->company_id : null;
+        $companyId = $posSetting ? $posSetting->company_id : null;
 
         $session = WhatsAppSession::where('session_name', $sessionId)
-            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->when($companyId, function ($query) use ($companyId) {
+                return $query->where('company_id', $companyId);
+            })
             ->first();
 
         return $session ? $session->session_token : null;
     }
 
-    /**
-     * Resuelve el sessionId: si se proporciona lo usa, si no, busca en la BD.
-     */
-    private function resolveSessionId(?string $sessionId): ?string
+    private function resolveSessionId($sessionId)
     {
         if ($sessionId && trim($sessionId) !== '') {
             return trim($sessionId);
@@ -1018,13 +923,10 @@ class WhatsAppMessageController extends Controller
         return null;
     }
 
-    /**
-     * Obtiene la URL base del servicio de WhatsApp.
-     */
-    private function getWhatsAppBaseUrl(): string
+    private function getWhatsAppBaseUrl()
     {
         $posSetting = PosSetting::first();
-        
+
         if ($posSetting && $posSetting->url_whatsapp) {
             $base = (string) $posSetting->url_whatsapp;
             $base = preg_replace('/\?.*$/', '', $base);
@@ -1043,10 +945,7 @@ class WhatsAppMessageController extends Controller
         return 'http://154.53.54.236:3000/api/v1';
     }
 
-    /**
-     * Asegura que la URL base termine en /api/v1.
-     */
-    private function ensureApiV1Base(string $base): string
+    private function ensureApiV1Base($base)
     {
         if (preg_match('#/api/v1$#i', $base)) {
             return $base;
@@ -1057,12 +956,7 @@ class WhatsAppMessageController extends Controller
         return rtrim($base, '/') . '/api/v1';
     }
 
-    /**
-     * Intenta parsear JSON; si no es JSON válido devuelve string.
-     *
-     * @return mixed
-     */
-    private function safeJsonOrString(string $body)
+    private function safeJsonOrString($body)
     {
         $trimmed = trim($body);
         if ($trimmed === '') {

@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
             SuppliersSeeder::class,
             UnitsSeeder::class,
             WarehousesSeeder::class,
+            AccountsSeeder::class,
             // SIAT: sucursales y puntos de venta (billers los referencian)
             SucursalSiatSeeder::class,
             PuntoVentaSeeder::class,

@@ -363,6 +363,17 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::post('setting/pos_setting_update', 'SettingController@posSettingUpdate');
 	Route::get('setting/empty-database', 'SettingController@emptyDatabase')->name('setting.emptyDatabase');
 	Route::get('setting/backup-database', 'SettingController@backupDatabase')->name('setting.backupDatabase');
+	Route::get('setting/restore-company-data', 'CompanyDataImportController@index')->name('setting.restoreCompanyData');
+	Route::post('setting/restore-company-data', 'CompanyDataImportController@store')->name('setting.restoreCompanyDataStore');
+	Route::get('setting/restore-company-data/preview', function () {
+		return redirect()->route('setting.restoreCompanyData');
+	});
+	Route::post('setting/restore-company-data/preview', 'CompanyDataImportController@preview')->name('setting.restoreCompanyDataPreview');
+	Route::get('setting/restore-company-data/jobs/{importJob}/status', 'CompanyDataImportController@status')->name('setting.restoreCompanyDataStatus');
+	Route::post('setting/restore-company-data/jobs/{importJob}/retry', 'CompanyDataImportController@retry')->name('setting.restoreCompanyDataRetry');
+	Route::post('setting/restore-company-data/jobs/{importJob}/cancel', 'CompanyDataImportController@cancel')->name('setting.restoreCompanyDataCancel');
+	Route::get('setting/restore-company-data/queues/status', 'CompanyDataImportController@queuesStatus')->name('setting.restoreCompanyDataQueuesStatus');
+	Route::post('setting/restore-company-data/queues/stop', 'CompanyDataImportController@stopWorkers')->name('setting.restoreCompanyDataQueuesStop');
 	Route::get('setting/module_qr', 'SettingController@moduleQr')->name('setting.qrsimple');
 	Route::get('setting/module_siat', 'SiatController@index')->name('setting.siat');
 

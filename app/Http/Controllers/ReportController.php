@@ -531,7 +531,7 @@ class ReportController extends Controller
             $end_date = date("Y-m", $start) . '-' . '31';
 
             $best_selling_qty = DB::table('sales')
-                ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')->select(DB::raw('product_sales.product_id, sum(product_sales.qty) as sold_qty'))->where('sales.warehouse_id', $data['warehouse_id'])->whereDate('sales.created_at', '>=', $start_date)->whereDate('sales.created_at', '<=', $end_date)->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(1)->get();
+                ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')->select(DB::raw('product_sales.product_id, sum(product_sales.qty) as sold_qty'))->where('sales.warehouse_id', $data['warehouse_id'])->where('sales.company_id', Auth::user()->company_id)->whereDate('sales.created_at', '>=', $start_date)->whereDate('sales.created_at', '<=', $end_date)->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(1)->get();
 
             if (!count($best_selling_qty)) {
                 $product[] = '';
@@ -590,51 +590,45 @@ class ReportController extends Controller
                 ['products.is_active', true],
                 ['product_warehouse.qty', '>', 0],
             ])->count();
-        $payment_recieved_number = DB::table('payments')->whereNotNull('sale_id')->whereDate('created_at', '>=', $start_date)
+        $companyId = Auth::user()->company_id;
+        $payment_recieved_number = Payment::whereNotNull('sale_id')->whereDate('created_at', '>=', $start_date)
             ->whereDate('created_at', '<=', $end_date)->count();
-        $payment_recieved = DB::table('payments')->whereNotNull('sale_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('payments.amount');
-        $credit_card_payment_sale = DB::table('payments')
-            ->where('paying_method', 'Credit Card')
-            ->whereNotNull('payments.sale_id')
-            ->whereDate('payments.created_at', '>=', $start_date)
-            ->whereDate('payments.created_at', '<=', $end_date)->sum('payments.amount');
-        $cheque_payment_sale = DB::table('payments')
-            ->where('paying_method', 'Cheque')
-            ->whereNotNull('payments.sale_id')
-            ->whereDate('payments.created_at', '>=', $start_date)
-            ->whereDate('payments.created_at', '<=', $end_date)->sum('payments.amount');
-        $gift_card_payment_sale = DB::table('payments')
-            ->where('paying_method', 'Gift Card')
+        $payment_recieved = Payment::whereNotNull('sale_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
+        $credit_card_payment_sale = Payment::where('paying_method', 'Credit Card')
+            ->whereNotNull('sale_id')
+            ->whereDate('created_at', '>=', $start_date)
+            ->whereDate('created_at', '<=', $end_date)->sum('amount');
+        $cheque_payment_sale = Payment::where('paying_method', 'Cheque')
+            ->whereNotNull('sale_id')
+            ->whereDate('created_at', '>=', $start_date)
+            ->whereDate('created_at', '<=', $end_date)->sum('amount');
+        $gift_card_payment_sale = Payment::where('paying_method', 'Gift Card')
             ->whereNotNull('sale_id')
             ->whereDate('created_at', '>=', $start_date)
             ->whereDate('created_at', '<=', $end_date)
             ->sum('amount');
-        $paypal_payment_sale = DB::table('payments')
-            ->where('paying_method', 'Paypal')
+        $paypal_payment_sale = Payment::where('paying_method', 'Paypal')
             ->whereNotNull('sale_id')
             ->whereDate('created_at', '>=', $start_date)
             ->whereDate('created_at', '<=', $end_date)
             ->sum('amount');
-        $deposit_payment_sale = DB::table('payments')
-            ->where('paying_method', 'Deposit')
+        $deposit_payment_sale = Payment::where('paying_method', 'Deposit')
             ->whereNotNull('sale_id')
             ->whereDate('created_at', '>=', $start_date)
             ->whereDate('created_at', '<=', $end_date)
             ->sum('amount');
         $cash_payment_sale = $payment_recieved - $credit_card_payment_sale - $cheque_payment_sale - $gift_card_payment_sale - $paypal_payment_sale - $deposit_payment_sale;
-        $payment_sent_number = DB::table('payments')->whereNotNull('purchase_id')->whereDate('created_at', '>=', $start_date)
+        $payment_sent_number = Payment::whereNotNull('purchase_id')->whereDate('created_at', '>=', $start_date)
             ->whereDate('created_at', '<=', $end_date)->count();
-        $payment_sent = DB::table('payments')->whereNotNull('purchase_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('payments.amount');
-        $credit_card_payment_purchase = DB::table('payments')
-            ->where('paying_method', 'Gift Card')
-            ->whereNotNull('payments.purchase_id')
-            ->whereDate('payments.created_at', '>=', $start_date)
-            ->whereDate('payments.created_at', '<=', $end_date)->sum('payments.amount');
-        $cheque_payment_purchase = DB::table('payments')
-            ->where('paying_method', 'Cheque')
-            ->whereNotNull('payments.purchase_id')
-            ->whereDate('payments.created_at', '>=', $start_date)
-            ->whereDate('payments.created_at', '<=', $end_date)->sum('payments.amount');
+        $payment_sent = Payment::whereNotNull('purchase_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
+        $credit_card_payment_purchase = Payment::where('paying_method', 'Gift Card')
+            ->whereNotNull('purchase_id')
+            ->whereDate('created_at', '>=', $start_date)
+            ->whereDate('created_at', '<=', $end_date)->sum('amount');
+        $cheque_payment_purchase = Payment::where('paying_method', 'Cheque')
+            ->whereNotNull('purchase_id')
+            ->whereDate('created_at', '>=', $start_date)
+            ->whereDate('created_at', '<=', $end_date)->sum('amount');
         $cash_payment_purchase = $payment_sent - $credit_card_payment_purchase - $cheque_payment_purchase;
         $lims_warehouse_all = Warehouse::where('is_active', true)->get();
         $warehouse_name = [];
@@ -1283,10 +1277,9 @@ class ReportController extends Controller
         $lims_purchase_data = Purchase::with('warehouse')->where('user_id', $user_id)->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
         $lims_quotation_data = Quotation::with('customer', 'warehouse')->where('user_id', $user_id)->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
         $lims_transfer_data = Transfer::with('fromWarehouse', 'toWarehouse')->where('user_id', $user_id)->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
-        $lims_payment_data = DB::table('payments')
-            ->where('user_id', $user_id)
-            ->whereDate('payments.created_at', '>=', $start_date)
-            ->whereDate('payments.created_at', '<=', $end_date)
+        $lims_payment_data = Payment::where('user_id', $user_id)
+            ->whereDate('created_at', '>=', $start_date)
+            ->whereDate('created_at', '<=', $end_date)
             ->orderBy('created_at', 'desc')
             ->get();
         $lims_expense_data = Expense::with('warehouse', 'expenseCategory')->where('user_id', $user_id)->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
@@ -1318,9 +1311,8 @@ class ReportController extends Controller
         $lims_sale_data = Sale::with('warehouse')->where('customer_id', $customer_id)->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
         $lims_quotation_data = Quotation::with('warehouse')->where('customer_id', $customer_id)->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
         $lims_return_data = Returns::with('warehouse', 'biller')->where([['customer_id', $customer_id], ['is_active', true]])->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
-        $lims_payment_data = DB::table('payments')
-            ->join('sales', 'payments.sale_id', '=', 'sales.id')
-            ->where('customer_id', $customer_id)
+        $lims_payment_data = Payment::join('sales', 'payments.sale_id', '=', 'sales.id')
+            ->where('sales.customer_id', $customer_id)
             ->whereDate('payments.created_at', '>=', $start_date)
             ->whereDate('payments.created_at', '<=', $end_date)
             ->select('payments.*', 'sales.reference_no as sale_reference')
@@ -1353,9 +1345,8 @@ class ReportController extends Controller
         $lims_purchase_data = Purchase::with('warehouse')->where('supplier_id', $supplier_id)->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
         $lims_quotation_data = Quotation::with('warehouse', 'customer')->where('supplier_id', $supplier_id)->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
         $lims_return_data = ReturnPurchase::with('warehouse')->where('supplier_id', $supplier_id)->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->orderBy('created_at', 'desc')->get();
-        $lims_payment_data = DB::table('payments')
-            ->join('purchases', 'payments.purchase_id', '=', 'purchases.id')
-            ->where('supplier_id', $supplier_id)
+        $lims_payment_data = Payment::join('purchases', 'payments.purchase_id', '=', 'purchases.id')
+            ->where('purchases.supplier_id', $supplier_id)
             ->whereDate('payments.created_at', '>=', $start_date)
             ->whereDate('payments.created_at', '<=', $end_date)
             ->select('payments.*', 'purchases.reference_no as purchase_reference')

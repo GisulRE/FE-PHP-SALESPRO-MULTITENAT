@@ -19,6 +19,7 @@ class CreateCategoriesTable extends Migration
             $table->string('image')->nullable();
             $table->integer('parent_id')->nullable();
             $table->boolean('is_active')->nullable();
+            $table->boolean('is_public')->nullable();
             $table->string('codigo_actividad')->nullable();
             $table->string('codigo_producto_servicio')->nullable();
             $table->timestamps();

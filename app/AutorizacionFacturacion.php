@@ -3,6 +3,8 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class AutorizacionFacturacion extends Model
@@ -25,6 +27,7 @@ class AutorizacionFacturacion extends Model
         "usuario_alta", 
         "usuario_modificacion", 
         "id_empresa", 
+        "company_id", 
         
         "id_url_produccion_obtencion_codigos", 
         "id_url_produccion_operaciones", 
@@ -36,6 +39,26 @@ class AutorizacionFacturacion extends Model
         "id_url_pruebas_recepcion_compras", 
         "id_url_pruebas_sincronizacion_datos", 
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        $table = (new static)->getTable();
+        if (Schema::hasColumn($table, 'company_id')) {
+            static::addGlobalScope('company', function (Builder $builder) use ($table) {
+                if (auth()->check()) {
+                    $builder->where($table . '.company_id', auth()->user()->company_id);
+                }
+            });
+
+            static::creating(function ($model) {
+                if (auth()->check() && empty($model->company_id)) {
+                    $model->company_id = auth()->user()->company_id;
+                }
+            });
+        }
+    }
 
     public function getAmbiente()
     {
