@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Product;
 use App\Reservation;
 use App\Warehouse;
+use App\Employee;
+use App\EmployeeReservationSchedule;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use Auth;
@@ -14,10 +16,131 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Services\WhatsAppService;
+use App\PosSetting;
 
 class ReservationController extends Controller
 {
   // Agregar métodos para marcar ausencia y cancelar reserva
+
+  private function getEmployeeDaySchedules($employeeId, $date)
+  {
+    $day = Carbon::parse($date)->dayOfWeek;
+    $schedules = EmployeeReservationSchedule::where('employee_id', $employeeId)
+      ->where('day_of_week', $day)
+      ->where('is_enabled', true)
+      ->orderBy('start_time', 'asc')
+      ->get();
+
+    $result = [];
+    foreach ($schedules as $schedule) {
+      if (empty($schedule->start_time) || empty($schedule->end_time)) {
+        continue;
+      }
+      $interval = intval($schedule->interval_minutes ?: 30);
+      $start = Carbon::parse($date . ' ' . $schedule->start_time);
+      $end = Carbon::parse($date . ' ' . $schedule->end_time);
+      if ($start->gte($end)) {
+        continue;
+      }
+      $result[] = [
+        'start' => $start,
+        'end' => $end,
+        'interval' => max($interval, 5),
+      ];
+    }
+
+    return $result;
+  }
+
+  private function validateEmployeeScheduleWindow($employeeId, Carbon $start, Carbon $end)
+  {
+    $schedules = $this->getEmployeeDaySchedules($employeeId, $start->toDateString());
+    if (empty($schedules)) {
+      return [
+        'ok' => false,
+        'message' => 'El empleado no tiene horario habilitado para ese día',
+      ];
+    }
+
+    foreach ($schedules as $schedule) {
+      if ($start->lt($schedule['start']) || $end->gt($schedule['end'])) {
+        continue;
+      }
+      $minutesFromStart = $schedule['start']->diffInMinutes($start, false);
+      if ($minutesFromStart < 0) {
+        continue;
+      }
+      if (($minutesFromStart % $schedule['interval']) !== 0) {
+        continue;
+      }
+      return ['ok' => true, 'schedule' => $schedule];
+    }
+
+    return [
+      'ok' => false,
+      'message' => 'El horario solicitado está fuera de los turnos o intervalos configurados del empleado',
+    ];
+  }
+
+  private function buildEmployeeSlots($employeeId, $date, $duration)
+  {
+    $schedules = $this->getEmployeeDaySchedules($employeeId, $date);
+    if (empty($schedules)) {
+      return [
+        'available' => false,
+        'message' => 'El empleado no tiene horarios habilitados para ese día',
+        'hora_inicio' => null,
+        'hora_fin' => null,
+        'intervalo_minutos' => null,
+        'slots' => [],
+      ];
+    }
+
+    $slots = [];
+    foreach ($schedules as $schedule) {
+      // Regla solicitada: la duración efectiva de cada slot es igual al intervalo.
+      $effectiveDuration = intval($schedule['interval']);
+      $slot = $schedule['start']->copy();
+      while ($slot->lte($schedule['end']->copy()->subMinutes($effectiveDuration))) {
+        $slotEnd = $slot->copy()->addMinutes($effectiveDuration);
+        $conflict = Reservation::where('employee_id', $employeeId)
+          ->where('reserved_date', $date)
+          ->whereNotIn('status', ['cancelled', 'canceled', 'expired', 'completed', 'absent'])
+          ->get()
+          ->filter(function ($r) use ($slot, $slotEnd) {
+            $rStart = Carbon::parse($r->reserved_date . ' ' . $r->reserved_time);
+            $rEnd = $rStart->copy()->addMinutes($r->duration_minutes ?? 30);
+            return $slot->lt($rEnd) && $slotEnd->gt($rStart);
+          });
+
+        $slots[$slot->format('H:i')] = ['time' => $slot->format('H:i'), 'available' => $conflict->isEmpty()];
+        $slot->addMinutes($schedule['interval']);
+      }
+    }
+
+    $slots = array_values($slots);
+    usort($slots, function ($a, $b) {
+      return strcmp($a['time'], $b['time']);
+    });
+
+    $horaInicio = $schedules[0]['start']->format('H:i');
+    $horaFin = $schedules[count($schedules) - 1]['end']->format('H:i');
+    $intervalMin = $schedules[0]['interval'];
+
+    $hasAvailable = collect($slots)->contains(function ($s) {
+      return !empty($s['available']);
+    });
+
+    return [
+      'available' => $hasAvailable,
+      'message' => $hasAvailable ? 'Hay horarios disponibles para el empleado' : 'No hay horarios disponibles para el empleado en ese día',
+      'duration_minutes' => $intervalMin,
+      'hora_inicio' => $horaInicio,
+      'hora_fin' => $horaFin,
+      'intervalo_minutos' => $intervalMin,
+      'slots' => $slots,
+    ];
+  }
 
   /**
    * Marcar una reserva como ausencia (no-show).
@@ -42,6 +165,72 @@ class ReservationController extends Controller
     if ($r) {
       $r->status = 'cancelled';
       $r->save();
+
+      try {
+        $phone = preg_replace('/[^0-9+]/', '', $r->phone);
+        $phoneDigits = preg_replace('/[^0-9]/', '', $phone);
+        if (substr($phoneDigits, 0, 3) === '591') {
+          $to = $phoneDigits;
+        } else {
+          $to = '591' . ltrim($phoneDigits, '0');
+        }
+
+        try {
+          $dt = Carbon::parse($r->reserved_date . ' ' . $r->reserved_time)->locale('es');
+          $dateFormatted = $dt->isoFormat('dddd, D [de] MMMM');
+          $timeFormatted = $dt->format('H:i');
+        } catch (\Exception $e) {
+          $dateFormatted = $r->reserved_date;
+          $timeFormatted = $r->reserved_time;
+        }
+
+        $serviceName = $r->product ? $r->product->name : '-';
+        $appName = config('app.name') ?: 'H2O';
+
+        $message = "Hola, {$r->name}:\n\n";
+        $message .= "Lamentamos informarle que su reserva de los servicios {$serviceName} para el {$dateFormatted} a las {$timeFormatted} ha sido cancelada por el proveedor {$appName}. Para obtener más detalles o ayuda adicional, no dude en ponerse en contacto con nosotros.";
+
+        $waService = app(WhatsAppService::class);
+        $sent = $waService->sendMessage($to, $message);
+        if (!$sent) {
+          \Log::warning('No se pudo enviar WA al cancelar reserva', ['reservation_id' => $r->id, 'to' => $to]);
+        }
+        // Enviar también al encargado configurado en pos_setting (si existe)
+        try {
+          $posSetting = PosSetting::latest()->first();
+          if ($posSetting && !empty($posSetting->nro_encargado)) {
+            $mgrPhone = preg_replace('/[^0-9+]/', '', $posSetting->nro_encargado);
+            $mgrDigits = preg_replace('/[^0-9]/', '', $mgrPhone);
+            if (!empty($mgrDigits)) {
+              if (substr($mgrDigits, 0, 3) === '591') {
+                $toMgr = $mgrDigits;
+              } else {
+                $toMgr = '591' . ltrim($mgrDigits, '0');
+              }
+              $mgrMsg = "👨‍💼 Encargado/a, reserva cancelada:\n\n";
+              $mgrMsg .= "👤 Cliente: {$r->name}\n";
+              $mgrMsg .= "📝 Servicio: {$serviceName}\n";
+              $mgrMsg .= "🏢 Sucursal: " . ($r->warehouse ? $r->warehouse->name : '-') . "\n";
+              $mgrMsg .= "🗓️ Fecha: {$dateFormatted}\n";
+              $mgrMsg .= "🕑 Hora: {$timeFormatted}\n\n";
+              $mgrMsg .= "Estado: Cancelada. Por favor, coordine según corresponda.";
+              try {
+                $sentMgr = $waService->sendMessage($toMgr, $mgrMsg);
+                if (!$sentMgr) {
+                  \Log::warning('No se pudo enviar WA al encargado (cancelReservation)', ['reservation_id' => $r->id, 'to' => $toMgr]);
+                }
+              } catch (\Exception $e) {
+                \Log::error('Excepción enviando WA al encargado (cancelReservation)', ['reservation_id' => $r->id, 'error' => $e->getMessage()]);
+              }
+            }
+          }
+        } catch (\Exception $e) {
+          \Log::error('Error obteniendo posSetting para enviar al encargado (cancelReservation)', ['error' => $e->getMessage()]);
+        }
+      } catch (\Exception $e) {
+        \Log::error('Excepción enviando WA (cancelReservation)', ['reservation_id' => $r->id, 'error' => $e->getMessage()]);
+      }
+
       return redirect('reservations')->with('message', 'Reserva cancelada');
     }
     return redirect('reservations')->with('not_permitted', 'Reserva no encontrada');
@@ -252,7 +441,7 @@ class ReservationController extends Controller
     if ($role->hasPermissionTo('reservations-add')) {
       $products = Product::where('is_active', true)->get();
       $warehouses = Warehouse::where('is_active', true)->get();
-      $employees = \App\Employee::where('is_active', true)->get();
+      $employees = \App\Employee::where('is_active', true)->orderBy('name', 'asc')->get();
       return view('reservation.create', compact('products', 'warehouses', 'employees'));
     }
     return redirect()->back()->with('not_permitted', '¡Lo siento! No tienes permiso para acceder a este módulo.');
@@ -312,12 +501,106 @@ class ReservationController extends Controller
       }
       $serviceName = $reservation->product ? $reservation->product->name : '-';
       $warehouseName = $reservation->warehouse ? $reservation->warehouse->name : '-';
-      $message = "Hola {$reservation->name}, su reserva para el servicio: {$serviceName} en {$warehouseName} ha sido programada para el {$reservation->reserved_date} a las {$reservation->reserved_time}.";
+      $employeeName = $reservation->employee ? strtoupper($reservation->employee->name) : strtoupper('nuestro equipo');
+
+      try {
+        $dt = Carbon::parse($reservation->reserved_date . ' ' . $reservation->reserved_time)->locale('es');
+        $dateFormatted = $dt->isoFormat('dddd, D [de] MMMM');
+        $timeFormatted = $dt->format('H:i');
+      } catch (\Exception $e) {
+        $dateFormatted = $reservation->reserved_date;
+        $timeFormatted = $reservation->reserved_time;
+      }
+
+      $appName = config('app.name') ?: 'H2O';
+      $message = "¡Hola, {$reservation->name}! 👋\n\n";
+      $message .= "Tu reserva ha sido confirmada exitosamente. ✅\n";
+      $message .= "Aquí tienes los detalles:\n\n";
+      $message .= "📝 Servicios solicitados: {$serviceName}\n";
+      $message .= "🗓️ Fecha: {$dateFormatted}\n";
+      $message .= "🕑 Hora: {$timeFormatted}\n";
+      $message .= "👤 Colaborador: {$employeeName}\n";
+      $message .= "🏢 Sucursal: {$warehouseName}\n\n";
+      $message .= "Puedes hacer tu reserva también por nuestra app:\n\n";
+      $message .= "🔗 https://reservas.gisulsrl.com/\n\n";
+      $message .= "¡Gracias por confiar en nosotros, {$appName}! 😊";
 
       $waService = app(WhatsAppService::class);
       $sentOk = $waService->sendMessage($to, $message);
       if (!$sentOk) {
         \Log::warning('No se pudo enviar WA via WhatsAppService (store)', ['reservation_id' => $reservation->id, 'to' => $to]);
+      }
+
+      // Enviar también notificación al empleado asignado (si existe y tiene phone_number)
+      if (!empty($reservation->employee_id) && $reservation->employee) {
+        $empPhone = preg_replace('/[^0-9+]/', '', $reservation->employee->phone_number ?? '');
+        $empDigits = preg_replace('/[^0-9]/', '', $empPhone);
+        if (!empty($empDigits)) {
+          if (substr($empDigits, 0, 3) === '591') {
+            $toEmp = $empDigits;
+          } else {
+            $toEmp = '591' . ltrim($empDigits, '0');
+          }
+          $empAssignedName = $reservation->employee ? $reservation->employee->name : '';
+          $empAssignedNameU = strtoupper($empAssignedName ?: '');
+          try {
+            $dtEmp = Carbon::parse($reservation->reserved_date . ' ' . $reservation->reserved_time)->locale('es');
+            $dateEmp = $dtEmp->isoFormat('dddd, D [de] MMMM');
+            $timeEmp = $dtEmp->format('H:i');
+          } catch (\Exception $e) {
+            $dateEmp = $reservation->reserved_date;
+            $timeEmp = $reservation->reserved_time;
+          }
+          $empMsg = "📌 Hola {$empAssignedNameU},\n\n";
+          $empMsg .= "🆕 Nueva reserva asignada ✅\n\n";
+          $empMsg .= "👤 Cliente: {$reservation->name}\n";
+          $empMsg .= "📝 Servicio: {$serviceName}\n";
+          $empMsg .= "🏢 Sucursal: {$warehouseName}\n";
+          $empMsg .= "🗓️ Fecha: {$dateEmp}\n";
+          $empMsg .= "🕑 Hora: {$timeEmp}\n\n";
+          $empMsg .= "Por favor, prepare el espacio y esté presente a la hora indicada. Gracias.";
+          try {
+            $sentEmp = $waService->sendMessage($toEmp, $empMsg);
+            if (!$sentEmp) {
+              \Log::warning('No se pudo enviar WA al empleado (store)', ['reservation_id' => $reservation->id, 'employee_id' => $reservation->employee_id, 'to' => $toEmp]);
+            }
+          } catch (\Exception $e) {
+            \Log::error('Excepción enviando WA al empleado (store)', ['reservation_id' => $reservation->id, 'employee_id' => $reservation->employee_id, 'error' => $e->getMessage()]);
+          }
+        }
+      }
+      // Enviar también al encargado configurado en pos_setting (si existe)
+      try {
+        $posSetting = PosSetting::latest()->first();
+        if ($posSetting && !empty($posSetting->nro_encargado)) {
+          $mgrPhone = preg_replace('/[^0-9+]/', '', $posSetting->nro_encargado);
+          $mgrDigits = preg_replace('/[^0-9]/', '', $mgrPhone);
+          if (!empty($mgrDigits)) {
+            if (substr($mgrDigits, 0, 3) === '591') {
+              $toMgr = $mgrDigits;
+            } else {
+              $toMgr = '591' . ltrim($mgrDigits, '0');
+            }
+            $mgrMsg = "👨‍💼 Encargado/a, nueva reserva registrada:\n\n";
+            $mgrMsg .= "👤 Cliente: {$reservation->name}\n";
+            $mgrMsg .= "📝 Servicio: {$serviceName}\n";
+            $mgrMsg .= "🏢 Sucursal: {$warehouseName}\n";
+            $mgrMsg .= "🗓️ Fecha: {$dateFormatted}\n";
+            $mgrMsg .= "🕑 Hora: {$timeFormatted}\n";
+            $mgrMsg .= "👤 Colaborador: {$employeeName}\n\n";
+            $mgrMsg .= "Por favor, tome nota. Gracias.";
+            try {
+              $sentMgr = $waService->sendMessage($toMgr, $mgrMsg);
+              if (!$sentMgr) {
+                \Log::warning('No se pudo enviar WA al encargado (store)', ['reservation_id' => $reservation->id, 'to' => $toMgr]);
+              }
+            } catch (\Exception $e) {
+              \Log::error('Excepción enviando WA al encargado (store)', ['reservation_id' => $reservation->id, 'error' => $e->getMessage()]);
+            }
+          }
+        }
+      } catch (\Exception $e) {
+        \Log::error('Error obteniendo posSetting para enviar al encargado (store)', ['error' => $e->getMessage()]);
       }
     } catch (\Exception $e) {
       \Log::error('Error preparando WA (store)', ['reservation_id' => $reservation->id, 'error' => $e->getMessage()]);
@@ -351,7 +634,8 @@ class ReservationController extends Controller
       $reservation = Reservation::findOrFail($id);
       $products = Product::where('is_active', true)->get();
       $warehouses = Warehouse::where('is_active', true)->get();
-      return view('reservation.edit', compact('reservation', 'products', 'warehouses'));
+      $employees = Employee::where('is_active', true)->orderBy('name', 'asc')->get();
+      return view('reservation.edit', compact('reservation', 'products', 'warehouses', 'employees'));
     }
     return redirect()->back()->with('not_permitted', '¡Lo siento! No tienes permiso para acceder a este módulo.');
   }
@@ -384,35 +668,57 @@ class ReservationController extends Controller
 
   /**
    * Enviar recordatorios por WhatsApp a reservas seleccionadas.
-   * Sólo envía a reservas con estado 'pending', fecha = hoy y hora > ahora.
+   * Envía a reservas con fecha >= hoy. Omite las que tienen estado 'expired' o 'absent'.
    */
   public function sendReminders(Request $request)
   {
     $ids = $request->input('reservationIdArray', []);
-    if (empty($ids))
+    \Log::info('sendReminders: Iniciando proceso', ['ids_recibidos' => $ids]);
+
+    if (empty($ids)) {
+      \Log::warning('sendReminders: No hay reservas seleccionadas');
       return response()->json('No hay reservas seleccionadas.', 422);
+    }
 
     $now = Carbon::now();
     $today = $now->toDateString();
     $sent = [];
     $skipped = [];
+    $skippedReasons = [];
+
+    \Log::info('sendReminders: Fecha y hora actual', ['today' => $today, 'now' => $now->toDateTimeString()]);
 
     $reservations = Reservation::whereIn('id', $ids)->get();
+    \Log::info('sendReminders: Reservas encontradas', ['count' => $reservations->count()]);
+
     foreach ($reservations as $r) {
-      if (strtolower($r->status) !== 'pending' || $r->reserved_date != $today) {
+      \Log::info('sendReminders: Procesando reserva', [
+        'id' => $r->id,
+        'name' => $r->name,
+        'phone' => $r->phone,
+        'status' => $r->status,
+        'reserved_date' => $r->reserved_date,
+        'reserved_time' => $r->reserved_time
+      ]);
+
+      // Omitir reservas con estado 'expired' o 'absent'
+      $status = strtolower($r->status);
+      if (in_array($status, ['expired', 'absent'])) {
+        \Log::info('sendReminders: Reserva omitida - estado es expired o absent', ['id' => $r->id, 'status' => $r->status]);
         $skipped[] = $r->id;
+        $skippedReasons[$r->id] = 'Estado es ' . $r->status;
         continue;
       }
-      try {
-        $reservedAt = Carbon::parse($r->reserved_date . ' ' . $r->reserved_time);
-      } catch (\Exception $e) {
+
+      // Solo enviar a reservas con fecha >= hoy (hoy y futuras)
+      if ($r->reserved_date < $today) {
+        \Log::info('sendReminders: Reserva omitida - fecha es pasada', ['id' => $r->id, 'reserved_date' => $r->reserved_date, 'today' => $today]);
         $skipped[] = $r->id;
+        $skippedReasons[$r->id] = 'Fecha es pasada';
         continue;
       }
-      if ($reservedAt->lte($now)) {
-        $skipped[] = $r->id;
-        continue;
-      }
+
+      // Enviamos recordatorio a reservas de hoy y futuras con estado válido
 
       $phone = preg_replace('/[^0-9+]/', '', $r->phone);
       $phoneDigits = preg_replace('/[^0-9]/', '', $phone);
@@ -424,22 +730,86 @@ class ReservationController extends Controller
 
       $serviceName = $r->product ? $r->product->name : '-';
       $warehouseName = $r->warehouse ? $r->warehouse->name : '-';
-      $message = "Hola {$r->name}, le recordamos su reserva para el servicio: {$serviceName} en la sucursal: {$warehouseName} el {$r->reserved_date} a las {$r->reserved_time}.";
+      $employeeName = $r->employee ? strtoupper($r->employee->name) : strtoupper('nuestro equipo');
+      try {
+        $dtR = Carbon::parse($r->reserved_date . ' ' . $r->reserved_time)->locale('es');
+        $dateFormatted = $dtR->isoFormat('dddd, D [de] MMMM');
+        $timeFormatted = $dtR->format('H:i');
+      } catch (\Exception $e) {
+        $dateFormatted = $r->reserved_date;
+        $timeFormatted = $r->reserved_time;
+      }
+      $appName = config('app.name') ?: 'H2O';
+      $message = "¡Hola, {$r->name}! 👋\n\n";
+      $message .= "Te recordamos tu reserva. ✅\n\n";
+      $message .= "📝 Servicio: {$serviceName}\n";
+      $message .= "🗓️ Fecha: {$dateFormatted}\n";
+      $message .= "🕑 Hora: {$timeFormatted}\n";
+      $message .= "👤 Colaborador: {$employeeName}\n";
+      $message .= "🏢 Sucursal: {$warehouseName}\n\n";
+      $message .= "Por favor preséntese 10 minutos antes. Si necesita reprogramar o cancelar, contáctenos o use https://reservas.gisulsrl.com/\n\n";
+      $message .= "¡Gracias por confiar en nosotros, {$appName}! 😊";
+
+      \Log::info('sendReminders: Intentando enviar WhatsApp', ['id' => $r->id, 'to' => $to, 'message' => $message]);
 
       try {
         $waService = app(WhatsAppService::class);
         $sentOk = $waService->sendMessage($to, $message);
         if ($sentOk) {
+          \Log::info('sendReminders: WhatsApp enviado correctamente', ['id' => $r->id, 'to' => $to]);
           $sent[] = $r->id;
         } else {
-          \Log::warning('No se pudo enviar WA via WhatsAppService (sendReminders)', ['id' => $r->id, 'to' => $to]);
+          \Log::warning('sendReminders: WhatsAppService retornó false', ['id' => $r->id, 'to' => $to]);
           $skipped[] = $r->id;
+          $skippedReasons[$r->id] = 'WhatsApp no enviado';
+        }
+        // Enviar también al empleado asignado si tiene phone_number
+        if ($r->employee && !empty($r->employee->phone_number)) {
+          $empPhone = preg_replace('/[^0-9+]/', '', $r->employee->phone_number);
+          $empDigits = preg_replace('/[^0-9]/', '', $empPhone);
+          if (!empty($empDigits)) {
+            if (substr($empDigits, 0, 3) === '591') {
+              $toEmp = $empDigits;
+            } else {
+              $toEmp = '591' . ltrim($empDigits, '0');
+            }
+            $empAssignedName = $r->employee ? $r->employee->name : '';
+            $empAssignedNameU = strtoupper($empAssignedName ?: '');
+            try {
+              $dtEmpR = Carbon::parse($r->reserved_date . ' ' . $r->reserved_time)->locale('es');
+              $dateEmpR = $dtEmpR->isoFormat('dddd, D [de] MMMM');
+              $timeEmpR = $dtEmpR->format('H:i');
+            } catch (\Exception $e) {
+              $dateEmpR = $r->reserved_date;
+              $timeEmpR = $r->reserved_time;
+            }
+            $empMsg = "⏰ Recordatorio - Reserva asignada\n\n";
+            $empMsg .= "👤 Cliente: {$r->name}\n";
+            $empMsg .= "📝 Servicio: {$serviceName}\n";
+            $empMsg .= "🏢 Sucursal: {$warehouseName}\n";
+            $empMsg .= "🗓️ Fecha: {$dateEmpR}\n";
+            $empMsg .= "🕑 Hora: {$timeEmpR}\n\n";
+            $empMsg .= "Por favor, organice su agenda y esté presente a la hora indicada. Gracias.";
+            try {
+              $sentEmp = $waService->sendMessage($toEmp, $empMsg);
+              if ($sentEmp) {
+                \Log::info('sendReminders: WhatsApp enviado al empleado', ['id' => $r->id, 'employee_id' => $r->employee->id, 'to' => $toEmp]);
+              } else {
+                \Log::warning('sendReminders: WhatsAppService retornó false al enviar al empleado', ['id' => $r->id, 'employee_id' => $r->employee->id, 'to' => $toEmp]);
+              }
+            } catch (\Exception $e) {
+              \Log::error('sendReminders: Excepción enviando WA al empleado', ['id' => $r->id, 'employee_id' => $r->employee->id, 'error' => $e->getMessage()]);
+            }
+          }
         }
       } catch (\Exception $e) {
-        \Log::error('Error enviando WA en sendReminders', ['id' => $r->id, 'error' => $e->getMessage()]);
+        \Log::error('sendReminders: Excepción enviando WhatsApp', ['id' => $r->id, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         $skipped[] = $r->id;
+        $skippedReasons[$r->id] = 'Error: ' . $e->getMessage();
       }
     }
+
+    \Log::info('sendReminders: Proceso finalizado', ['sent' => $sent, 'skipped' => $skipped, 'skippedReasons' => $skippedReasons]);
 
     return response()->json(['sent' => $sent, 'skipped' => $skipped, 'message' => 'Proceso terminado.']);
   }
@@ -474,11 +844,19 @@ class ReservationController extends Controller
     }
     $end = $start->copy()->addMinutes($duration);
 
+    if ($employee) {
+      $scheduleValidation = $this->validateEmployeeScheduleWindow($employee, $start, $end);
+      if (!$scheduleValidation['ok']) {
+        return response()->json(['available' => false, 'message' => $scheduleValidation['message']], 200);
+      }
+    }
+
     // Traer reservas en la misma fecha. Si se especificó empleado, filtrar por empleado;
     // en caso contrario filtrar por sucursal.
     if ($employee) {
       $existing = Reservation::where('employee_id', $employee)
         ->where('reserved_date', $date)
+        ->whereNotIn('status', ['cancelled', 'canceled', 'expired', 'completed', 'absent'])
         ->when($exclude, function ($q) use ($exclude) {
           return $q->where('id', '!=', $exclude);
         })
@@ -490,6 +868,7 @@ class ReservationController extends Controller
       }
       $existing = Reservation::where('sucursal_id', $sucursal)
         ->where('reserved_date', $date)
+        ->whereNotIn('status', ['cancelled', 'canceled', 'expired', 'completed', 'absent'])
         ->when($exclude, function ($q) use ($exclude) {
           return $q->where('id', '!=', $exclude);
         })
@@ -526,6 +905,7 @@ class ReservationController extends Controller
       // Find the next reservation for this employee on the same date that starts after the requested start
       $next = Reservation::where('employee_id', $employee)
         ->where('reserved_date', $date)
+        ->whereNotIn('status', ['cancelled', 'canceled', 'expired', 'completed', 'absent'])
         ->whereRaw("CONCAT(reserved_date,' ',reserved_time) > ?", [$start->toDateTimeString()])
         ->orderBy('reserved_time', 'asc')
         ->first();
@@ -558,41 +938,94 @@ class ReservationController extends Controller
       'reserved_date' => 'required|date',
       'reserved_time' => 'required',
       'duration_minutes' => 'nullable|integer|min:1',
-      'sucursal_id' => 'required|integer'
+      'sucursal_id' => 'required|integer',
+      'employee_id' => 'nullable|integer'
     ]);
 
     $date = $request->input('reserved_date');
     $time = $request->input('reserved_time');
     $duration = intval($request->input('duration_minutes', 30));
     $sucursal = $request->input('sucursal_id');
+    $requestedEmployeeId = $request->input('employee_id');
 
     try {
       $start = Carbon::parse($date . ' ' . $time);
     } catch (\Exception $e) {
       return response()->json(['error' => 'Fecha u hora inválida'], 422);
     }
-    $end = $start->copy()->addMinutes($duration);
 
-    // Obtener empleados activos asignados a la sucursal; si ninguno, tomar todos activos
-    $employees = \App\Employee::where([['is_active', true], ['warehouse_id', $sucursal]])->get();
-    if ($employees->isEmpty()) {
-      $employees = \App\Employee::where('is_active', true)->get();
+    if ($start->lte(Carbon::now())) {
+      return response()->json(['error' => 'Sólo se permiten reservas para fechas y horas futuras'], 422);
     }
 
-    // Revisar disponibilidad por empleado
+    $end = $start->copy()->addMinutes($duration);
+
     $assignedEmployee = null;
-    foreach ($employees as $emp) {
+
+    // Si se especificó un empleado, verificar disponibilidad de ese empleado
+    if ($requestedEmployeeId) {
+      $emp = \App\Employee::where('id', $requestedEmployeeId)->where('is_active', true)->first();
+      if (!$emp) {
+        return response()->json(['error' => 'Empleado no encontrado o no está activo'], 404);
+      }
+
+      // Verificar si el empleado tiene conflicto en ese horario
+      $scheduleValidation = $this->validateEmployeeScheduleWindow($emp->id, $start, $end);
+      if (!$scheduleValidation['ok']) {
+        return response()->json(['error' => $scheduleValidation['message']], 200);
+      }
+
       $conflict = Reservation::where('employee_id', $emp->id)
         ->where('reserved_date', $date)
+        ->whereNotIn('status', ['cancelled', 'canceled', 'expired', 'completed', 'absent'])
         ->get()
         ->filter(function ($r) use ($start, $end) {
           $rStart = Carbon::parse($r->reserved_date . ' ' . $r->reserved_time);
           $rEnd = $rStart->copy()->addMinutes($r->duration_minutes ?? 30);
           return $start->lt($rEnd) && $end->gt($rStart);
         });
-      if ($conflict->isEmpty()) {
-        $assignedEmployee = $emp;
-        break;
+
+      if ($conflict->isNotEmpty()) {
+        return response()->json(['error' => 'El empleado seleccionado no está disponible en este horario'], 200);
+      }
+
+      $assignedEmployee = $emp;
+    } else {
+      // Round-robin: asignar al empleado con menos reservas del día que esté disponible
+      $employees = \App\Employee::where([['is_active', true], ['warehouse_id', $sucursal]])->get();
+      if ($employees->isEmpty()) {
+        $employees = \App\Employee::where('is_active', true)->get();
+      }
+
+      // Contar reservas del día por empleado y ordenar por cantidad (menor primero)
+      $employeesWithCount = $employees->map(function ($emp) use ($date) {
+        $count = Reservation::where('employee_id', $emp->id)
+          ->where('reserved_date', $date)
+          ->count();
+        return ['employee' => $emp, 'count' => $count];
+      })->sortBy('count');
+
+      // Buscar el empleado con menos reservas que esté disponible en el horario
+      foreach ($employeesWithCount as $item) {
+        $emp = $item['employee'];
+        $scheduleValidation = $this->validateEmployeeScheduleWindow($emp->id, $start, $end);
+        if (!$scheduleValidation['ok']) {
+          continue;
+        }
+        $conflict = Reservation::where('employee_id', $emp->id)
+          ->where('reserved_date', $date)
+          ->whereNotIn('status', ['cancelled', 'canceled', 'expired', 'completed', 'absent'])
+          ->get()
+          ->filter(function ($r) use ($start, $end) {
+            $rStart = Carbon::parse($r->reserved_date . ' ' . $r->reserved_time);
+            $rEnd = $rStart->copy()->addMinutes($r->duration_minutes ?? 30);
+            return $start->lt($rEnd) && $end->gt($rStart);
+          });
+
+        if ($conflict->isEmpty()) {
+          $assignedEmployee = $emp;
+          break;
+        }
       }
     }
 
@@ -620,12 +1053,67 @@ class ReservationController extends Controller
       }
       $serviceName = $reservation->product ? $reservation->product->name : '-';
       $warehouseName = $reservation->warehouse ? $reservation->warehouse->name : '-';
-      $message = "Hola {$reservation->name}, su reserva para el servicio: {$serviceName} en {$warehouseName} ha sido programada para el {$reservation->reserved_date} a las {$reservation->reserved_time}.";
+      try {
+        $dtPub = Carbon::parse($reservation->reserved_date . ' ' . $reservation->reserved_time)->locale('es');
+        $datePub = $dtPub->isoFormat('dddd, D [de] MMMM');
+        $timePub = $dtPub->format('H:i');
+      } catch (\Exception $e) {
+        $datePub = $reservation->reserved_date;
+        $timePub = $reservation->reserved_time;
+      }
+      $appName = config('app.name') ?: 'H2O';
+      $message = "¡Hola, {$reservation->name}! 👋\n\n";
+      $message .= "Tu reserva ha sido programada ✅\n\n";
+      $message .= "📝 Servicio: {$serviceName}\n";
+      $message .= "🗓️ Fecha: {$datePub}\n";
+      $message .= "🕑 Hora: {$timePub}\n";
+      $message .= "🏢 Sucursal: {$warehouseName}\n\n";
+      $message .= "Puedes gestionar tu reserva también en https://reservas.gisulsrl.com/\n\n";
+      $message .= "¡Gracias por confiar en Urban Fashion! 😊";
 
       $waService = app(WhatsAppService::class);
       $sentOk = $waService->sendMessage($to, $message);
       if (!$sentOk) {
         \Log::warning('No se pudo enviar WA via WhatsAppService (publicCreateReservation)', ['reservation_id' => $reservation->id, 'to' => $to]);
+      }
+
+      // Enviar también al empleado asignado (public API flow)
+      if ($assignedEmployee && !empty($assignedEmployee->phone_number)) {
+        $empPhone = preg_replace('/[^0-9+]/', '', $assignedEmployee->phone_number);
+        $empDigits = preg_replace('/[^0-9]/', '', $empPhone);
+        if (!empty($empDigits)) {
+          if (substr($empDigits, 0, 3) === '591') {
+            $toEmp = $empDigits;
+          } else {
+            $toEmp = '591' . ltrim($empDigits, '0');
+          }
+          $empAssignedName = $assignedEmployee ? $assignedEmployee->name : '';
+          $empAssignedNameU = strtoupper($empAssignedName ?: '');
+          try {
+            $dtEmpPub = Carbon::parse($reservation->reserved_date . ' ' . $reservation->reserved_time)->locale('es');
+            $dateEmpPub = $dtEmpPub->isoFormat('dddd, D [de] MMMM');
+            $timeEmpPub = $dtEmpPub->format('H:i');
+          } catch (\Exception $e) {
+            $dateEmpPub = $reservation->reserved_date;
+            $timeEmpPub = $reservation->reserved_time;
+          }
+          $empMsg = "📌 Hola {$empAssignedNameU},\n\n";
+          $empMsg .= "🆕 Nueva reserva asignada ✅\n\n";
+          $empMsg .= "👤 Cliente: {$reservation->name}\n";
+          $empMsg .= "📝 Servicio: {$serviceName}\n";
+          $empMsg .= "🏢 Sucursal: {$warehouseName}\n";
+          $empMsg .= "🗓️ Fecha: {$dateEmpPub}\n";
+          $empMsg .= "🕑 Hora: {$timeEmpPub}\n\n";
+          $empMsg .= "Por favor, organice su agenda y esté presente a la hora indicada. Gracias.";
+          try {
+            $sentEmp = $waService->sendMessage($toEmp, $empMsg);
+            if (!$sentEmp) {
+              \Log::warning('No se pudo enviar WA al empleado (publicCreateReservation)', ['reservation_id' => $reservation->id, 'employee_id' => $assignedEmployee->id, 'to' => $toEmp]);
+            }
+          } catch (\Exception $e) {
+            \Log::error('Excepción enviando WA al empleado (publicCreateReservation)', ['reservation_id' => $reservation->id, 'employee_id' => $assignedEmployee->id, 'error' => $e->getMessage()]);
+          }
+        }
       }
     } catch (\Exception $e) {
       \Log::error('Error preparando WA para publicCreateReservation', ['reservation_id' => $reservation->id, 'error' => $e->getMessage()]);
@@ -661,46 +1149,194 @@ class ReservationController extends Controller
     $date = $request->query('date', Carbon::now()->toDateString());
     $duration = intval($request->query('duration_minutes', 30));
     $sucursal = $request->query('sucursal_id');
+    $employeeId = $request->query('employee_id');
 
-    if (!$sucursal) {
-      return response()->json(['error' => 'sucursal_id requerido'], 422);
+    if (!$sucursal && !$employeeId) {
+      return response()->json(['error' => 'sucursal_id o employee_id requerido'], 422);
     }
 
-    // Rango de 08:00 a 21:00
-    $start = Carbon::parse($date . ' 08:00');
-    $endLimit = Carbon::parse($date . ' 21:00');
+    if ($employeeId) {
+      $employee = \App\Employee::find($employeeId);
+      if (!$employee) {
+        return response()->json(['error' => 'Empleado no encontrado'], 404);
+      }
+
+      $employeeSlots = $this->buildEmployeeSlots($employee->id, $date, $duration);
+      $duration = intval($employeeSlots['duration_minutes'] ?? $duration);
+      return response()->json([
+        'date' => $date,
+        'employee_id' => $employee->id,
+        'employee_name' => $employee->name,
+        'duration_minutes' => $duration,
+        'hora_inicio' => $employeeSlots['hora_inicio'],
+        'hora_fin' => $employeeSlots['hora_fin'],
+        'intervalo_minutos' => $employeeSlots['intervalo_minutos'],
+        'available' => $employeeSlots['available'],
+        'message' => $employeeSlots['message'],
+        'slots' => $employeeSlots['slots'],
+      ]);
+    }
+
+    // Obtener horarios de atención desde pos_setting
+    $posSetting = \App\PosSetting::first();
+    $horaInicio = $posSetting && $posSetting->hora_inicio_atencion ? $posSetting->hora_inicio_atencion : '08:00:00';
+    $horaFin = $posSetting && $posSetting->hora_fin_atencion ? $posSetting->hora_fin_atencion : '21:00:00';
+    $intervalo = $posSetting && $posSetting->intervalo_reserva_minutos ? intval($posSetting->intervalo_reserva_minutos) : 30;
+
+    // Usar el intervalo de la configuración si no se especifica duración
+    if (!$request->has('duration_minutes')) {
+      $duration = $intervalo;
+    }
+
+    // Rango desde hora_inicio_atencion hasta hora_fin_atencion
+    $start = Carbon::parse($date . ' ' . $horaInicio);
+    $endLimit = Carbon::parse($date . ' ' . $horaFin);
 
     $slots = [];
     $slot = $start->copy();
+    // If employee_id provided, validate employee and compute availability per that employee.
+    $employee = null;
+    if ($employeeId) {
+      $employee = \App\Employee::find($employeeId);
+      if (!$employee) {
+        return response()->json(['error' => 'Empleado no encontrado'], 404);
+      }
+    }
+
     while ($slot->lte($endLimit->copy()->subMinutes($duration))) {
       $slotEnd = $slot->copy()->addMinutes($duration);
 
       // comprobar solapamiento con reservas existentes
-      // ahora comprobamos si al menos un empleado está libre en ese slot
-      $employees = \App\Employee::where([['is_active', true], ['warehouse_id', $sucursal]])->get();
-      if ($employees->isEmpty()) {
-        $employees = \App\Employee::where('is_active', true)->get();
-      }
-      $slotAvailable = false;
-      foreach ($employees as $emp) {
-        $conflict = Reservation::where('employee_id', $emp->id)
+      if ($employee) {
+        $conflict = Reservation::where('employee_id', $employee->id)
           ->where('reserved_date', $date)->get()
           ->filter(function ($r) use ($slot, $slotEnd) {
             $rStart = Carbon::parse($r->reserved_date . ' ' . $r->reserved_time);
             $rEnd = $rStart->copy()->addMinutes($r->duration_minutes ?? 30);
             return $slot->lt($rEnd) && $slotEnd->gt($rStart);
           });
-        if ($conflict->isEmpty()) {
-          $slotAvailable = true;
-          break;
+
+        $slotAvailable = $conflict->isEmpty();
+      } else {
+        // ahora comprobamos si al menos un empleado está libre en ese slot (comportamiento previo)
+        $employees = \App\Employee::where([['is_active', true], ['warehouse_id', $sucursal]])->get();
+        if ($employees->isEmpty()) {
+          $employees = \App\Employee::where('is_active', true)->get();
+        }
+        $slotAvailable = false;
+        foreach ($employees as $emp) {
+          $conflict = Reservation::where('employee_id', $emp->id)
+            ->where('reserved_date', $date)->get()
+            ->filter(function ($r) use ($slot, $slotEnd) {
+              $rStart = Carbon::parse($r->reserved_date . ' ' . $r->reserved_time);
+              $rEnd = $rStart->copy()->addMinutes($r->duration_minutes ?? 30);
+              return $slot->lt($rEnd) && $slotEnd->gt($rStart);
+            });
+          if ($conflict->isEmpty()) {
+            $slotAvailable = true;
+            break;
+          }
         }
       }
 
-      $slots[] = ['time' => $slot->format('H:i'), 'available' => $slotAvailable];
-      $slot->addMinutes(30);
+      $entry = ['time' => $slot->format('H:i'), 'available' => $slotAvailable];
+      if ($employee) {
+        $entry['employee_id'] = $employee->id;
+      }
+      $slots[] = $entry;
+      $slot->addMinutes($intervalo);
     }
 
-    return response()->json(['date' => $date, 'duration_minutes' => $duration, 'slots' => $slots]);
+    return response()->json([
+      'date' => $date,
+      'duration_minutes' => $duration,
+      'hora_inicio' => Carbon::parse($horaInicio)->format('H:i'),
+      'hora_fin' => Carbon::parse($horaFin)->format('H:i'),
+      'intervalo_minutos' => $intervalo,
+      'slots' => $slots
+    ]);
+  }
+
+  /**
+   * Endpoint público para consultar disponibilidad por barbero al seleccionarlo.
+   * GET /api/reservations/employee-availability?employee_id=1&date=YYYY-MM-DD&duration_minutes=30
+   */
+  public function publicEmployeeAvailability(Request $request)
+  {
+    $request->validate([
+      'employee_id' => 'required|integer',
+      'date' => 'required|date',
+      'duration_minutes' => 'nullable|integer|min:1',
+    ]);
+
+    $employee = Employee::where('id', $request->query('employee_id'))
+      ->where('is_active', true)
+      ->first();
+
+    if (!$employee) {
+      return response()->json(['error' => 'Empleado no encontrado o no está activo'], 404);
+    }
+
+    $date = $request->query('date');
+    $duration = intval($request->query('duration_minutes', 30));
+    $employeeSlots = $this->buildEmployeeSlots($employee->id, $date, $duration);
+    $duration = intval($employeeSlots['duration_minutes'] ?? $duration);
+
+    return response()->json([
+      'employee' => ['id' => $employee->id, 'name' => $employee->name],
+      'date' => $date,
+      'duration_minutes' => $duration,
+      'has_available_slots' => $employeeSlots['available'],
+      'message' => $employeeSlots['message'],
+      'hora_inicio' => $employeeSlots['hora_inicio'],
+      'hora_fin' => $employeeSlots['hora_fin'],
+      'intervalo_minutos' => $employeeSlots['intervalo_minutos'],
+      'slots' => $employeeSlots['slots'],
+    ]);
+  }
+
+  /**
+   * Endpoint público para obtener espacios libres/ocupados por empleado y fecha.
+   * GET /api/reservations/employee-slots?employee_id=1&sucursal_id=1&date=2026-03-13&duration_minutes=30
+   */
+  public function publicEmployeeSlots(Request $request)
+  {
+    $request->validate([
+      'employee_id' => 'required|integer',
+      'sucursal_id' => 'nullable|integer',
+      'date' => 'required|date',
+      'duration_minutes' => 'nullable|integer|min:1',
+    ]);
+
+    $sucursalId = $request->query('sucursal_id');
+
+    $employee = Employee::where('id', $request->query('employee_id'))
+      ->where('is_active', true)
+      ->first();
+
+    if (!$employee) {
+      return response()->json(['error' => 'Empleado no encontrado o no está activo'], 404);
+    }
+
+    if (!empty($sucursalId) && intval($employee->warehouse_id) !== intval($sucursalId)) {
+      return response()->json(['error' => 'El empleado no pertenece a la sucursal indicada'], 422);
+    }
+
+    $date = Carbon::parse($request->query('date'))->toDateString();
+    $duration = intval($request->query('duration_minutes', 30));
+    $slotsData = $this->buildEmployeeSlots($employee->id, $date, $duration);
+    $duration = intval($slotsData['duration_minutes'] ?? $duration);
+
+    return response()->json([
+      'employee_id' => $employee->id,
+      'sucursal_id' => $sucursalId ? intval($sucursalId) : null,
+      'date' => $date,
+      'duration_minutes' => $duration,
+      'hora_inicio' => $slotsData['hora_inicio'],
+      'hora_fin' => $slotsData['hora_fin'],
+      'intervalo_minutos' => $slotsData['intervalo_minutos'],
+      'slots' => $slotsData['slots'],
+    ]);
   }
 
   public function deleteBySelection(Request $request)

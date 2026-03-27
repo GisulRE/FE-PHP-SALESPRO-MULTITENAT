@@ -5,6 +5,8 @@ namespace App;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
+use App\Warehouse;
+use App\Employee;
 
 class Reservation extends Model
 {
@@ -38,6 +40,18 @@ class Reservation extends Model
       });
 
       static::creating(function ($model) {
+        if (empty($model->company_id) && !empty($model->sucursal_id)) {
+          $model->company_id = Warehouse::withoutGlobalScopes()
+            ->where('id', $model->sucursal_id)
+            ->value('company_id');
+        }
+
+        if (empty($model->company_id) && !empty($model->employee_id)) {
+          $model->company_id = Employee::withoutGlobalScopes()
+            ->where('id', $model->employee_id)
+            ->value('company_id');
+        }
+
         if (auth()->check() && empty($model->company_id)) {
           $model->company_id = auth()->user()->company_id;
         }
