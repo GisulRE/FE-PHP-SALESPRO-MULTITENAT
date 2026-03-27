@@ -162,7 +162,7 @@
         dom: '<"row"lfB>rtip',
         buttons: [
           {
-            text: 'Enviar recordatorios de hoy', className: 'buttons-remind btn btn-primary', action: function (e, dt, node, config) {
+            text: 'Enviar recordatorios', className: 'buttons-remind btn btn-primary', action: function (e, dt, node, config) {
               var reservation_id = [];
               $('input.dt-checkboxes:checked').each(function () {
                 var id = $(this).closest('tr').data('id');
@@ -172,20 +172,68 @@
                 swal('Mensaje', 'Ninguna Reserva seleccionada', 'info');
                 return;
               }
-              if (!confirm('¿Enviar recordatorios de hoy a las reservas seleccionadas?')) return;
-              $.ajax({
-                type: 'POST',
-                url: '{{ url("reservations/send-reminders") }}',
-                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
-                data: { reservationIdArray: reservation_id },
-                success: function (data) {
-                  swal('Mensaje', data, 'success');
-                },
-                error: function (xhr) {
-                  console.error(xhr.responseText || xhr.statusText);
-                  swal('Error', 'No se pudo enviar recordatorios. Comprueba la consola.', 'error');
-                }
-              });
+
+              // Función para enviar los recordatorios
+              function enviarRecordatorios() {
+                $.ajax({
+                  type: 'POST',
+                  url: '{{ url("reservations/send-reminders") }}',
+                  headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                  data: { reservationIdArray: reservation_id },
+                  success: function (data) {
+                    var msg = '';
+                    if (data.sent && data.sent.length > 0) {
+                      msg += 'Enviados: ' + data.sent.length + ' recordatorio(s).\n';
+                    }
+                    if (data.skipped && data.skipped.length > 0) {
+                      msg += 'Omitidos: ' + data.skipped.length + ' (fecha pasada, estado expirado/ausente o error).';
+                    }
+                    if (!msg) {
+                      msg = data.message || 'Proceso completado.';
+                    }
+                    swal('Mensaje', msg, 'success');
+                  },
+                  error: function (xhr) {
+                    console.error(xhr.responseText || xhr.statusText);
+                    swal('Error', 'No se pudo enviar recordatorios. Comprueba la consola.', 'error');
+                  }
+                });
+              }
+
+              // Compatible con SweetAlert 1.x y 2.x
+              var swalVersion2 = (typeof swal.getState === 'function' || (swal.version && swal.version.indexOf('2') === 0));
+
+              if (swalVersion2) {
+                // SweetAlert 2.x (usa Promises)
+                swal({
+                  title: '¿Enviar recordatorios?',
+                  text: 'Se enviarán recordatorios por WhatsApp a las ' + reservation_id.length + ' reserva(s) seleccionada(s) con fecha de hoy o futura.',
+                  icon: 'warning',
+                  buttons: ['Cancelar', 'Sí, enviar'],
+                  dangerMode: true
+                }).then(function (isConfirm) {
+                  if (isConfirm) {
+                    enviarRecordatorios();
+                  }
+                });
+              } else {
+                // SweetAlert 1.x (usa callback)
+                swal({
+                  title: '¿Enviar recordatorios?',
+                  text: 'Se enviarán recordatorios por WhatsApp a las ' + reservation_id.length + ' reserva(s) seleccionada(s) con fecha de hoy o futura.',
+                  type: 'warning',
+                  showCancelButton: true,
+                  confirmButtonColor: '#3085d6',
+                  cancelButtonColor: '#d33',
+                  confirmButtonText: 'Sí, enviar',
+                  cancelButtonText: 'Cancelar',
+                  closeOnConfirm: true
+                }, function (isConfirm) {
+                  if (isConfirm) {
+                    enviarRecordatorios();
+                  }
+                });
+              }
             }
           }
         ]

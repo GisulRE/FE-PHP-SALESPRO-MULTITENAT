@@ -179,12 +179,43 @@
         });
       }
 
+      function checkEmployeeAvailabilitySlots() {
+        if (!employeeSelect || !employeeSelect.value || !dateInput.value) return;
+        var duration = durationInput && durationInput.value ? parseInt(durationInput.value) : 30;
+        var url = '/api/reservations/employee-availability?employee_id=' + encodeURIComponent(employeeSelect.value)
+          + '&date=' + encodeURIComponent(dateInput.value)
+          + '&duration_minutes=' + encodeURIComponent(duration);
+
+        fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } })
+          .then(function (res) {
+            return res.json().then(function (body) { return { status: res.status, body: body }; });
+          })
+          .then(function (j) {
+            if (j.status >= 400) {
+              var m = (j.body && (j.body.error || j.body.message)) ? (j.body.error || j.body.message) : 'No se pudo validar disponibilidad del barbero.';
+              showAvailability(false, m);
+              return;
+            }
+            if (j.body && j.body.has_available_slots === false) {
+              showAvailability(false, j.body.message || 'El barbero no tiene horarios disponibles para la fecha seleccionada.');
+            }
+          })
+          .catch(function (err) {
+            console.error(err);
+          });
+      }
+
       // eventos para disparar la comprobación
       if (dateInput) dateInput.addEventListener('change', checkAvailability);
       if (timeInput) timeInput.addEventListener('change', checkAvailability);
       if (durationInput) durationInput.addEventListener('input', function () { setTimeout(checkAvailability, 200); });
       if (sucursalSelect) sucursalSelect.addEventListener('change', checkAvailability);
-      if (employeeSelect) employeeSelect.addEventListener('change', checkAvailability);
+      if (employeeSelect) employeeSelect.addEventListener('change', function () {
+        checkAvailability();
+        checkEmployeeAvailabilitySlots();
+      });
+      if (dateInput) dateInput.addEventListener('change', checkEmployeeAvailabilitySlots);
+      if (durationInput) durationInput.addEventListener('input', function () { setTimeout(checkEmployeeAvailabilitySlots, 200); });
 
       // comprobar al cargar si hay valores
       setTimeout(checkAvailability, 500);
