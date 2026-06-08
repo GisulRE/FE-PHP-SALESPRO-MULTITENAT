@@ -330,7 +330,7 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title"> {{ __('file.Cancel Invoice') }} </h5>
+                        <h5 id="exampleModalLabel" class="modal-title" data-role="anulacion-title"> {{ __('file.Cancel Invoice') }} </h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close">
                             <span aria-hidden="true">
                                 <i class="dripicons-cross"></i></span>
@@ -338,7 +338,7 @@
                     </div>
                     <div class="modal-body">
                         <p class="italic">
-                            <small>
+                            <small id="anulacion-help-text-book">
                                 Este proceso anulará la venta facturada.* (Servicio de Impuestos)
                             </small>
                         </p>
@@ -367,11 +367,14 @@
                             <input type="text" name="cuf_anulacion_id" id="cuf_anulacion_id" hidden>
                             <input type="text" name="punto_venta_anulacion_id" id="punto_venta_anulacion_id" hidden>
                             <input type="text" name="sucursal_anulacion_id" id="sucursal_anulacion_id" hidden>
+                            <input type="text" name="codigo_documento_sector_anulacion_id" id="codigo_documento_sector_anulacion_id" hidden>
+                            <input type="text" name="accion_anulacion_modal_book" id="accion_anulacion_modal_book" value="anular" hidden>
                             <div class="form-group col-md-12">
                                 <label>Motivo de Anulación</label>
                                 <select name="motivo_anulacion_id" id="motivo_anulacion_id"
-                                    class="selectpicker form-control" title="Seleccione motivo...">
+                                    class="selectpicker form-control" title="Seleccione motivo..." required>
                                 </select>
+                                <small class="text-danger d-none" id="motivo_anulacion_error_book">Debe seleccionar un motivo de anulación.</small>
                             </div>
                             
                             <!-- Opción para enviar WhatsApp -->
@@ -1251,35 +1254,70 @@
             });
         }
 
-        $(document).on("click", "table tbody .anular-factura-modal", function(event) {
-            var id = $(this).data('id').toString();          // CUF
-            var puntoVenta = $(this).data('ptoventa');
-            var sucursal = $(this).data('sucursal');
-            var $tr = $(this).closest('tr');
+        function configurarModalAnulacion(accion) {
+            var esReversion = accion === 'revertir_anulacion';
 
-            console.log('Anular factura - CUF:', id, 'PtoVenta:', puntoVenta, 'Sucursal:', sucursal);
+            $('#accion_anulacion_modal_book').val(accion);
+            $('#anular-factura-modal [data-role="anulacion-title"]').text(
+                esReversion ? 'Revertir Anulación de Factura' : '{{ __('file.Cancel Invoice') }}'
+            );
+            $('#anulacion-help-text-book').text(
+                esReversion
+                    ? 'Este proceso revertirá la anulación de la venta facturada.* (Servicio de Impuestos)'
+                    : 'Este proceso anulará la venta facturada.* (Servicio de Impuestos)'
+            );
 
-            $('input[name="cuf_anulacion_id"]').val(id);
-            $('input[name="punto_venta_anulacion_id"]').val(puntoVenta);
-            $('input[name="sucursal_anulacion_id"]').val(sucursal);
-
-            // Resetear checkbox y campo de WhatsApp
             $('#send_whatsapp_book').prop('checked', false);
             $('#whatsapp_phone_container_book').hide();
             $('#whatsapp_phone_book').val('');
 
-            // Extraer datos correctos desde la fila (según tu THEAD)
-            // 0 Nro Factura | 1 Doc Sector | 2 NIT/CI | 3 Razon Social | 4 Desc | 5 Sujeto IVA | 6 Total | 7 Fecha | 8 Estado
+            if (esReversion) {
+                $('#btn_anulaFactura').removeClass('btn-danger').addClass('btn-primary').val('Revertir Anulación');
+                $('#send_whatsapp_book').closest('.form-group').hide();
+            } else {
+                $('#btn_anulaFactura').removeClass('btn-primary').addClass('btn-danger').val('Confirmar');
+                $('#send_whatsapp_book').closest('.form-group').show();
+            }
+        }
+
+        function abrirModalAnulacion($button, accion) {
+            var id = $button.data('id').toString();
+            var puntoVenta = $button.data('ptoventa');
+            var sucursal = $button.data('sucursal');
+            var codigoDocumento = $button.data('docsector');
+            var $tr = $button.closest('tr');
+            var rowData = null;
+
+            try {
+                rowData = $('#facturas_modal').DataTable().row($tr).data();
+            } catch (e) {
+                rowData = null;
+            }
+
+            configurarModalAnulacion(accion);
+
+            $('input[name="cuf_anulacion_id"]').val(id);
+            $('input[name="punto_venta_anulacion_id"]').val(puntoVenta);
+            $('input[name="sucursal_anulacion_id"]').val(sucursal);
+            $('input[name="codigo_documento_sector_anulacion_id"]').val(codigoDocumento || (rowData ? rowData.codigoDocumentoSector : ''));
+
             try {
                 var cells = $tr.find('td');
                 if (cells.length > 0) {
-                    var nroFactura   = $(cells[0]).text().trim() || '';
-                    var nit          = $(cells[2]).text().trim() || '';
-                    var razonSocial  = $(cells[3]).text().trim() || '';
-                    var montoTotal   = $(cells[6]).text().trim() || '';
-                    var fechaEmision = $(cells[7]).text().trim() || '';
+                    var nroFactura = (rowData && rowData.numeroFactura ? rowData.numeroFactura : $(cells[0]).text().trim()) || '';
+                    var nit = (rowData && rowData.numeroDocumento ? rowData.numeroDocumento : $(cells[2]).text().trim()) || '';
+                    var razonSocial = (rowData && rowData.nombreRazonSocial ? rowData.nombreRazonSocial : $(cells[3]).text().trim()) || '';
+                    var montoTotal = (rowData && rowData.montoTotal ? rowData.montoTotal : $(cells[6]).text().trim()) || '';
+                    var fechaEmision = (rowData && rowData.fechaEmision ? rowData.fechaEmision : $(cells[7]).text().trim()) || '';
 
-                    // Mostrar los datos en el modal
+                    // Normalizar razón social cuando viene concatenada como "razon|codigo|medidor".
+                    if (typeof razonSocial === 'string' && razonSocial.indexOf('|') !== -1) {
+                        razonSocial = razonSocial.split('|')[0].trim();
+                    }
+
+                    // Limpiar formato visual para conservar solo el valor mostrado del monto.
+                    montoTotal = String(montoTotal).replace(/\s+/g, ' ').trim();
+
                     $('#modal-nro-factura-book').text(nroFactura || '-');
                     $('#modal-cliente-book').text(razonSocial || '-');
                     $('#modal-nit-book').text(nit || '-');
@@ -1287,7 +1325,6 @@
                     $('#modal-total-book').text('Bs. ' + (montoTotal || '-'));
                     $('#factura-info-card-book').show();
 
-                    // ✅ Guardar datos globalmente para el POST (el botón Confirmar está en el modal, no en la tabla)
                     window.facturaAnulacionData = {
                         nroFactura: nroFactura,
                         nit: nit,
@@ -1296,26 +1333,24 @@
                         fecha: fechaEmision
                     };
 
-                    console.log('Factura guardada para anulación:', window.facturaAnulacionData);
-
-                    // Intentar obtener el número de teléfono del cliente
-                    $.ajax({
-                        url: '{{ route('sales.get_customer_phone_by_cuf') }}',
-                        type: 'POST',
-                        data: {
-                            cuf: id,
-                            _token: '{{ csrf_token() }}'
-                        },
-                        success: function(response) {
-                            if (response.success && response.phone) {
-                                $('#whatsapp_phone_book').val(response.phone);
+                    if (accion === 'anular') {
+                        $.ajax({
+                            url: '{{ route('sales.get_customer_phone_by_cuf') }}',
+                            type: 'POST',
+                            data: {
+                                cuf: id,
+                                _token: '{{ csrf_token() }}'
+                            },
+                            success: function(response) {
+                                if (response.success && response.phone) {
+                                    $('#whatsapp_phone_book').val(response.phone);
+                                }
+                            },
+                            error: function() {
+                                console.log('No se pudo obtener el teléfono del cliente');
                             }
-                        },
-                        error: function() {
-                            console.log('No se pudo obtener el teléfono del cliente');
-                        }
-                    });
-
+                        });
+                    }
                 } else {
                     $('#factura-info-card-book').hide();
                     window.facturaAnulacionData = {};
@@ -1326,9 +1361,11 @@
                 window.facturaAnulacionData = {};
             }
 
-            // Cargar motivos (desde caché o servidor)
             cargarMotivosAnulacion(function(data) {
                 $("select[name='motivo_anulacion_id']").empty();
+                $("select[name='motivo_anulacion_id']").append(
+                    '<option value="" selected disabled>Seleccione motivo...</option>'
+                );
                 for (let i = 0; i < data.length; i++) {
                     $("select[name='motivo_anulacion_id']").append(
                         '<option value="' + data[i].codigo_clasificador + '">' +
@@ -1339,6 +1376,14 @@
                 $('.selectpicker').selectpicker('refresh');
                 $('#anular-factura-modal').modal('show');
             });
+        }
+
+        $(document).on("click", "table tbody .anular-factura-modal", function(event) {
+            abrirModalAnulacion($(this), 'anular');
+        });
+
+        $(document).on("click", "table tbody .revertir-anulacion-factura-modal", function(event) {
+            abrirModalAnulacion($(this), 'revertir_anulacion');
         });
 
         /** Pagar Factura */
@@ -1412,12 +1457,22 @@
             var motivo = $("select[name='motivo_anulacion_id']").val();
             var puntoVenta = $('input[name="punto_venta_anulacion_id"]').val();
             var sucursal = $('input[name="sucursal_anulacion_id"]').val();
+            var codigoDocumento = $('input[name="codigo_documento_sector_anulacion_id"]').val();
+            var accionModal = $('#accion_anulacion_modal_book').val();
+            var esReversionAnulacion = accionModal === 'revertir_anulacion';
+
+            if (!motivo || String(motivo).trim() === '') {
+                $('#motivo_anulacion_error_book').removeClass('d-none');
+                swal('Error', 'Debe seleccionar un motivo de anulación', 'warning');
+                return;
+            }
+            $('#motivo_anulacion_error_book').addClass('d-none');
 
             var sendWhatsapp = $('#send_whatsapp_book').is(':checked') ? '1' : '0';
             var whatsappPhone = $('#whatsapp_phone_book').val();
 
             // Validar número de WhatsApp si el checkbox está marcado
-            if (sendWhatsapp === '1' && (!whatsappPhone || whatsappPhone.trim() === '')) {
+            if (!esReversionAnulacion && sendWhatsapp === '1' && (!whatsappPhone || whatsappPhone.trim() === '')) {
                 swal('Error', 'Por favor ingrese el número de WhatsApp', 'warning');
                 return;
             }
@@ -1425,17 +1480,21 @@
             // ✅ Tomar datos guardados al hacer click en el icono de anulación
             var facturaData = window.facturaAnulacionData || {};
 
-            console.log('Enviando anulación:', {
+            console.log('Enviando solicitud de factura:', {
                 cuf: id,
                 motivo: motivo,
                 puntoVenta: puntoVenta,
                 sucursal: sucursal,
+                codigoDocumento: codigoDocumento,
+                accion: accionModal,
                 whatsapp: sendWhatsapp,
                 phone: whatsappPhone,
                 facturaData: facturaData
             });
 
-            var url_data = "{{ route('sales.anular_factura') }}";
+            var url_data = esReversionAnulacion
+                ? "{{ route('sales.revertir-anulacion-factura') }}"
+                : "{{ route('sales.anular_factura') }}";
             $('#anular-factura-modal').modal('hide');
             $("#spinner-div").show();
 
@@ -1447,6 +1506,7 @@
                     motivo_anulacion_id: motivo,
                     punto_venta_id: puntoVenta,
                     sucursal_id: sucursal,
+                    codigo_documento_sector: codigoDocumento,
                     send_whatsapp: sendWhatsapp,
                     whatsapp_phone: whatsappPhone,
 
@@ -1456,6 +1516,7 @@
                     factura_nit: facturaData.nit || '',
                     factura_fecha: facturaData.fecha || '',
                     factura_total: facturaData.total || '',
+                    accion: accionModal,
 
                     _token: '{{ csrf_token() }}'
                 },

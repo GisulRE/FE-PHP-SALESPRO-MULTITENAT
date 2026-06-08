@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class AddNitToCompaniesTable extends Migration
 {
@@ -17,6 +18,17 @@ class AddNitToCompaniesTable extends Migration
                 $table->string('nit', 30)->nullable()->after('name')->unique();
             }
         });
+
+        $defaultCompany = DB::table('companies')
+            ->where('name', 'Default Company')
+            ->whereNull('nit')
+            ->first();
+
+        if ($defaultCompany && !DB::table('companies')->where('nit', '000000')->exists()) {
+            DB::table('companies')
+                ->where('id', $defaultCompany->id)
+                ->update(['nit' => '000000']);
+        }
     }
 
     public function down()

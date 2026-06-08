@@ -313,10 +313,9 @@ class SiatPanelController extends Controller
             if (isset($request->auth))
                 $is_auth = true;
 
-            $cuis = SiatPuntoVenta::where("codigo_punto_venta", $p_venta)->pluck('codigo_cuis')[0];
             $nit = $request->nit;
             try {
-                $response = $this->getResponse($operacion, $sucursal, $p_venta, $cuis, $nit);
+                $response = $this->getResponse($nit, $sucursal, $p_venta);
                 $this->llenarTablaxOperacion($operacion, $response, $sucursal, $p_venta);
             } catch (\Excepcion $e) {
                 return redirect()->back()->with('warning', 'Credenciales SIAT no válidas');

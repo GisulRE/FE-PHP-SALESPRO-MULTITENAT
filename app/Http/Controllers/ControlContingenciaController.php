@@ -95,7 +95,14 @@ class ControlContingenciaController extends Controller
 
     public function getPuntoVenta($sucursal)
     {
-        $puntos_ventas = SiatPuntoVenta::where('sucursal', $sucursal)->where('modo_contingencia', false)->get();
+        $puntos_ventas = $this->getPuntosVentaDesdeSiatApi($sucursal);
+        if ($puntos_ventas === null) {
+            $puntos_ventas = SiatPuntoVenta::where('sucursal', $sucursal)->where('modo_contingencia', false)->get();
+        } else {
+            $puntos_ventas = $puntos_ventas->filter(function($pv) {
+                return !$pv->modo_contingencia;
+            })->values();
+        }
         return $puntos_ventas;
     }
 

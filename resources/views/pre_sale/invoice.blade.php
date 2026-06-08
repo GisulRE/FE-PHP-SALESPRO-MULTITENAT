@@ -159,11 +159,7 @@
                 <strong>{{ trans('file.reference presale') }}:</strong>
                 <span>{{ $lims_sale_data->reference_no }}</span>
                 <strong>{{ trans('file.customer') }}:</strong>
-                @if ($lims_sale_data->attentionshift->customer_name)
-                    <span>{{ $lims_sale_data->attentionshift->customer_name }}</span>
-                @else
-                    <span>{{ $lims_customer_data->name }}</span>
-                @endif
+                <span>{{ optional($lims_customer_data)->name ?? 'Cliente no encontrado' }}</span>
                 <strong>{{ trans('file.Employee Service') }}:</strong>
                 @php
                     if ($lims_sale_data->employee_id != null) {

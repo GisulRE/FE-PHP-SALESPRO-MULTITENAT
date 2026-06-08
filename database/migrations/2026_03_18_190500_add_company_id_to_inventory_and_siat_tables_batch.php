@@ -9,6 +9,11 @@ class AddCompanyIdToInventoryAndSiatTablesBatch extends Migration
 {
     public function up()
     {
+        $driver = DB::getDriverName();
+        $runUpdateFromJoin = function ($mysqlSql, $pgsqlSql) use ($driver) {
+            DB::statement($driver === 'pgsql' ? $pgsqlSql : $mysqlSql);
+        };
+
         $tables = [
             'product_variants',
             'product_warehouse',
@@ -44,7 +49,10 @@ class AddCompanyIdToInventoryAndSiatTablesBatch extends Migration
             && Schema::hasTable('products')
             && Schema::hasColumn('products', 'company_id')
         ) {
-            DB::statement('UPDATE product_variants pv INNER JOIN products p ON p.id = pv.product_id SET pv.company_id = p.company_id WHERE pv.company_id IS NULL AND p.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE product_variants pv INNER JOIN products p ON p.id = pv.product_id SET pv.company_id = p.company_id WHERE pv.company_id IS NULL AND p.company_id IS NOT NULL',
+                'UPDATE product_variants pv SET company_id = p.company_id FROM products p WHERE p.id = pv.product_id AND pv.company_id IS NULL AND p.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -54,7 +62,10 @@ class AddCompanyIdToInventoryAndSiatTablesBatch extends Migration
             && Schema::hasTable('products')
             && Schema::hasColumn('products', 'company_id')
         ) {
-            DB::statement('UPDATE product_warehouse pw INNER JOIN products p ON p.id = pw.product_id SET pw.company_id = p.company_id WHERE pw.company_id IS NULL AND p.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE product_warehouse pw INNER JOIN products p ON p.id = pw.product_id SET pw.company_id = p.company_id WHERE pw.company_id IS NULL AND p.company_id IS NOT NULL',
+                'UPDATE product_warehouse pw SET company_id = p.company_id FROM products p WHERE p.id = pw.product_id AND pw.company_id IS NULL AND p.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -63,7 +74,10 @@ class AddCompanyIdToInventoryAndSiatTablesBatch extends Migration
             && Schema::hasColumn('puntos_venta', 'id_empresa')
             && Schema::hasTable('companies')
         ) {
-            DB::statement('UPDATE puntos_venta pv INNER JOIN companies c ON c.id = pv.id_empresa SET pv.company_id = c.id WHERE pv.company_id IS NULL');
+            $runUpdateFromJoin(
+                'UPDATE puntos_venta pv INNER JOIN companies c ON c.id = pv.id_empresa SET pv.company_id = c.id WHERE pv.company_id IS NULL',
+                'UPDATE puntos_venta pv SET company_id = c.id FROM companies c WHERE c.id = pv.id_empresa AND pv.company_id IS NULL'
+            );
         }
 
         if (
@@ -73,7 +87,10 @@ class AddCompanyIdToInventoryAndSiatTablesBatch extends Migration
             && Schema::hasTable('users')
             && Schema::hasColumn('users', 'company_id')
         ) {
-            DB::statement('UPDATE puntos_venta pv INNER JOIN users u ON u.id = pv.usuario_alta SET pv.company_id = u.company_id WHERE pv.company_id IS NULL AND u.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE puntos_venta pv INNER JOIN users u ON u.id = pv.usuario_alta SET pv.company_id = u.company_id WHERE pv.company_id IS NULL AND u.company_id IS NOT NULL',
+                'UPDATE puntos_venta pv SET company_id = u.company_id FROM users u WHERE u.id = pv.usuario_alta AND pv.company_id IS NULL AND u.company_id IS NOT NULL'
+            );
         }
 
         $defaultCompanyId = null;

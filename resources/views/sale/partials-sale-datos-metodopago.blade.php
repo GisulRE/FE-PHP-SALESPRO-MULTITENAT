@@ -14,8 +14,12 @@
     }
 
     function hideDatosInputTexto() {
+        if (window.desactivarPagoMultiple) {
+            window.desactivarPagoMultiple();
+        }
         blockAmounts();
         $("#html_montos_metodos_de_pago").empty();
+        $("#monto_total_pagado").val('0.00');
 
         $("#MP_tarjeta").hide();
         $('input[name="number_card"]').val("");

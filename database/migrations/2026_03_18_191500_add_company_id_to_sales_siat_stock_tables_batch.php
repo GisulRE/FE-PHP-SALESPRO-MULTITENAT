@@ -9,6 +9,11 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
 {
     public function up()
     {
+        $driver = DB::getDriverName();
+        $runUpdateFromJoin = function ($mysqlSql, $pgsqlSql) use ($driver) {
+            DB::statement($driver === 'pgsql' ? $pgsqlSql : $mysqlSql);
+        };
+
         $tables = [
             'sales_import_temp',
             'shift_employee',
@@ -16,7 +21,6 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
             'siat_cufd',
             'siat_documento_sector',
             'siat_leyendas_facturas',
-            'siat_parametricas_varios',
             'siat_producto_servicios',
             'stock_counts',
             'sucursal_siat',
@@ -50,7 +54,10 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
             && Schema::hasTable('users')
             && Schema::hasColumn('users', 'company_id')
         ) {
-            DB::statement('UPDATE sales_import_temp sit INNER JOIN users u ON u.id = sit.user_id SET sit.company_id = u.company_id WHERE sit.company_id IS NULL AND u.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE sales_import_temp sit INNER JOIN users u ON u.id = sit.user_id SET sit.company_id = u.company_id WHERE sit.company_id IS NULL AND u.company_id IS NOT NULL',
+                'UPDATE sales_import_temp sit SET company_id = u.company_id FROM users u WHERE u.id = sit.user_id AND sit.company_id IS NULL AND u.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -60,7 +67,10 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
             && Schema::hasTable('employees')
             && Schema::hasColumn('employees', 'company_id')
         ) {
-            DB::statement('UPDATE shift_employee se INNER JOIN employees e ON e.id = se.employee_id SET se.company_id = e.company_id WHERE se.company_id IS NULL AND e.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE shift_employee se INNER JOIN employees e ON e.id = se.employee_id SET se.company_id = e.company_id WHERE se.company_id IS NULL AND e.company_id IS NOT NULL',
+                'UPDATE shift_employee se SET company_id = e.company_id FROM employees e WHERE e.id = se.employee_id AND se.company_id IS NULL AND e.company_id IS NOT NULL'
+            );
         }
 
         $siatTables = [
@@ -68,7 +78,6 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
             'siat_cufd',
             'siat_documento_sector',
             'siat_leyendas_facturas',
-            'siat_parametricas_varios',
             'siat_producto_servicios',
             'sucursal_siat',
         ];
@@ -80,7 +89,10 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
                 && Schema::hasColumn($table, 'id_empresa')
                 && Schema::hasTable('companies')
             ) {
-                DB::statement("UPDATE {$table} t INNER JOIN companies c ON c.id = t.id_empresa SET t.company_id = c.id WHERE t.company_id IS NULL");
+                $runUpdateFromJoin(
+                    "UPDATE {$table} t INNER JOIN companies c ON c.id = t.id_empresa SET t.company_id = c.id WHERE t.company_id IS NULL",
+                    "UPDATE {$table} t SET company_id = c.id FROM companies c WHERE c.id = t.id_empresa AND t.company_id IS NULL"
+                );
             }
 
             if (
@@ -90,7 +102,10 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
                 && Schema::hasTable('users')
                 && Schema::hasColumn('users', 'company_id')
             ) {
-                DB::statement("UPDATE {$table} t INNER JOIN users u ON u.id = t.usuario_alta SET t.company_id = u.company_id WHERE t.company_id IS NULL AND u.company_id IS NOT NULL");
+                $runUpdateFromJoin(
+                    "UPDATE {$table} t INNER JOIN users u ON u.id = t.usuario_alta SET t.company_id = u.company_id WHERE t.company_id IS NULL AND u.company_id IS NOT NULL",
+                    "UPDATE {$table} t SET company_id = u.company_id FROM users u WHERE u.id = t.usuario_alta AND t.company_id IS NULL AND u.company_id IS NOT NULL"
+                );
             }
         }
 
@@ -101,7 +116,10 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
             && Schema::hasTable('warehouses')
             && Schema::hasColumn('warehouses', 'company_id')
         ) {
-            DB::statement('UPDATE stock_counts sc INNER JOIN warehouses w ON w.id = sc.warehouse_id SET sc.company_id = w.company_id WHERE sc.company_id IS NULL AND w.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE stock_counts sc INNER JOIN warehouses w ON w.id = sc.warehouse_id SET sc.company_id = w.company_id WHERE sc.company_id IS NULL AND w.company_id IS NOT NULL',
+                'UPDATE stock_counts sc SET company_id = w.company_id FROM warehouses w WHERE w.id = sc.warehouse_id AND sc.company_id IS NULL AND w.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -111,7 +129,10 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
             && Schema::hasTable('users')
             && Schema::hasColumn('users', 'company_id')
         ) {
-            DB::statement('UPDATE stock_counts sc INNER JOIN users u ON u.id = sc.user_id SET sc.company_id = u.company_id WHERE sc.company_id IS NULL AND u.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE stock_counts sc INNER JOIN users u ON u.id = sc.user_id SET sc.company_id = u.company_id WHERE sc.company_id IS NULL AND u.company_id IS NOT NULL',
+                'UPDATE stock_counts sc SET company_id = u.company_id FROM users u WHERE u.id = sc.user_id AND sc.company_id IS NULL AND u.company_id IS NOT NULL'
+            );
         }
 
         $defaultCompanyId = null;
@@ -151,7 +172,6 @@ class AddCompanyIdToSalesSiatStockTablesBatch extends Migration
             'siat_cufd',
             'siat_documento_sector',
             'siat_leyendas_facturas',
-            'siat_parametricas_varios',
             'siat_producto_servicios',
             'stock_counts',
             'sucursal_siat',

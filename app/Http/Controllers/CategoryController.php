@@ -132,8 +132,8 @@ class CategoryController extends Controller
 
                 $nestedData['number_of_product'] = $category->product()->where('is_active', true)->count();
                 $nestedData['stock_qty'] = $category->product()->where('is_active', true)->sum('qty');
-                $total_price = $category->product()->where('is_active', true)->sum(DB::raw('price * qty'));
-                $total_cost = $category->product()->where('is_active', true)->sum(DB::raw('cost * qty'));
+                $total_price = $category->product()->where('is_active', true)->sum(DB::raw('CAST(price AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
+                $total_cost = $category->product()->where('is_active', true)->sum(DB::raw('CAST(cost AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
 
                 if (config('currency_position') == 'prefix')
                     $nestedData['stock_worth'] = config('currency') . ' ' . $total_price . ' / ' . config('currency') . ' ' . $total_cost;

@@ -9,6 +9,9 @@
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="all,follow">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style type="text/css">
         @font-face {
@@ -25,6 +28,8 @@
             font-family: 'HelveticaNeueTicket', sans-serif;
             text-transform: capitalize;
         }
+        .invoice-ticket-container { overflow-x: hidden; }
+        .invoice-ticket-container table { width:100% !important; table-layout:auto; word-break:break-word; }
 
         .invoice-ticket-container .btn {
             padding: 7px 10px;
@@ -34,6 +39,8 @@
             text-align: center;
             margin: 7px;
             cursor: pointer;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 600;
         }
 
         .invoice-ticket-container .btn-info {
@@ -133,18 +140,23 @@
 </head>
 
 <body>
+    @php
+        $service_employee_name = null;
+        foreach ($lims_product_sale_data as $service_product_sale_data) {
+            if ($service_product_sale_data->employee_id) {
+                $service_employee_data = \App\Employee::find($service_product_sale_data->employee_id);
+                if ($service_employee_data) {
+                    $service_employee_name = $service_employee_data->name;
+                    break;
+                }
+            }
+        }
+    @endphp
 
-    <div class="invoice-ticket-container" style="max-width:90%;margin:0 auto">
-        @if (preg_match('~[0-9]~', url()->previous()))
-            @php $url = redirect()->to('pos'); @endphp
-        @else
-            @php $url = url()->previous(); @endphp
-        @endif
+    <div class="invoice-ticket-container" style="max-width:90%;margin:0 auto; padding: 0 1rem;">
         <div class="hidden-print">
             <table>
                 <tr>
-                    <td><a href="{{ route('sale.pos') }}" class="btn btn-info"><i class="fa fa-arrow-left"></i> Volver
-                            POS</a> </td>
                     <td><button onclick="window.print();" class="btn btn-primary"><i class="dripicons-print"></i>
                             {{ trans('file.Print') }}</button></td>
                 </tr>
@@ -174,14 +186,16 @@
                     {{ trans('file.reference') }}: <span
                         style="font-size: large;font-weight: bold;">{{ $lims_sale_data->reference_no }}</span><br>
                     {{ trans('file.Date') }}: {{ \Carbon\Carbon::parse($lims_sale_data->date_sell)->format($lims_sale_data->formato_fecha) }}<br>
-                    {{ trans('file.Biller') }}: {{ $lims_biller_data->name }}<br>
+                    @if ($service_employee_name)
+                        Servicio por: {{ $service_employee_name }}<br>
+                    @endif
                     @if ($lims_sale_data->sale_status == 4)
                         {{ trans('file.Status') }}: {{ trans('file.Receivable') }}<br>
                     @endif
                 </p>
             </div>
 
-            <table>
+                    <td><button onclick="if(window.parent && window.parent.printPreviewFromModal){window.parent.printPreviewFromModal();}else{window.print();}" class="btn btn-primary"><i class="dripicons-print"></i>
                 <thead>
                     <th style="text-align:center">{{ trans('file.Qty') }}</th>
                     <th style="text-align:center">{{ trans('file.Unit') }}</th>
@@ -204,6 +218,9 @@
                                 $product_name = $lims_product_data->name . ' [' . $variant_data->name . ']';
                             } else {
                                 $product_name = $lims_product_data->name;
+                            }
+                            if (!empty($product_sale_data->description)) {
+                                $product_name .= ' - ' . $product_sale_data->description;
                             }
                         @endphp
 
@@ -301,10 +318,12 @@
     </div>
 
     <script type="text/javascript">
+        @if (!isset($is_preview_mode) || !$is_preview_mode)
         function auto_print() {
             window.print()
         }
         setTimeout(auto_print, 1000);
+        @endif
     </script>
 
 </body>

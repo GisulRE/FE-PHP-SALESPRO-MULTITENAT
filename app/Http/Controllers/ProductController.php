@@ -65,61 +65,61 @@ class ProductController extends Controller
         $start = $request->input('start');
         $order = 'products.' . $columns[$request->input('order.0.column')];
         $dir = $request->input('order.0.dir');
+        // Añadir filtro por categoría si fue enviado
+        $categoryFilter = $request->input('category_id', 0);
+
         if (empty($request->input('search.value'))) {
-            $products = Product::with('category', 'brand', 'unit')->offset($start)
-                ->where('is_active', true)
+            $query = Product::with('category', 'brand', 'unit')
+                ->where('products.is_active', true);
+
+            if ($categoryFilter && intval($categoryFilter) > 0) {
+                $query->where('products.category_id', intval($categoryFilter));
+            }
+
+            $products = $query->offset($start)
                 ->limit($limit)
                 ->orderBy($order, $dir)
                 ->get();
         } else {
             $search = $request->input('search.value');
-            $products = Product::select('products.*')
+            $s = '%' . strtolower($search) . '%';
+
+            // Construir consulta que use LOWER(...) para comparaciones case-insensitive
+            $base = Product::select('products.*')
                 ->with('category', 'brand', 'unit')
                 ->join('categories', 'products.category_id', '=', 'categories.id')
                 ->leftjoin('brands', 'products.brand_id', '=', 'brands.id')
-                ->where([
-                    ['products.name', 'LIKE', "%{$search}%"],
-                    ['products.is_active', true]
-                ])
-                ->orWhere([
-                    ['products.code', 'LIKE', "%{$search}%"],
-                    ['products.is_active', true]
-                ])
-                ->orWhere([
-                    ['categories.name', 'LIKE', "%{$search}%"],
-                    ['categories.is_active', true],
-                    ['products.is_active', true]
-                ])
-                ->orWhere([
-                    ['brands.title', 'LIKE', "%{$search}%"],
-                    ['brands.is_active', true],
-                    ['products.is_active', true]
-                ])
-                ->offset($start)
+                ->where('products.is_active', true);
+
+            if ($categoryFilter && intval($categoryFilter) > 0) {
+                $base->where('products.category_id', intval($categoryFilter));
+            }
+
+            $base->where(function ($q) use ($s) {
+                $q->whereRaw('LOWER(products.name) LIKE ?', [$s])
+                    ->orWhereRaw('LOWER(products.code) LIKE ?', [$s])
+                    ->orWhereRaw('LOWER(categories.name) LIKE ?', [$s])
+                    ->orWhereRaw('LOWER(brands.title) LIKE ?', [$s]);
+            });
+
+            $products = $base->offset($start)
                 ->limit($limit)
                 ->orderBy($order, $dir)->get();
 
-            $totalFiltered = Product::join('categories', 'products.category_id', '=', 'categories.id')
+            // totalFiltered
+            $countQ = Product::join('categories', 'products.category_id', '=', 'categories.id')
                 ->leftjoin('brands', 'products.brand_id', '=', 'brands.id')
-                ->where([
-                    ['products.name', 'LIKE', "%{$search}%"],
-                    ['products.is_active', true]
-                ])
-                ->orWhere([
-                    ['products.code', 'LIKE', "%{$search}%"],
-                    ['products.is_active', true]
-                ])
-                ->orWhere([
-                    ['categories.name', 'LIKE', "%{$search}%"],
-                    ['categories.is_active', true],
-                    ['products.is_active', true]
-                ])
-                ->orWhere([
-                    ['brands.title', 'LIKE', "%{$search}%"],
-                    ['brands.is_active', true],
-                    ['products.is_active', true]
-                ])
-                ->count();
+                ->where('products.is_active', true);
+            if ($categoryFilter && intval($categoryFilter) > 0) {
+                $countQ->where('products.category_id', intval($categoryFilter));
+            }
+            $countQ->where(function ($q) use ($s) {
+                $q->whereRaw('LOWER(products.name) LIKE ?', [$s])
+                    ->orWhereRaw('LOWER(products.code) LIKE ?', [$s])
+                    ->orWhereRaw('LOWER(categories.name) LIKE ?', [$s])
+                    ->orWhereRaw('LOWER(brands.title) LIKE ?', [$s]);
+            });
+            $totalFiltered = $countQ->count();
         }
         $data = array();
         if (!empty($products)) {

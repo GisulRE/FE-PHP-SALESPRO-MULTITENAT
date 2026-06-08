@@ -9,6 +9,9 @@
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="all,follow">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style type="text/css">
         @font-face {
@@ -26,6 +29,8 @@
             font-family: 'HelveticaNeueTicket', sans-serif;
             text-transform: capitalize;
         }
+        .invoice-ticket-container { overflow-x: hidden; }
+        .invoice-ticket-container table { width:100% !important; table-layout:auto; word-break:break-word; }
 
 
         .invoice-ticket-container .contenido {
@@ -40,6 +45,8 @@
             text-align: center;
             margin: 7px;
             cursor: pointer;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 600;
         }
 
         .invoice-ticket-container .btn-info {
@@ -122,20 +129,25 @@
 </head>
 
 <body>
+    @php
+        $service_employee_name = null;
+        foreach ($lims_product_sale_data as $service_product_sale_data) {
+            if ($service_product_sale_data->employee_id) {
+                $service_employee_data = \App\Employee::find($service_product_sale_data->employee_id);
+                if ($service_employee_data) {
+                    $service_employee_name = $service_employee_data->name;
+                    break;
+                }
+            }
+        }
+    @endphp
 
-    <div class="invoice-ticket-container" style="max-width:400px;margin:0 auto">
-        @if (preg_match('~[0-9]~', url()->previous()))
-            @php $url = redirect()->to('pos'); @endphp
-        @else
-            @php $url = url()->previous(); @endphp
-        @endif
+    <div class="invoice-ticket-container" style="max-width:400px;margin:0 auto;">
         <div class="hidden-print">
             <table>
                 <tr>
-                    <td><a href="{{ route('sale.pos') }}" class="btn btn-info"><i class="fa fa-arrow-left"></i> Volver
-                            POS</a> </td>
-                    <td><button onclick="window.print();" class="btn btn-primary"><i class="dripicons-print"></i>
-                            {{ trans('file.Print') }}</button></td>
+                    <td><button onclick="if(window.parent && window.parent.printPreviewFromModal){window.parent.printPreviewFromModal();}else{window.print();}" class="btn btn-primary"><i class="dripicons-print"></i>
+                            Imprimir Vista Previa</button></td>
                 </tr>
             </table>
             <br>
@@ -158,8 +170,10 @@
                 <span>{{ \Carbon\Carbon::parse($lims_sale_data->date_sell)->format($lims_sale_data->formato_fecha) }}</span>
                 <strong>{{ trans('file.reference') }}:</strong>
                 <span>{{ $lims_sale_data->reference_no }}</span>
-                <strong>{{ trans('file.Biller') }}:</strong>
-                <span>{{ $lims_biller_data->name }}</span>
+                @if ($service_employee_name)
+                    <strong>Servicio por:</strong>
+                    <span>{{ $service_employee_name }}</span>
+                @endif
                 <strong>{{ trans('file.customer') }}:</strong>
                 <span>{{ $lims_customer_data->name }}</span>
             </div>
@@ -182,6 +196,9 @@
                                 $product_name = $lims_product_data->name . ' [' . $variant_data->name . ']';
                             } else {
                                 $product_name = $lims_product_data->name;
+                            }
+                            if (!empty($product_sale_data->description)) {
+                                $product_name .= ' - ' . $product_sale_data->description;
                             }
                         @endphp
                         <tr>
@@ -269,6 +286,10 @@
                                 {{ number_format((float) $lims_sale_data->grand_total, 2, '.', ',') }}</td>
                         </tr>
                         <tr>
+                            <td style="padding: 5px;width:40%">Facturador:</td>
+                            <td style="padding: 5px;width:60%">{{ $lims_biller_data->name }}</td>
+                        </tr>
+                        <tr>
                             <td class="centered" colspan="3">
                                 {{ __('file.Thank you for shopping with us. Please come again') }}</td>
                         </tr>
@@ -281,6 +302,11 @@
                                     {{ number_format((float) $payment_data->amount, 2, '.', ',') }}</td>
                                 <td style="padding: 5px;width:30%">{{ trans('file.Change') }}:
                                     {{ number_format((float) $payment_data->change, 2, '.', ',') }}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px;width:30%">Facturador:</td>
+                                <td style="padding: 5px;width:40%">{{ $lims_biller_data->name }}</td>
+                                <td style="padding: 5px;width:30%"></td>
                             </tr>
                             <tr>
                                 <td class="centered" colspan="3">

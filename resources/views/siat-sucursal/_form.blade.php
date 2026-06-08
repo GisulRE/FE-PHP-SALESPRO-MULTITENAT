@@ -1,11 +1,18 @@
 @csrf 
 
+@php
+    $readonlySucursal = $readonlySucursal ?? false;
+    $sucursalInputValue = $readonlySucursal
+        ? ($sucursal->sucursal ?? '')
+        : old('sucursal', $sucursal->sucursal);
+@endphp
+
 <div class="row">
     <div class="col-md-4">
         <div class="form-group">
             <label> Sucursal *</strong> </label>
-            <input type="text" name="sucursal" id="sucursal" class="form-control" required 
-                value="{{ old('sucursal', $sucursal->sucursal) }}">
+            <input type="number" name="sucursal" id="sucursal" class="form-control" required min="0"
+                value="{{ $sucursalInputValue }}" {{ $readonlySucursal ? 'readonly' : '' }}>
         </div>
     </div>
     <div class="col-md-4">

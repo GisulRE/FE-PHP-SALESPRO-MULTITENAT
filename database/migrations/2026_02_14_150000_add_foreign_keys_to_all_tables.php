@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 
 class AddForeignKeysToAllTables extends Migration
 {
+    public $withinTransaction = false;
+
     public function up()
     {
         // STEP 1: Normalize column types to match PKs (all should be BIGINT UNSIGNED)
@@ -283,6 +285,7 @@ class AddForeignKeysToAllTables extends Migration
      */
     private function normalizeColumnTypes()
     {
+        $driver = DB::getDriverName();
         // Define all FK columns that need normalization
         $normalizations = [
             'products' => ['category_id', 'brand_id', 'unit_id'],
@@ -337,7 +340,12 @@ class AddForeignKeysToAllTables extends Migration
                 }
 
                 try {
-                    DB::statement("ALTER TABLE `{$table}` MODIFY `{$column}` INT UNSIGNED NULL");
+                    if ($driver === 'pgsql') {
+                        DB::statement("ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column}\" TYPE INTEGER USING NULLIF(\"{$column}\"::text, '')::integer");
+                        DB::statement("ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column}\" DROP NOT NULL");
+                    } else {
+                        DB::statement("ALTER TABLE `{$table}` MODIFY `{$column}` INT UNSIGNED NULL");
+                    }
                     echo "  ✓ Normalized {$table}.{$column}\n";
                 } catch (\Exception $e) {
                     echo "  ⚠ Could not normalize {$table}.{$column}: {$e->getMessage()}\n";

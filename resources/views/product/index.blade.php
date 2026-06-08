@@ -32,16 +32,52 @@
 
     <section>
         <div class="container-fluid">
-            @if (in_array('products-add', $all_permission))
-                <a href="{{ route('products.create') }}" class="stopReload_out btn btn-info">
-                    <i class="dripicons-plus"></i>
-                    {{ __('file.add_product') }}
-                </a>
-                <a href="#" data-toggle="modal" data-target="#importProduct" class="btn btn-primary"><i
-                        class="dripicons-copy"></i> {{ __('file.import_product') }}</a>
-                <a href="#" data-toggle="modal" data-target="#importProductPrice" class="btn btn-primary"><i
-                        class="dripicons-upload"></i> Actualizar Precios y Cuentas</a>
-            @endif
+            <div class="row align-items-center mb-2">
+                <div class="col-md-8 mb-2 mb-md-0">
+                    @if (in_array('products-add', $all_permission))
+                        <a href="{{ route('products.create') }}" class="stopReload_out btn btn-info">
+                            <i class="dripicons-plus"></i>
+                            {{ __('file.add_product') }}
+                        </a>
+                        <a href="#" data-toggle="modal" data-target="#importProduct" class="btn btn-primary"><i
+                                class="dripicons-copy"></i> {{ __('file.import_product') }}</a>
+                        <a href="#" data-toggle="modal" data-target="#importProductPrice" class="btn btn-primary"><i
+                                class="dripicons-upload"></i> Actualizar Precios y Cuentas</a>
+                    @endif
+                </div>
+                <div class="col-md-4 text-md-right">
+                    <button class="btn btn-outline-primary" type="button" data-toggle="collapse" data-target="#productFilterAccordion" aria-expanded="true" aria-controls="productFilterAccordion">
+                        <i class="dripicons-toggles"></i> Filtros de productos
+                    </button>
+                </div>
+            </div>
+
+            <div class="collapse show" id="productFilterAccordion">
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-body py-3">
+                        <div class="row align-items-end">
+                            <div class="col-md-5 mb-2 mb-md-0">
+                                <label for="filter_keyword" class="mb-1"><strong>Buscar</strong></label>
+                                <input id="filter_keyword" type="text" class="form-control" placeholder="Nombre, código, marca o categoría...">
+                            </div>
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <label for="filter_category" class="mb-1"><strong>{{ trans('file.category') }}</strong></label>
+                                <select id="filter_category" class="form-control selectpicker" data-live-search="true" data-live-search-style="contains" title="Seleccionar categoría">
+                                    <option value="0">Todos</option>
+                                    @foreach ($lims_category_list as $category)
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3 text-md-right">
+                                <button id="btn_clear_filters" type="button" class="btn btn-light border mt-3 mt-md-0">
+                                    <i class="dripicons-cross"></i> Limpiar filtros
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="table-responsive">
             <table id="product-data-table" class="table" style="width: 100%">
@@ -547,8 +583,10 @@
                 "serverSide": true,
                 "ajax": {
                     url: "products/product-data",
-                    data: {
-                        all_permission: all_permission
+                    data: function (d) {
+                        // Enviar permiso y filtro de categoría al servidor
+                        d.all_permission = all_permission;
+                        d.category_id = $('#filter_category').val() || 0;
                     },
                     dataType: "json",
                     type: "post"
@@ -633,7 +671,8 @@
                     [10, 25, 50, -1],
                     [10, 25, 50, "All"]
                 ],
-                dom: '<"row"lfB>rtip',
+                // Se usa buscador personalizado en el panel de filtros
+                dom: '<"row"lB>rtip',
                 buttons: [{
                     extend: 'pdf',
                     text: '{{ trans('file.PDF') }}',
@@ -734,6 +773,30 @@
                     columns: ':gt(0)'
                 },
                 ],
+            });
+
+            // Búsqueda global con debounce para evitar demasiadas consultas al escribir
+            var productSearchDebounce = null;
+            $('#filter_keyword').on('input keyup change', function () {
+                var keyword = $(this).val();
+                clearTimeout(productSearchDebounce);
+                productSearchDebounce = setTimeout(function () {
+                    table.search(keyword).draw();
+                }, 300);
+            });
+
+            // Filtrado por categoría
+            $('#filter_category').on('changed.bs.select change', function () {
+                table.ajax.reload();
+            });
+
+            // Limpiar filtros de forma rápida
+            $('#btn_clear_filters').on('click', function () {
+                clearTimeout(productSearchDebounce);
+                $('#filter_keyword').val('');
+                $('#filter_category').selectpicker('val', '0');
+                table.search('');
+                table.ajax.reload();
             });
 
         });

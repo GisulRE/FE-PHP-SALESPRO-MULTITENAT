@@ -68,7 +68,7 @@ class ControlContingencia extends Model
 
     public function getFechaInicio()
     {
-        $formato_fecha = GeneralSetting::first()->date_format;
+        $formato_fecha = GeneralSetting::currentDateFormat();
 
         $fecha = new Carbon($this->fecha_inicio_evento);
         $fecha = $fecha->format("$formato_fecha H:i");
@@ -77,7 +77,7 @@ class ControlContingencia extends Model
 
     public function getFechaFin()
     {
-        $formato_fecha = GeneralSetting::first()->date_format;
+        $formato_fecha = GeneralSetting::currentDateFormat();
 
         if ($this->fecha_fin_evento) {
             $fecha = new Carbon($this->fecha_fin_evento);

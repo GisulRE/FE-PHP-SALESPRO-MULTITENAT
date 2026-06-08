@@ -6,6 +6,7 @@ use App\ImportJob;
 use App\ImportJobDetail;
 use App\ImportJobLog;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class ImportProgressService
 {
@@ -145,6 +146,21 @@ class ImportProgressService
 
     public function log(ImportJob $job, $level, $message, array $context = [], ImportJobDetail $detail = null)
     {
+        $logMessage = "[Import Job #{$job->id}]" . ($detail ? " [Table: {$detail->table_name}]" : "") . " {$message}";
+        
+        switch ($level) {
+            case 'error':
+                Log::error($logMessage, $context);
+                break;
+            case 'warning':
+                Log::warning($logMessage, $context);
+                break;
+            case 'info':
+            default:
+                Log::info($logMessage, $context);
+                break;
+        }
+
         return ImportJobLog::create([
             'import_job_id' => $job->id,
             'import_job_detail_id' => $detail ? $detail->id : null,

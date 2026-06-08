@@ -18,6 +18,7 @@ use App\Unit;
 use App\Variant;
 use App\Warehouse;
 use Auth;
+use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -132,7 +133,7 @@ class QuotationController extends Controller
                     $quotation->quotation_status = '<div class="badge badge-success">' . trans('file.Sent') . '</div>';
                     $status = trans('file.Sent');
                 }
-                $quotation->grand_total = number_format($quotation->grand_total, 2);
+                $quotation->grand_total = number_format((float)($quotation->grand_total ?? 0), 2);
 
                 $quotation->options = '<div class="btn-group">
                             <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">' . trans("file.action") . '
@@ -402,6 +403,9 @@ class QuotationController extends Controller
     {
         $lims_customer_data = Customer::find($id);
         $lims_customer_group_data = CustomerGroup::find($lims_customer_data->customer_group_id);
+        if (!$lims_customer_group_data) {
+            return 0;
+        }
         return $lims_customer_group_data->percentage;
     }
 
@@ -885,7 +889,7 @@ class QuotationController extends Controller
         $lims_product_quotation_data = ProductQuotation::where('quotation_id', $id)->get();
         $lims_biller_data = Biller::find($lims_quotation_data->biller_id);
         $lims_pos_setting_data = PosSetting::latest()->first();
-        $general_setting = GeneralSetting::latest()->first();
+        $general_setting = GeneralSetting::current();
 
         $numberToWords = new NumberToWords();
         if (\App::getLocale() == 'ar' || \App::getLocale() == 'hi' || \App::getLocale() == 'vi' || \App::getLocale() == 'en-gb') {
@@ -993,4 +997,124 @@ class QuotationController extends Controller
         $centavos = round(($numero - $parteEntera) * 100); 
         return sprintf("%02d", $centavos).'/100';  
     }
-}
+
+    /**
+     * Lista proformas pendientes para el POS (quotation_status = 1 y valid_date >= hoy o sin fecha).
+     * Soporta filtros: fecha_desde, fecha_hasta, search (referencia/cliente).
+     */
+    public function listForPos(Request $request)
+    {
+        $role = Role::find(Auth::user()->role_id);
+        if (!$role->hasPermissionTo('quotes-index')) {
+            return response()->json(['data' => [], 'recordsTotal' => 0, 'recordsFiltered' => 0]);
+        }
+
+        $today = Carbon::now()->toDateString();
+        $query = Quotation::with('customer', 'warehouse')
+            ->where('quotation_status', 1) // Solo pendientes
+            ->where(function ($q) use ($today) {
+                // Válidas: sin fecha de vencimiento O con fecha >= hoy
+                $q->whereNull('valid_date')
+                  ->orWhere('valid_date', '>=', $today);
+            });
+
+        // Filtro por rango de fecha de creación
+        if ($request->filled('fecha_desde')) {
+            $query->whereDate('created_at', '>=', $request->fecha_desde);
+        }
+        if ($request->filled('fecha_hasta')) {
+            $query->whereDate('created_at', '<=', $request->fecha_hasta);
+        }
+        // Filtro de búsqueda (referencia o nombre de cliente)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('reference_no', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function ($c) use ($search) {
+                      $c->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $quotations = $query->orderBy('created_at', 'desc')->get();
+
+        $data = [];
+        foreach ($quotations as $key => $quotation) {
+            $data[] = [
+                'id'            => $quotation->id,
+                'key'           => $key + 1,
+                'reference_no'  => $quotation->reference_no,
+                'date'          => date(config('date_format'), strtotime($quotation->created_at)),
+                'customer'      => optional($quotation->customer)->name ?? 'Sin cliente',
+                'warehouse'     => optional($quotation->warehouse)->name ?? '-',
+                'grand_total'   => number_format((float)($quotation->grand_total ?? 0), 2),
+                'valid_date'    => $quotation->valid_date
+                    ? date(config('date_format'), strtotime($quotation->valid_date))
+                    : 'Sin fecha',
+                'note'          => $quotation->note ?? '',
+            ];
+        }
+
+        return response()->json([
+            'recordsTotal'    => count($data),
+            'recordsFiltered' => count($data),
+            'data'            => $data,
+        ]);
+    }
+
+    /**
+     * Retorna los datos de cabecera e ítems de una proforma para cargarla en el carrito del POS.
+     */
+    public function loadForPos($id)
+    {
+        $quotation = Quotation::with('customer', 'warehouse')->find($id);
+        if (!$quotation) {
+            return response()->json(['error' => 'Proforma no encontrada'], 404);
+        }
+
+        $productQuotations = ProductQuotation::where('quotation_id', $id)->get();
+        $items = [];
+
+        foreach ($productQuotations as $pq) {
+            $product = Product::find($pq->product_id);
+            if (!$product) continue;
+
+            $unit = $pq->sale_unit_id ? Unit::find($pq->sale_unit_id) : null;
+            $code = $product->code;
+
+            if ($pq->variant_id) {
+                $pv = ProductVariant::select('item_code')
+                    ->FindExactProduct($pq->product_id, $pq->variant_id)
+                    ->first();
+                if ($pv) {
+                    $code = $pv->item_code;
+                }
+            }
+
+            $items[] = [
+                'product_id'     => $pq->product_id,
+                'product_code'   => $code,
+                'product_name'   => $product->name,
+                'qty'            => $pq->qty,
+                'sale_unit'      => $unit ? $unit->unit_name : 'n/a',
+                'net_unit_price' => $pq->net_unit_price,
+                'discount'       => $pq->discount,
+                'tax_rate'       => $pq->tax_rate,
+                'tax'            => $pq->tax,
+                'total'          => $pq->total,
+            ];
+        }
+
+        return response()->json([
+            'head' => [
+                'id'           => $quotation->id,
+                'reference_no' => $quotation->reference_no,
+                'customer_id'  => $quotation->customer_id,
+                'warehouse_id' => $quotation->warehouse_id,
+                'grand_total'  => $quotation->grand_total,
+                'note'         => $quotation->note,
+            ],
+            'body' => $items,
+        ]);
+    }
+}

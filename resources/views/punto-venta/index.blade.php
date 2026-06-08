@@ -16,6 +16,10 @@
                 <i class="fa fa-refresh"></i>
                 Cuis Renovacion Masiva
             </a>
+            <a href="{{ route('puntoventa.sincronizar') }}" class="btn btn-primary" onclick="return confirm('¿Está seguro de sincronizar los puntos de venta desde el SIAT?')">
+                <i class="fa fa-cloud-download"></i>
+                Sincronizar de SIAT
+            </a>
 
         </div>
         <div class="table-responsive">
@@ -207,12 +211,12 @@
                         </div>
                         <div class="row">
                             <div class="form-group col-md-6">
-                                <label>Código CUIS <small> (Generado Automaticamente)</small></label>
-                                <input type="text" name="codigo_cuis" readonly class="form-control">
+                                <label>Código CUIS <small> (Manual u Obtención Automática)</small></label>
+                                <input type="text" name="codigo_cuis" class="form-control" placeholder="Ingrese CUIS manual">
                             </div>
                             <div class="form-group col-md-6">
-                                <label>Vencimiento CUIS <small> (Generado Automaticamente)</small></label>
-                                <input type="datetime-local" name="fecha_vigencia_cuis" readonly class="form-control">
+                                <label>Vencimiento CUIS <small> (Manual u Obtención Automática)</small></label>
+                                <input type="datetime-local" name="fecha_vigencia_cuis" class="form-control">
                             </div>
                         </div>
 
@@ -298,12 +302,12 @@
                             </div>
                             <div class="form-group col-md-6"></div>
                             <div class="form-group col-md-6">
-                                <label>Código CUIS <small> (Generado Automaticamente)</small></label>
-                                <input type="text" name="codigo_cuis" readonly class="form-control">
+                                <label>Código CUIS <small> (Manual u Obtención Automática)</small></label>
+                                <input type="text" name="codigo_cuis" class="form-control" placeholder="Ingrese CUIS manual">
                             </div>
                             <div class="form-group col-md-6">
-                                <label>Vencimiento CUIS <small> (Generado Automaticamente)</small></label>
-                                <input type="datetime-local" name="fecha_vigencia_cuis" readonly class="form-control">
+                                <label>Vencimiento CUIS <small> (Manual u Obtención Automática)</small></label>
+                                <input type="datetime-local" name="fecha_vigencia_cuis" class="form-control">
                             </div>
                         </div>
 
@@ -382,23 +386,22 @@
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Código CUIS *</label>
-                                    <div class="input-group">
-                                        <input type="text" name="codigo_cuis" required class="form-control" readonly>
-                                        <div class="input-group-append">
-                                            <button id="btn_renovar" type="button" class="btn btn-sm btn-warning"
-                                                title="Renovar CUIS"><i class="fa fa-refresh"></i></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label>Vencimiento CUIS *</label>
-                                <input type="datetime-local" name="fecha_vigencia_cuis" required class="form-control"
-                                    readonly>
-                            </div>
+                             <div class="col-md-6">
+                                 <div class="form-group">
+                                     <label>Código CUIS *</label>
+                                     <div class="input-group">
+                                         <input type="text" name="codigo_cuis" required class="form-control">
+                                         <div class="input-group-append">
+                                             <button id="btn_renovar" type="button" class="btn btn-sm btn-warning"
+                                                 title="Renovar CUIS"><i class="fa fa-refresh"></i></button>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                             <div class="form-group col-md-6">
+                                 <label>Vencimiento CUIS *</label>
+                                 <input type="datetime-local" name="fecha_vigencia_cuis" required class="form-control">
+                             </div>
                         </div>
 
                         <div class="form-group mt-3">
@@ -483,23 +486,22 @@
                                 <input type="date" name="fecha_fin" required class="form-control">
                             </div>
                             <div class="form-group col-md-6"></div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Código CUIS *</label>
-                                    <div class="input-group">
-                                        <input type="text" name="codigo_cuis" required class="form-control" readonly>
-                                        <div class="input-group-append">
-                                            <button id="btn_renovar" type="button" class="btn btn-sm btn-warning"
-                                                title="Renovar CUIS"><i class="fa fa-refresh"></i></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label>Vencimiento CUIS *</label>
-                                <input type="datetime-local" name="fecha_vigencia_cuis" required class="form-control"
-                                    readonly>
-                            </div>
+                             <div class="col-md-6">
+                                 <div class="form-group">
+                                     <label>Código CUIS *</label>
+                                     <div class="input-group">
+                                         <input type="text" name="codigo_cuis" required class="form-control">
+                                         <div class="input-group-append">
+                                             <button id="btn_renovar" type="button" class="btn btn-sm btn-warning"
+                                                 title="Renovar CUIS"><i class="fa fa-refresh"></i></button>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                             <div class="form-group col-md-6">
+                                 <label>Vencimiento CUIS *</label>
+                                 <input type="datetime-local" name="fecha_vigencia_cuis" required class="form-control">
+                             </div>
                         </div>
 
                         <div class="form-group mt-3">

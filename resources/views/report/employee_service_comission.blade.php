@@ -68,6 +68,16 @@
                             <button type="button" id="btn-add-adjustment" class="btn btn-warning mr-2">
                                 <i class="dripicons-document-edit"></i> Ajuste Pago QR
                             </button>
+                            <div class="btn-group mr-2" role="group">
+                                <button id="btn-print-format" type="button" class="btn btn-primary dropdown-toggle"
+                                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="dripicons-print"></i> Imprimir
+                                </button>
+                                <div class="dropdown-menu" aria-labelledby="btn-print-format">
+                                    <a class="dropdown-item" href="#" id="print-format-a4">Formato A4</a>
+                                    <a class="dropdown-item" href="#" id="print-format-ticket">Formato Ticket</a>
+                                </div>
+                            </div>
                         </div>
                         <!-- Right-aligned QR commission button -->
                         <div class="btn-group ml-auto" role="group" aria-label="Acción de configuración">
@@ -303,7 +313,7 @@
             }
         });
 
-        $('#report-table').DataTable({
+        var reportTable = $('#report-table').DataTable({
             "order": [],
             'language': {
                 'lengthMenu': '_MENU_ {{ trans('file.records per page') }}',
@@ -421,6 +431,161 @@
                 }).data().sum().toFixed(2));
             }
         }
+
+        // En este reporte se trabaja por día: ambas fechas siempre deben ser iguales.
+        function syncEqualDates(source) {
+            var startInput = document.getElementById('input_start_date');
+            var endInput = document.getElementById('input_end_date');
+            if (!startInput || !endInput) {
+                return;
+            }
+            if (source === 'start' && startInput.value) {
+                endInput.value = startInput.value;
+            } else if (source === 'end' && endInput.value) {
+                startInput.value = endInput.value;
+            }
+        }
+
+        $('#input_start_date').on('change', function () {
+            syncEqualDates('start');
+        });
+
+        $('#input_end_date').on('change', function () {
+            syncEqualDates('end');
+        });
+
+        if ($('#input_start_date').val() && $('#input_end_date').val() && $('#input_start_date').val() !== $('#input_end_date').val()) {
+            syncEqualDates('start');
+        }
+
+        $('form[action="{{ route('report.employeeComissionService') }}"]').on('submit', function () {
+            syncEqualDates('start');
+        });
+
+        function toNumber(value) {
+            if (value === null || value === undefined) {
+                return 0;
+            }
+            var clean = value.toString().replace(/[^0-9.-]/g, '');
+            var parsed = parseFloat(clean);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+
+        function getComissionRowsForPrint() {
+            var rows = [];
+            reportTable.rows({ search: 'applied' }).every(function () {
+                var data = this.data();
+                rows.push({
+                    reference_no: data[1],
+                    service: data[2],
+                    employee: data[3],
+                    date: data[4],
+                    total: data[5],
+                    percentaje: data[6],
+                    comision: data[8]
+                });
+            });
+            return rows;
+        }
+
+        function printComissionTicket() {
+            var selectedEmployeeId = $('#employee_id').val();
+            var employeeName = $('#employee_id option:selected').text();
+            var startDate = $('#input_start_date').val();
+            var endDate = $('#input_end_date').val();
+
+            var rows = getComissionRowsForPrint();
+            if (!rows.length) {
+                alert('No hay datos para imprimir.');
+                return;
+            }
+
+            var detailHtml = '';
+            var totalComission = 0;
+            var groupedRows = {};
+
+            rows.forEach(function (row) {
+                var employeeKey = row.employee || 'Sin empleado';
+                if (!groupedRows[employeeKey]) {
+                    groupedRows[employeeKey] = [];
+                }
+                groupedRows[employeeKey].push(row);
+            });
+
+            Object.keys(groupedRows).forEach(function (empName) {
+                var subtotalByEmployee = 0;
+                detailHtml += '<tr><td colspan="6" style="font-weight:700; border-top:1px dashed #000;">Empleado: ' + empName + '</td></tr>';
+
+                groupedRows[empName].forEach(function (row) {
+                    var rowComission = toNumber(row.comision);
+                    totalComission += rowComission;
+                    subtotalByEmployee += rowComission;
+                    detailHtml += '<tr>' +
+                        '<td>' + row.reference_no + '</td>' +
+                        '<td>' + row.service + '</td>' +
+                        '<td>' + row.date + '</td>' +
+                        '<td class="text-right">' + row.total + '</td>' +
+                        '<td class="text-right">' + row.percentaje + '</td>' +
+                        '<td class="text-right">' + row.comision + '</td>' +
+                        '</tr>';
+                });
+
+                detailHtml += '<tr><td colspan="5" class="text-right" style="font-weight:700;">Subtotal ' + empName + '</td>' +
+                    '<td class="text-right" style="font-weight:700;">' + subtotalByEmployee.toFixed(2) + '</td></tr>';
+            });
+
+            var printWindow = window.open('', '_blank', 'width=460,height=760');
+            if (!printWindow) {
+                alert('No se pudo abrir la ventana de impresión. Verifique el bloqueador de ventanas.');
+                return;
+            }
+
+            var html = '<!doctype html><html><head><meta charset="utf-8"><title>Comisión de Empleado</title>' +
+                '<style>' +
+                'body{font-family:Arial, sans-serif; margin:0; padding:10px; color:#000; width:80mm;}' +
+                '.title{text-align:center; font-weight:700; font-size:16px; margin-bottom:8px;}' +
+                '.meta{font-size:12px; margin-bottom:8px;}' +
+                '.line{border-top:1px dashed #000; margin:8px 0;}' +
+                'table{width:100%; border-collapse:collapse; font-size:10px;}' +
+                'th,td{padding:3px 2px; border-bottom:1px solid #ddd; vertical-align:top;}' +
+                'th{text-align:left; font-size:9px;}' +
+                '.text-right{text-align:right;}' +
+                '.total{margin-top:8px; font-size:14px; font-weight:700; text-align:right;}' +
+                '@media print { @page { size: 80mm auto; margin: 4mm; } body{width:auto;} }' +
+                '</style></head><body>' +
+                '<div class="title">Comisión de Empleado</div>' +
+                '<div class="meta"><strong>Nombre del Empleado:</strong> ' + employeeName + '<br>' +
+                '<strong>Rango de Fechas:</strong> ' + formatDate(startDate) + ' a ' + formatDate(endDate) + '</div>' +
+                '<div class="line"></div>' +
+                '<table><thead><tr>' +
+                '<th>Nro. Pre-Venta</th>' +
+                '<th>Servicio</th>' +
+                '<th>Fecha</th>' +
+                '<th class="text-right">Total</th>' +
+                '<th class="text-right">%</th>' +
+                '<th class="text-right">Comisión</th>' +
+                '</tr></thead><tbody>' + detailHtml + '</tbody></table>' +
+                '<div class="total">TOTAL: Bs. ' + totalComission.toFixed(2) + '</div>' +
+                '</body></html>';
+
+            printWindow.document.open();
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(function () {
+                printWindow.print();
+            }, 300);
+        }
+
+        $('#print-format-a4').on('click', function (e) {
+            e.preventDefault();
+            $('.buttons-print').click();
+        });
+
+        $('#print-format-ticket').on('click', function (e) {
+            e.preventDefault();
+            printComissionTicket();
+        });
 
         function setting_qrcommission() {
             $("#qr_commission").empty();

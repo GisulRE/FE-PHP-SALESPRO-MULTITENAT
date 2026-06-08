@@ -264,7 +264,7 @@
                 "processing": true,
                 "serverSide": true,
                 "ajax": {
-                    url: "category/category-data",
+                    url: "{{ url('category/category-data') }}",
                     dataType: "json",
                     type: "post"
                 },

@@ -23,6 +23,15 @@
                             @endif
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>NIT</label>
+                            <input type="text" name="nit" class="form-control" value="{{ $company->nit ?? '' }}" maxlength="30">
+                            @if ($errors->has('nit'))
+                                <span class="text-danger">{{ $errors->first('nit') }}</span>
+                            @endif
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <input type="submit" value="{{ trans('file.submit') }}" class="btn btn-primary">

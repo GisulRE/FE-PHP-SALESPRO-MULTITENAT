@@ -186,6 +186,25 @@
                                 </div>
                             </div>
                             <div class="dropdown-divider"></div>
+                            <p class="italic"><small>Horario de Atención para Reservas.</small></p>
+                            <div class="row">
+                                <div class="form-group col-md-4">
+                                    <label>Hora Inicio Atención *</label>
+                                    <input type="time" name="hora_inicio_atencion" class="form-control"
+                                        value="{{ isset($lims_pos_setting_data->hora_inicio_atencion) ? date('H:i', strtotime($lims_pos_setting_data->hora_inicio_atencion)) : '08:00' }}" step="60" required />
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Hora Fin Atención *</label>
+                                    <input type="time" name="hora_fin_atencion" class="form-control"
+                                        value="{{ isset($lims_pos_setting_data->hora_fin_atencion) ? date('H:i', strtotime($lims_pos_setting_data->hora_fin_atencion)) : '21:00' }}" step="60" required />
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Intervalo de Reserva (minutos) *</label>
+                                    <input type="number" name="intervalo_reserva_minutos" class="form-control" min="5" max="120" step="5"
+                                        value="{{ $lims_pos_setting_data->intervalo_reserva_minutos ?? 30 }}" required />
+                                </div>
+                            </div>
+                            <div class="dropdown-divider"></div>
                             <p class="italic"><small>Información SIAT.</small></p>
                             <div class="row">
                                 <div class="form-group col-md-6">
@@ -219,6 +238,7 @@
                                     <input type="hidden" name="tipo_moneda_id_hidden"
                                         value="{{ $lims_pos_setting_data->tipo_moneda_siat }}">
                                     <select name="tipo_moneda_siat" class="selectpicker form-control"
+                                        data-live-search="true" data-live-search-style="begins"
                                         title="Seleccione moneda...">
                                         @include('setting.partials-tipo_moneda')
                                     </select>
@@ -688,7 +708,20 @@
         $('select[name="warehouse_id"]').val($("input[name='warehouse_id_hidden']").val());
         $('select[name="facturacion_id"]').val($("input[name='facturacion_id_hidden']").val());
         $('select[name="codigo_emision"]').val($("input[name='codigo_emision_hidden']").val());
-        $('select[name="tipo_moneda_siat"]').val($("input[name='tipo_moneda_id_hidden']").val());
+
+        var monedaGuardada = $("input[name='tipo_moneda_id_hidden']").val();
+        if (monedaGuardada) {
+            $('select[name="tipo_moneda_siat"]').val(monedaGuardada);
+        } else {
+            var bolivianoOption = $('select[name="tipo_moneda_siat"] option').filter(function() {
+                return $(this).text().trim().toUpperCase() === 'BOLIVIANO';
+            }).first();
+
+            if (bolivianoOption.length) {
+                $('select[name="tipo_moneda_siat"]').val(bolivianoOption.val());
+            }
+        }
+
         $('.selectpicker').selectpicker('refresh');
 
 

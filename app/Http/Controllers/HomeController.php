@@ -25,15 +25,19 @@ class HomeController extends Controller
 
     public function index()
     {
-        $start_date = date("Y") . '-' . date("m") . '-' . '01';
-        $end_date = date("Y") . '-' . date("m") . '-' . '31';
+        $start_date = date("Y-m-01");
+        $end_date = date("Y-m-t");
         $yearly_sale_amount = [];
 
-        $general_setting = DB::table('general_settings')->latest()->first();
-        if (Auth::user()->role_id > 2 && $general_setting->staff_access == 'own') {
+        $general_setting = DB::table('general_settings')
+            ->where('company_id', Auth::user()->company_id)
+            ->latest()
+            ->first();
+        $staff_access = $general_setting->staff_access ?? 'admin';
+        if (Auth::user()->role_id > 2 && $staff_access == 'own') {
             $revenue = Sale::whereDate('created_at', '>=', $start_date)->where('user_id', Auth::id())->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $cost = DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->Join('sales', 'product_sales.sale_id', '=', 'sales.id')->whereDate('product_sales.created_at', '>=', $start_date)
-                ->whereDate('product_sales.created_at', '<=', $end_date)->where('sales.user_id', Auth::id())->sum(DB::raw('product_sales.qty*products.cost'));
+                ->whereDate('product_sales.created_at', '<=', $end_date)->where('sales.user_id', Auth::id())->sum(DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
             $return = Returns::whereDate('created_at', '>=', $start_date)->where('user_id', Auth::id())->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $purchase_return = ReturnPurchase::whereDate('created_at', '>=', $start_date)->where('user_id', Auth::id())->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $revenue = $revenue - $return;
@@ -47,7 +51,7 @@ class HomeController extends Controller
             $recent_payment = Payment::orderBy('id', 'desc')->where('user_id', Auth::id())->take(5)->get();
         } else {
             $revenue = Sale::whereBetween('date_sell', [$start_date, $end_date])->sum('grand_total');
-            $cost = DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->whereBetween('product_sales.created_at', [$start_date, $end_date])->sum(DB::raw('product_sales.qty*products.cost'));
+            $cost = DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->whereBetween('product_sales.created_at', [$start_date, $end_date])->sum(DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
             //$cost = Product_Sale::select('SUM(product_sales.qty*products.cost) total')->join('products', 'product_sales.product_id', 'products.id')->whereDate('product_sales.created_at', '>=' , $start_date)
             //->whereDate('product_sales.created_at', '<=' , $end_date)->first();
             $return = Returns::whereBetween('created_at', [$start_date, $end_date])->sum('grand_total');
@@ -70,13 +74,13 @@ class HomeController extends Controller
 
         //cash flow of last 6 months
         $start = strtotime(date('Y-m-01', strtotime('-6 month', strtotime(date('Y-m-d')))));
-        $end = strtotime(date('Y-m-31'));
+        $end = strtotime(date('Y-m-t'));
 
         while ($start < $end) {
-            $start_date = date("Y-m", $start) . '-' . '01';
-            $end_date = date("Y-m", $start) . '-' . '31';
+            $start_date = date("Y-m-01", $start);
+            $end_date = date("Y-m-t", $start);
 
-            if (Auth::user()->role_id > 2 && $general_setting->staff_access == 'own') {
+            if (Auth::user()->role_id > 2 && $staff_access == 'own') {
                 $recieved_amount = DB::table('payments')->whereNotNull('sale_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('amount');
                 $sent_amount = DB::table('payments')->whereNotNull('purchase_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('amount');
                 $return_amount = Returns::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
@@ -102,9 +106,9 @@ class HomeController extends Controller
         $start = strtotime(date("Y") . '-01-01');
         $end = strtotime(date("Y") . '-12-31');
         while ($start < $end) {
-            $start_date = date("Y") . '-' . date('m', $start) . '-' . '01';
-            $end_date = date("Y") . '-' . date('m', $start) . '-' . '31';
-            if (Auth::user()->role_id > 2 && $general_setting->staff_access == 'own') {
+            $start_date = date("Y-m-01", $start);
+            $end_date = date("Y-m-t", $start);
+            if (Auth::user()->role_id > 2 && $staff_access == 'own') {
                 $sale_amount = Sale::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
                 $purchase_amount = Purchase::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
             } else {
@@ -135,11 +139,15 @@ class HomeController extends Controller
 
     public function dashboardFilter($start_date, $end_date)
     {
-        $general_setting = DB::table('general_settings')->latest()->first();
-        if (Auth::user()->role_id > 2 && $general_setting->staff_access == 'own') {
+        $general_setting = DB::table('general_settings')
+            ->where('company_id', Auth::user()->company_id)
+            ->latest()
+            ->first();
+        $staff_access = $general_setting->staff_access ?? 'admin';
+        if (Auth::user()->role_id > 2 && $staff_access == 'own') {
             $revenue = Sale::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
             $cost = DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->Join('sales', 'product_sales.sale_id', '=', 'sales.id')->whereDate('product_sales.created_at', '>=', $start_date)
-                ->whereDate('product_sales.created_at', '<=', $end_date)->where('sales.user_id', Auth::id())->sum(DB::raw('product_sales.qty*products.cost'));
+                ->whereDate('product_sales.created_at', '<=', $end_date)->where('sales.user_id', Auth::id())->sum(DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
             $return = Returns::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
             $purchase_return = ReturnPurchase::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
             $revenue -= $return;
@@ -154,7 +162,7 @@ class HomeController extends Controller
         } else {
             $revenue = Sale::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $cost = DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->whereDate('product_sales.created_at', '>=', $start_date)
-                ->whereDate('product_sales.created_at', '<=', $end_date)->sum(DB::raw('product_sales.qty*products.cost'));
+                ->whereDate('product_sales.created_at', '<=', $end_date)->sum(DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
             $return = Returns::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $purchase_return = ReturnPurchase::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $revenue -= $return;

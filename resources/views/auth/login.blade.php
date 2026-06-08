@@ -1,11 +1,17 @@
-<?php $general_setting = DB::table('general_settings')->find(1); ?>
+<?php 
+$general_setting = $general_setting ?? DB::table('general_settings')->find(1) ?? DB::table('general_settings')->first() ?? (object)[
+    'theme' => 'default.css',
+    'site_logo' => 'logo.png',
+    'site_title' => 'GISUL POS'
+];
+?>
 <!DOCTYPE html>
 <html>
 
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>{{ $general_setting->site_title }}</title>
+    <title>GISUL POS</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="all,follow">
@@ -54,7 +60,7 @@
         <div class="container">
             <div class="form-outer text-center d-flex align-items-center">
                 <div class="form-inner">
-                    <div class="logo"><span>{{ $general_setting->site_title }}</span></div>
+                    <div class="logo"><span>GISUL POS</span></div>
                     @if (session()->has('delete_message'))
                         <div class="alert alert-danger alert-dismissible text-center"><button type="button"
                                 class="close" data-dismiss="alert" aria-label="Close"><span
@@ -63,6 +69,17 @@
                     @endif
                     <form method="POST" action="{{ route('login') }}" id="login-form">
                         @csrf
+                        <div class="form-group-material">
+                            <input id="login-nit" type="text" name="nit_login" required class="input-material"
+                                value="{{ old('nit_login') }}" maxlength="30">
+                            <label for="login-nit" class="label-material">NIT *</label>
+                            @if ($errors->has('nit_login'))
+                                <p>
+                                    <strong>{{ $errors->first('nit_login') }}</strong>
+                                </p>
+                            @endif
+                        </div>
+
                         <div class="form-group-material">
                             <input id="login-username" type="text" name="name" required class="input-material"
                                 value="">
@@ -161,5 +178,19 @@
         $input.attr('type', type);
         $(this).attr('aria-label', type === 'password' ? 'Mostrar contraseña' : 'Ocultar contraseña');
         $(this).find('i').toggleClass('fa-eye fa-eye-slash');
+    });
+
+    // Persist NIT in localStorage and prefill on next login.
+    var savedNit = localStorage.getItem('login_nit');
+    if (savedNit && !$('#login-nit').val()) {
+        $('#login-nit').val(savedNit);
+        $('#login-nit').siblings('.label-material').addClass('active');
+    }
+
+    $('#login-form').on('submit', function() {
+        var nit = $('#login-nit').val();
+        if (nit) {
+            localStorage.setItem('login_nit', nit);
+        }
     });
 </script>

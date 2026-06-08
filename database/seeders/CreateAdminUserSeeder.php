@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\User;
 use Spatie\Permission\Models\Role;
 
@@ -16,8 +17,19 @@ class CreateAdminUserSeeder extends Seeder
             $role = Role::where('name', 'Administrador')->first();
             
             if (!$role) {
-                // Fallback: create if doesn't exist
-                $role = Role::create(['name' => 'Administrador', 'guard_name' => 'web', 'description' => 'El administrador del sistema']);
+                // Fallback: create if doesn't exist (asegurando campos requeridos)
+                $role = Role::create([
+                    'name' => 'Administrador',
+                    'guard_name' => 'web',
+                    'description' => 'El administrador del sistema',
+                    'is_active' => true,
+                ]);
+            } else {
+                // Si existe pero el flag is_active está ausente o nulo, asegurarlo
+                if (!isset($role->is_active) || $role->is_active === null) {
+                    $role->is_active = true;
+                    $role->save();
+                }
             }
 
             // Determine default company if any
@@ -26,10 +38,11 @@ class CreateAdminUserSeeder extends Seeder
 
             // Admin user data
             $email = 'admin@local.test';
-            $user = DB::table('users')->where('email', $email)->first();
+            $user = User::where('email', $email)->first();
 
             if (!$user) {
-                $id = DB::table('users')->insertGetId([
+                // Crear con Eloquent para activar eventos y reglas de modelo
+                $user = User::create([
                     'name' => 'admin',
                     'email' => $email,
                     'password' => bcrypt('Llave123.#'),
@@ -40,32 +53,30 @@ class CreateAdminUserSeeder extends Seeder
                     'biller_id' => null,
                     'is_active' => true,
                     'is_deleted' => false,
-                    'created_at' => now(),
-                    'updated_at' => now(),
                 ]);
 
-                $userModel = User::find($id);
-                if ($userModel) {
-                    $userModel->assignRole($role->name);
+                if ($user) {
+                    $user->assignRole($role->name);
+                    Log::info('CreateAdminUserSeeder: usuario admin creado: ' . $email);
                 }
             } else {
                 // Update existing user to ensure admin
-                DB::table('users')->where('id', $user->id)->update([
-                    'role_id' => $role->id,
-                    'company_id' => $companyId,
-                    'is_active' => true,
-                    'is_deleted' => false,
-                    'password' => bcrypt('Llave123.#'),
-                    'updated_at' => now(),
-                ]);
-                $userModel = User::where('email', $email)->first();
-                if ($userModel && !$userModel->hasRole($role->name)) {
-                    $userModel->assignRole($role->name);
+                $user->role_id = $role->id;
+                $user->company_id = $companyId;
+                $user->is_active = true;
+                $user->is_deleted = false;
+                $user->password = bcrypt('Llave123.#');
+                $user->save();
+
+                if (!$user->hasRole($role->name)) {
+                    $user->assignRole($role->name);
                 }
+                Log::info('CreateAdminUserSeeder: usuario admin actualizado: ' . $email);
             }
 
         } catch (\Exception $e) {
-            // ignore on failure
+            Log::error('CreateAdminUserSeeder error: ' . $e->getMessage());
+            throw $e;
         }
     }
 }

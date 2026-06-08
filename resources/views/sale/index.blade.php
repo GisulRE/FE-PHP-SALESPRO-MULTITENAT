@@ -18,6 +18,14 @@
         {{ session()->forget('info') }}
     @endif
 
+    <script>
+        // Stub global para evitar ReferenceError si se invoca antes de inicializar
+        window.loadFacturaSiat = window.loadFacturaSiat || function(saleId, verificada, dataFactura) {
+            console.warn('loadFacturaSiat llamado antes de estar inicializado', { saleId: saleId });
+            return;
+        };
+    </script>
+
     <section>
         <div class="container-fluid">
             @if (in_array('sales-add', $all_permission))
@@ -149,6 +157,22 @@
                     </tbody>
                 </table>
                 <div id="sale-footer" class="modal-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="sale-print-preview-modal" tabindex="-1" role="dialog" aria-hidden="true" class="modal fade text-left">
+        <div role="document" class="modal-dialog" style="width: auto; max-width: 95vw;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nota de Venta</h5>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
+                            aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                </div>
+                <div class="modal-body p-0" style="height:80vh;">
+                    <iframe id="sale-print-preview-frame" src="about:blank" frameborder="0"
+                        style="width:100%; height:100%;"></iframe>
+                </div>
             </div>
         </div>
     </div>
@@ -721,6 +745,8 @@
         var payment_note = [];
         var account = [];
         var deposit;
+        var currentSaleIdForPreview = null;
+        var salePreviewBaseUrl = "{{ url('sales/preview_invoice') }}";
         
         // Cachear motivos de anulación globalmente
         var motivosAnulacionCache = null;
@@ -738,17 +764,57 @@
             var sale = $(this).parent().parent().parent().parent().parent().data('sale');
             saleDetails(sale);
         });
+
+        function openSalePreviewModal(previewUrl) {
+            $('#sale-print-preview-frame').attr('src', previewUrl);
+            $('#sale-print-preview-modal').modal('show');
+        }
+
+        function adjustSalePreviewModalWidth() {
+            var frame = document.getElementById('sale-print-preview-frame');
+            if (!frame || !frame.contentWindow || !frame.contentWindow.document) {
+                return;
+            }
+            var doc = frame.contentWindow.document;
+            var ticketContainer = doc.querySelector('.invoice-ticket-container');
+            var contentWidth = 0;
+
+            if (ticketContainer) {
+                contentWidth = Math.ceil(ticketContainer.getBoundingClientRect().width);
+            }
+
+            if (!contentWidth || contentWidth <= 0) {
+                var bodyWidth = doc.body ? doc.body.scrollWidth : 0;
+                var htmlWidth = doc.documentElement ? doc.documentElement.scrollWidth : 0;
+                contentWidth = Math.max(bodyWidth, htmlWidth);
+            }
+
+            contentWidth = Math.max(contentWidth, 360);
+            var viewportLimit = Math.floor(window.innerWidth * 0.95);
+            var modalWidth = Math.min(contentWidth + 80, viewportLimit);
+            $('#sale-print-preview-modal .modal-dialog').css('max-width', modalWidth + 'px');
+        }
+
+        $(document).on("click", ".print-sale-modal", function() {
+            var previewUrl = $(this).data('url');
+            openSalePreviewModal(previewUrl);
+        });
+
+        $('#sale-print-preview-frame').on('load', function() {
+            adjustSalePreviewModalWidth();
+        });
+
+        $('#sale-print-preview-modal').on('hidden.bs.modal', function() {
+            $('#sale-print-preview-frame').attr('src', 'about:blank');
+            $('#sale-print-preview-modal .modal-dialog').css('max-width', '95vw');
+        });
+
         $("#print-btn").on("click", function() {
-            var divToPrint = document.getElementById('sale-details');
-            var newWin = window.open('', 'Print-Window');
-            newWin.document.open();
-            newWin.document.write(
-                '<link rel="stylesheet" href="/public/vendor/bootstrap/css/bootstrap.min.css" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">' +
-                divToPrint.innerHTML + '</body>');
-            newWin.document.close();
-            setTimeout(function() {
-                newWin.close();
-            }, 10);
+            if (!currentSaleIdForPreview) {
+                return;
+            }
+            var previewUrl = salePreviewBaseUrl + '/' + currentSaleIdForPreview;
+            openSalePreviewModal(previewUrl);
         });
         $(document).on("click", "table.sale-list tbody .add-payment", function() {
             $("#cheque").hide();
@@ -763,6 +829,12 @@
             var balance = $('table.sale-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(10)')
                 .text();
             balance = parseFloat(balance.replace(/,/g, ''));
+            // Si el saldo pendiente es 0 pero la venta no tiene registro de pago,
+            // usar el total de la venta para permitir registrar el pago faltante
+            if (balance <= 0) {
+                var grandTotal = $('table.sale-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(8)').text();
+                balance = parseFloat(grandTotal.replace(/,/g, ''));
+            }
             $('input[name="paying_amount"]').val(balance);
             $('#add-payment input[name="balance"]').val(balance);
             $('input[name="amount"]').val(balance);
@@ -1292,6 +1364,7 @@
 
         function saleDetails(sale) {
             $("#sale-details input[name='sale_id']").val(sale[13]);
+            currentSaleIdForPreview = sale[13];
             var htmltext = '<strong>{{ trans('file.Date') }}: </strong>' + sale[0] +
                 '<br><strong>{{ trans('file.reference') }}: </strong>' + sale[1] +
                 '<br><strong>{{ trans('file.Warehouse') }}: </strong>' + sale[27] +
@@ -1675,7 +1748,7 @@
             var facturaVerificada = false;
             var facturaData = null;
             
-            function loadFacturaSiat(saleId, verificada, dataFactura) {
+            window.loadFacturaSiat = function(saleId, verificada, dataFactura) {
                 var url = '{{ url('sales/imprimir_factura') }}/' + saleId;
                 
                 // Limpiar container

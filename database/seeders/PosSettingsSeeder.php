@@ -19,6 +19,18 @@ class PosSettingsSeeder extends Seeder
                 return;
             }
 
+            $defaultCurrencyCode = '1';
+            if (DB::getSchemaBuilder()->hasTable('siat_parametricas_varios')) {
+                $bolivianoCode = DB::table('siat_parametricas_varios')
+                    ->where('tipo_clasificador', 'tipoMoneda')
+                    ->whereRaw('UPPER(descripcion) = ?', ['BOLIVIANO'])
+                    ->value('codigo_clasificador');
+
+                if (!empty($bolivianoCode)) {
+                    $defaultCurrencyCode = (string) $bolivianoCode;
+                }
+            }
+
             // Obtener todas las companies
             $companies = DB::table('companies')->get();
             
@@ -44,9 +56,18 @@ class PosSettingsSeeder extends Seeder
                         'pass_siat'                 => null,
                         'url_siat'                  => null,
                         'url_operaciones'           => null,
+                        'tipo_moneda_siat'          => $defaultCurrencyCode,
                         'created_at'                => now(),
                         'updated_at'                => now(),
                     ]);
+                } else {
+                    DB::table('pos_setting')
+                        ->where('company_id', $company->id)
+                        ->whereNull('tipo_moneda_siat')
+                        ->update([
+                            'tipo_moneda_siat' => $defaultCurrencyCode,
+                            'updated_at' => now(),
+                        ]);
                 }
             }
         } catch (\Exception $e) {

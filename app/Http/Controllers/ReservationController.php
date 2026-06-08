@@ -298,14 +298,28 @@ class ReservationController extends Controller
       }
     }
 
+    // Detectar driver de base de datos para usar la función de diferencia de tiempo adecuada
+    $driver = 'mysql';
+    try {
+      $driver = \DB::getPdo()->getAttribute(\PDO::ATTR_DRIVER_NAME);
+    } catch (\Exception $e) {
+      $driver = config('database.default');
+    }
     if (empty($request->input('search.value'))) {
       // If no explicit ordering provided, order by proximity to now (closest reservations first)
       if (empty($request->input('order.0.column'))) {
-        // Order by absolute seconds difference between reservation datetime and now
-        $reservations = $query->orderByRaw("ABS(TIMESTAMPDIFF(SECOND, CONCAT(reserved_date,' ',reserved_time), NOW())) ASC")
-          ->offset($start)
-          ->limit($limit)
-          ->get();
+        // Use DB-specific expression: MySQL uses TIMESTAMPDIFF, Postgres uses EXTRACT(EPOCH FROM ...)
+        if (strtolower($driver) === 'pgsql' || strtolower($driver) === 'postgresql' || stripos($driver, 'pgsql') !== false) {
+          $reservations = $query->orderByRaw("ABS(EXTRACT(EPOCH FROM (NOW() - ((reserved_date || ' ' || reserved_time)::timestamp)))) ASC")
+            ->offset($start)
+            ->limit($limit)
+            ->get();
+        } else {
+          $reservations = $query->orderByRaw("ABS(TIMESTAMPDIFF(SECOND, CONCAT(reserved_date,' ',reserved_time), NOW())) ASC")
+            ->offset($start)
+            ->limit($limit)
+            ->get();
+        }
       } else {
         $reservations = $query->offset($start)
           ->limit($limit)

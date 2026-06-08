@@ -28,6 +28,7 @@ use Illuminate\Http\Request;
 use App\Http\Traits\CufdTrait;
 use Clickatell\ClickatellException;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 
 class SettingController extends Controller
@@ -48,7 +49,7 @@ class SettingController extends Controller
 
     public function backupDatabase()
     {
-        $lims_general_setting_data = GeneralSetting::latest()->first();
+        $lims_general_setting_data = GeneralSetting::current();
         //ENTER THE RELEVANT INFO BELOW
         if (env('DB_HOST') != null && env('DB_HOST') != '') {
             $server = env('DB_HOST');
@@ -595,7 +596,13 @@ class SettingController extends Controller
 
     public function generalSetting()
     {
-        $lims_general_setting_data = GeneralSetting::firstOrNew(['id' => 1]);
+        if (Schema::hasColumn('general_settings', 'company_id') && auth()->check()) {
+            $companyId = auth()->user()->company_id;
+            $lims_general_setting_data = GeneralSetting::firstOrNew(['company_id' => $companyId]);
+            $lims_general_setting_data->company_id = $companyId;
+        } else {
+            $lims_general_setting_data = GeneralSetting::firstOrNew(['id' => 1]);
+        }
         $lims_account_list = Account::where('is_active', true)->get();
         $zones_array = array();
         $timestamp = time();
@@ -614,20 +621,26 @@ class SettingController extends Controller
         ]);
 
         $data = $request->except('site_logo');
-        //writting timezone info in .env file
-        $path = '.env';
-        $searchArray = array('APP_TIMEZONE=' . env('APP_TIMEZONE'));
-        $replaceArray = array('APP_TIMEZONE=' . $data['timezone']);
 
-        file_put_contents($path, str_replace($searchArray, $replaceArray, file_get_contents($path)));
-
-        $general_setting = GeneralSetting::firstOrNew(['id' => 1]);
+        if (Schema::hasColumn('general_settings', 'company_id') && auth()->check()) {
+            $companyId = auth()->user()->company_id;
+            $general_setting = GeneralSetting::firstOrNew(['company_id' => $companyId]);
+            $general_setting->company_id = $companyId;
+        } else {
+            $general_setting = GeneralSetting::firstOrNew(['id' => 1]);
+        }
         $general_setting->site_title = $data['site_title'];
         $general_setting->currency = $data['currency'];
         $general_setting->currency_position = $data['currency_position'];
         $general_setting->staff_access = $data['staff_access'];
         $general_setting->date_format = $data['date_format'];
-        $general_setting->alert_expiration = $data['alert_expiration'];
+        $general_setting->alert_expiration = isset($data['alert_expiration']) && $data['alert_expiration'] !== '' ? (int) $data['alert_expiration'] : 30;
+        // Asegurar que el campo `theme` no quede nulo (evita error SQL cuando se crea el registro)
+        if (isset($data['theme']) && $data['theme'] !== '') {
+            $general_setting->theme = $data['theme'];
+        } elseif (empty($general_setting->theme)) {
+            $general_setting->theme = 'default.css';
+        }
         $logo = $request->site_logo;
         if ($logo) {
             $logoName = $logo->getClientOriginalName();
@@ -640,7 +653,13 @@ class SettingController extends Controller
 
     public function changeTheme($theme)
     {
-        $lims_general_setting_data = GeneralSetting::firstOrNew(['id' => 1]);
+        if (Schema::hasColumn('general_settings', 'company_id') && auth()->check()) {
+            $companyId = auth()->user()->company_id;
+            $lims_general_setting_data = GeneralSetting::firstOrNew(['company_id' => $companyId]);
+            $lims_general_setting_data->company_id = $companyId;
+        } else {
+            $lims_general_setting_data = GeneralSetting::firstOrNew(['id' => 1]);
+        }
         $lims_general_setting_data->theme = $theme;
         $lims_general_setting_data->save();
     }
@@ -778,8 +797,15 @@ class SettingController extends Controller
         $tipo_emision_list[1]['name'] = "Masivo";
         $lims_biller_list = Biller::where('is_active', true)->get();
         $lims_printer_list = PrinterConfig::where('status', true)->get();
+        $defaultCurrencyCode = DB::table('siat_parametricas_varios')
+            ->where('tipo_clasificador', 'tipoMoneda')
+            ->whereRaw('UPPER(descripcion) = ?', ['BOLIVIANO'])
+            ->value('codigo_clasificador') ?? '1';
         $companyId = auth()->user()->company_id;
         $lims_pos_setting_data = PosSetting::firstOrNew(['company_id' => $companyId]);
+        if (empty($lims_pos_setting_data->tipo_moneda_siat)) {
+            $lims_pos_setting_data->tipo_moneda_siat = (string) $defaultCurrencyCode;
+        }
 
         return view('setting.pos_setting', compact('lims_customer_list', 'tipo_emision_list', 'lims_warehouse_list', 'lims_biller_list', 'lims_formatprint_list', 'lims_pos_setting_data', 'lims_printer_list'));
     }
@@ -796,7 +822,24 @@ class SettingController extends Controller
     {
         $data = $request->all();
         $companyId = auth()->user()->company_id;
-        $pos_setting = PosSetting::firstOrNew(['company_id' => $companyId]);
+        $defaultCurrencyCode = DB::table('siat_parametricas_varios')
+            ->where('tipo_clasificador', 'tipoMoneda')
+            ->whereRaw('UPPER(descripcion) = ?', ['BOLIVIANO'])
+            ->value('codigo_clasificador') ?? '1';
+
+        $pos_setting = PosSetting::firstOrCreate(
+            ['company_id' => $companyId],
+            [
+                'customer_id' => 1,
+                'warehouse_id' => 1,
+                'biller_id' => 1,
+                'product_number' => 10,
+                'stripe_secret_key' => '',
+                'stripe_public_key' => null,
+                'cant_decimal' => 2,
+                'tipo_moneda_siat' => (string) $defaultCurrencyCode,
+            ]
+        );
         if (isset($data['hour_resetshift'])) {
             $pos_setting->hour_resetshift = $data['hour_resetshift'];
         }
@@ -812,8 +855,37 @@ class SettingController extends Controller
 
     public function posSettingStore(Request $request)
     {
+        if ($request->has('hora_inicio_atencion') && $request->hora_inicio_atencion) {
+            $request->merge([
+                'hora_inicio_atencion' => date('H:i', strtotime($request->hora_inicio_atencion)),
+            ]);
+        }
+        if ($request->has('hora_fin_atencion') && $request->hora_fin_atencion) {
+            $request->merge([
+                'hora_fin_atencion' => date('H:i', strtotime($request->hora_fin_atencion)),
+            ]);
+        }
+
+        $request->validate([
+            'hora_inicio_atencion' => 'nullable|date_format:H:i',
+            'hora_fin_atencion' => 'nullable|date_format:H:i',
+            'intervalo_reserva_minutos' => 'nullable|integer|min:5|max:120',
+        ]);
+
         $data = $request->all();
         $companyId = auth()->user()->company_id;
+        $defaultCurrencyCode = DB::table('siat_parametricas_varios')
+            ->where('tipo_clasificador', 'tipoMoneda')
+            ->whereRaw('UPPER(descripcion) = ?', ['BOLIVIANO'])
+            ->value('codigo_clasificador') ?? '1';
+
+        $horaInicio = $data['hora_inicio_atencion'] ?? '08:00';
+        $horaFin = $data['hora_fin_atencion'] ?? '21:00';
+        if ($horaInicio >= $horaFin) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['hora_fin_atencion' => 'La hora fin de atención debe ser mayor a la hora inicio']);
+        }
 
         $pos_setting = PosSetting::firstOrNew(['company_id' => $companyId]);
         $pos_setting->company_id = $companyId;
@@ -823,10 +895,12 @@ class SettingController extends Controller
         $pos_setting->print_order = $data['type_printorder_id'];
         $pos_setting->biller_id = $data['biller_id'];
         $pos_setting->product_number = $data['product_number'];
+        $pos_setting->stripe_public_key = $data['stripe_public_key'] ?? null;
+        $pos_setting->stripe_secret_key = $data['stripe_secret_key'] ?? '';
         $pos_setting->t_c = $data['t_c'];
         $pos_setting->facturacion_id = $data['facturacion_id'];
         $pos_setting->codigo_emision = $data['codigo_emision'];
-        $pos_setting->tipo_moneda_siat = $data['tipo_moneda_siat'];
+        $pos_setting->tipo_moneda_siat = $data['tipo_moneda_siat'] ?? $defaultCurrencyCode;
         $pos_setting->nit_emisor = $data['nit_emisor'];
         $pos_setting->razon_social_emisor = $data['razon_social_emisor'];
         $pos_setting->direccion_emisor = $data['direccion_emisor'];
@@ -842,6 +916,9 @@ class SettingController extends Controller
         $pos_setting->url_whatsapp = $data['url_whatsapp'] ?? null;
         $pos_setting->require_transfer_authorization = isset($data['require_transfer_authorization']) ? 1 : 0;
 
+        $pos_setting->hora_inicio_atencion = $horaInicio;
+        $pos_setting->hora_fin_atencion = $horaFin;
+        $pos_setting->intervalo_reserva_minutos = $data['intervalo_reserva_minutos'] ?? 30;
 
         if (!isset($data['print']))
             $pos_setting->print = false;
@@ -900,11 +977,23 @@ class SettingController extends Controller
     public function runTareaProgramada(Request $request)
     {
         $bandera = false;
+        Log::info('POS_SETTING runTareaProgramada: request recibido', [
+            'user_id' => optional(Auth::user())->id,
+            'ip' => $request->ip(),
+        ]);
+        $this->writeCufdDebug('POS_SETTING runTareaProgramada: request recibido', [
+            'user_id' => optional(Auth::user())->id,
+            'ip' => $request->ip(),
+        ]);
         try {
             // Artisan::call('taskcufd:renovar');
             Artisan::call('schedule:run');
+            Log::info('POS_SETTING runTareaProgramada: ejecución completada', ['resultado' => true]);
+            $this->writeCufdDebug('POS_SETTING runTareaProgramada: ejecución completada', ['resultado' => true]);
             return $bandera = true;
         } catch (Exception $ex) {
+            Log::error('POS_SETTING runTareaProgramada: excepción', ['message' => $ex->getMessage()]);
+            $this->writeCufdDebug('POS_SETTING runTareaProgramada: excepción', ['message' => $ex->getMessage()]);
             $request->session()->flash('error', $ex->getMessage());
             return $bandera;
         }
@@ -913,7 +1002,23 @@ class SettingController extends Controller
 
     public function forzarRenovarCUFD()
     {
-        return $this->forceRenovarCUFD(); //CufdTrait, devuelve boolean
+        Log::info('POS_SETTING forzarRenovarCUFD: request recibido', [
+            'user_id' => optional(Auth::user())->id,
+            'ip' => request()->ip(),
+            'endpoint' => 'run/forzar_renovar_cufd',
+        ]);
+        $this->writeCufdDebug('POS_SETTING forzarRenovarCUFD: request recibido', [
+            'user_id' => optional(Auth::user())->id,
+            'ip' => request()->ip(),
+            'endpoint' => 'run/forzar_renovar_cufd',
+        ]);
+
+        $resultado = $this->forceRenovarCUFD(); // CufdTrait, devuelve boolean
+
+        Log::info('POS_SETTING forzarRenovarCUFD: resultado', ['resultado' => (bool) $resultado]);
+        $this->writeCufdDebug('POS_SETTING forzarRenovarCUFD: resultado', ['resultado' => (bool) $resultado]);
+
+        return $resultado;
     }
 
     public function listaPuntoVenta()
@@ -927,7 +1032,7 @@ class SettingController extends Controller
                 $item = collect($value);
                 $registro = SiatCufd::where('sucursal', $value->sucursal)->where('codigo_punto_venta', $value->codigo_punto_venta)->where('estado', true)->first();
                 if (isset($registro->fecha_vigencia)) {
-                    $generalSetting = GeneralSetting::first();
+                    $generalSetting = GeneralSetting::current();
                     $formato_fecha = $generalSetting ? $generalSetting->date_format : 'd/m/Y';
                     $fecha = new Carbon($registro->fecha_vigencia);
                     $fecha = $fecha->format("$formato_fecha H:i");
@@ -945,6 +1050,19 @@ class SettingController extends Controller
     // operación para renovar al día siguiente el cufd del determinado punto de venta, ya que la hora es mayor a las 23:30 
     public function vigenciaRenovarCUFD($biller_id)
     {
+        Log::info('POS_SETTING vigenciaRenovarCUFD: request recibido', [
+            'biller_id' => $biller_id,
+            'user_id' => optional(Auth::user())->id,
+            'ip' => request()->ip(),
+            'endpoint' => 'run/vigencia_renovar_cufd/{biller_id}',
+        ]);
+        $this->writeCufdDebug('POS_SETTING vigenciaRenovarCUFD: request recibido', [
+            'biller_id' => $biller_id,
+            'user_id' => optional(Auth::user())->id,
+            'ip' => request()->ip(),
+            'endpoint' => 'run/vigencia_renovar_cufd/{biller_id}',
+        ]);
+
         $data_biller = Biller::where('id', $biller_id)->first();
         $data_p_venta = SiatPuntoVenta::where('codigo_punto_venta', $data_biller->punto_venta_siat)->first();
         $registro = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->get()->each->updateEstado();
@@ -953,8 +1071,26 @@ class SettingController extends Controller
         try {
             Log::info('Renovando CUFD Manualmente desde Ajustes');
             $this->renovarVigenciaxPuntoVenta($data_p_venta);
+            Log::info('POS_SETTING vigenciaRenovarCUFD: resultado', [
+                'resultado' => true,
+                'sucursal' => optional($data_p_venta)->sucursal,
+                'codigo_punto_venta' => optional($data_p_venta)->codigo_punto_venta,
+            ]);
+            $this->writeCufdDebug('POS_SETTING vigenciaRenovarCUFD: resultado', [
+                'resultado' => true,
+                'sucursal' => optional($data_p_venta)->sucursal,
+                'codigo_punto_venta' => optional($data_p_venta)->codigo_punto_venta,
+            ]);
             return $bandera = true;
         } catch (\Throwable $th) {
+            Log::error('POS_SETTING vigenciaRenovarCUFD: excepción', [
+                'message' => $th->getMessage(),
+                'biller_id' => $biller_id,
+            ]);
+            $this->writeCufdDebug('POS_SETTING vigenciaRenovarCUFD: excepción', [
+                'message' => $th->getMessage(),
+                'biller_id' => $biller_id,
+            ]);
             return $bandera;
         }
     }
@@ -962,6 +1098,19 @@ class SettingController extends Controller
     // operación para renovar al día siguiente el cufd del determinado punto de venta, ya que la hora es mayor a las 23:30 
     public function vigenciaRenovarCUFDPuntoVenta($id)
     {
+        Log::info('POS_SETTING vigenciaRenovarCUFDPuntoVenta: request recibido', [
+            'siat_punto_venta_id' => $id,
+            'user_id' => optional(Auth::user())->id,
+            'ip' => request()->ip(),
+            'endpoint' => 'setting/vigencia_renovar_cufd_pv/{id}',
+        ]);
+        $this->writeCufdDebug('POS_SETTING vigenciaRenovarCUFDPuntoVenta: request recibido', [
+            'siat_punto_venta_id' => $id,
+            'user_id' => optional(Auth::user())->id,
+            'ip' => request()->ip(),
+            'endpoint' => 'setting/vigencia_renovar_cufd_pv/{id}',
+        ]);
+
         $data_p_venta = SiatPuntoVenta::find($id);
         $registro = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->get()->each->updateEstado();
 
@@ -969,8 +1118,26 @@ class SettingController extends Controller
         try {
             Log::info('Renovando CUFD Manualmente desde Ajustes');
             $this->renovarVigenciaxPuntoVenta($data_p_venta);
+            Log::info('POS_SETTING vigenciaRenovarCUFDPuntoVenta: resultado', [
+                'resultado' => true,
+                'sucursal' => optional($data_p_venta)->sucursal,
+                'codigo_punto_venta' => optional($data_p_venta)->codigo_punto_venta,
+            ]);
+            $this->writeCufdDebug('POS_SETTING vigenciaRenovarCUFDPuntoVenta: resultado', [
+                'resultado' => true,
+                'sucursal' => optional($data_p_venta)->sucursal,
+                'codigo_punto_venta' => optional($data_p_venta)->codigo_punto_venta,
+            ]);
             return $bandera = true;
         } catch (\Throwable $th) {
+            Log::error('POS_SETTING vigenciaRenovarCUFDPuntoVenta: excepción', [
+                'message' => $th->getMessage(),
+                'siat_punto_venta_id' => $id,
+            ]);
+            $this->writeCufdDebug('POS_SETTING vigenciaRenovarCUFDPuntoVenta: excepción', [
+                'message' => $th->getMessage(),
+                'siat_punto_venta_id' => $id,
+            ]);
             return $bandera;
         }
     }

@@ -7,7 +7,10 @@ class CreateBeforeProductReturnsTrigger extends Migration
 {
     public function up()
     {
-        DB::unprepared(<<<'SQL'
+        $driver = DB::getDriverName();
+
+        if ($driver === 'mysql') {
+            DB::unprepared(<<<'SQL'
 DROP TRIGGER IF EXISTS `BEFORE_PRODUCT_RETURNS_TRIGGER`;
 CREATE TRIGGER `BEFORE_PRODUCT_RETURNS_TRIGGER` BEFORE INSERT ON `product_returns` FOR EACH ROW
 BEGIN
@@ -32,11 +35,54 @@ ELSE
 END IF;
 END;
 SQL
-        );
+            );
+        } elseif ($driver === 'pgsql') {
+            DB::unprepared('DROP TRIGGER IF EXISTS "BEFORE_PRODUCT_RETURNS_TRIGGER" ON product_returns;');
+            DB::unprepared(<<<'SQL'
+CREATE OR REPLACE FUNCTION before_product_returns_trigger_fn()
+RETURNS trigger AS $$
+DECLARE
+    trans_id integer;
+    warehouse_id_val integer;
+    product_qty_before integer;
+    warehouse_qty_before integer;
+    purchase_ref_no varchar(50);
+    product_type varchar(50);
+BEGIN
+    SELECT id, warehouse_id, reference_no INTO trans_id, warehouse_id_val, purchase_ref_no FROM returns WHERE id = NEW.return_id;
+    SELECT qty, type INTO product_qty_before, product_type FROM products WHERE id = NEW.product_id;
+    SELECT qty INTO warehouse_qty_before FROM product_warehouse WHERE product_id = NEW.product_id AND warehouse_id = warehouse_id_val;
+    IF NEW.variant_id IS NOT NULL THEN
+        SELECT qty INTO product_qty_before FROM product_variants WHERE id = NEW.variant_id;
+    END IF;
+    IF product_type = 'digital' THEN
+        INSERT INTO record (transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after)
+        VALUES (trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 3, product_qty_before, product_qty_before, warehouse_qty_before, warehouse_qty_before);
+    ELSE
+        INSERT INTO record (transaction_id, warehouse_id, product_id, reference_no, transaction_type, product_qty_before, product_qty_after, warehouse_qty_before, warehouse_qty_after)
+        VALUES (trans_id, warehouse_id_val, NEW.product_id, purchase_ref_no, 3, (product_qty_before - NEW.qty), product_qty_before, (warehouse_qty_before - NEW.qty), warehouse_qty_before);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "BEFORE_PRODUCT_RETURNS_TRIGGER"
+BEFORE INSERT ON product_returns
+FOR EACH ROW
+EXECUTE FUNCTION before_product_returns_trigger_fn();
+SQL
+            );
+        }
     }
 
     public function down()
     {
-        DB::unprepared('DROP TRIGGER IF EXISTS `BEFORE_PRODUCT_RETURNS_TRIGGER`;');
+        $driver = DB::getDriverName();
+        if ($driver === 'mysql') {
+            DB::unprepared('DROP TRIGGER IF EXISTS `BEFORE_PRODUCT_RETURNS_TRIGGER`;');
+        } elseif ($driver === 'pgsql') {
+            DB::unprepared('DROP TRIGGER IF EXISTS "BEFORE_PRODUCT_RETURNS_TRIGGER" ON product_returns;');
+            DB::unprepared('DROP FUNCTION IF EXISTS before_product_returns_trigger_fn();');
+        }
     }
 }

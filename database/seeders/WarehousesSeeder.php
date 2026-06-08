@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class WarehousesSeeder extends Seeder
 {
@@ -25,38 +26,104 @@ class WarehousesSeeder extends Seeder
 
             // Obtener todas las companies
             $companies = DB::table('companies')->get();
+
+            $hasSucursalTable = Schema::hasTable('sucursal_siat');
+            $defaultUserId = DB::table('users')->orderBy('id')->value('id') ?? 1;
+            $hasSucursalCompanyIdColumn = $hasSucursalTable && Schema::hasColumn('sucursal_siat', 'company_id');
+
+            $resolveDefaultSucursal = function ($company) use ($hasSucursalTable, $defaultUserId, $hasSucursalCompanyIdColumn) {
+                if (!$hasSucursalTable) {
+                    return [null, null];
+                }
+
+                $defaultSucursalQuery = DB::table('sucursal_siat')
+                    ->where('sucursal', '0');
+
+                if ($hasSucursalCompanyIdColumn) {
+                    $defaultSucursalQuery->where('company_id', $company->id);
+                } else {
+                    $defaultSucursalQuery->where('id_empresa', $company->id);
+                }
+
+                $defaultSucursal = $defaultSucursalQuery->first();
+
+                if (!$defaultSucursal) {
+                    $insertData = [
+                        'sucursal'                    => '0',
+                        'nombre'                      => 'CASA MATRIZ - ' . strtoupper($company->name),
+                        'descripcion_sucursal'        => 'Casa Matriz de ' . $company->name,
+                        'domicilio_tributario'        => 'Av. Principal #1',
+                        'ciudad_municipio'            => 'La Paz',
+                        'telefono'                    => '591-2-2222222',
+                        'email'                       => null,
+                        'id_autorizacion_facturacion' => null,
+                        'departamento'                => 'La Paz',
+                        'estado'                      => 'ACTIVO',
+                        'usuario_alta'                => $defaultUserId,
+                        'id_empresa'                  => $company->id,
+                        'created_at'                  => now(),
+                        'updated_at'                  => now(),
+                    ];
+
+                    if ($hasSucursalCompanyIdColumn) {
+                        $insertData['company_id'] = $company->id;
+                    }
+
+                    $newId = DB::table('sucursal_siat')->insertGetId($insertData);
+
+                    return [$newId, '0'];
+                }
+
+                if ($hasSucursalCompanyIdColumn && empty($defaultSucursal->company_id)) {
+                    DB::table('sucursal_siat')
+                        ->where('id', $defaultSucursal->id)
+                        ->update([
+                            'company_id' => $company->id,
+                            'updated_at' => now(),
+                        ]);
+                }
+
+                return [$defaultSucursal->id, '0'];
+            };
             
             $warehouses = [
                 [
-                    'name' => 'Almacén Principal',
+                    'name' => 'Almacen Principal',
                     'phone' => '591-2-2222222',
                     'email' => 'principal@empresa.com',
                     'address' => 'Av. Principal #123',
                     'is_active' => true,
                 ],
-                [
-                    'name' => 'Almacén Secundario',
-                    'phone' => '591-2-3333333',
-                    'email' => 'secundario@empresa.com',
-                    'address' => 'Calle Secundaria #456',
-                    'is_active' => true,
-                ],
-                [
-                    'name' => 'Almacén Norte',
-                    'phone' => '591-2-4444444',
-                    'email' => 'norte@empresa.com',
-                    'address' => 'Zona Norte, Av. 6 de Agosto #789',
-                    'is_active' => true,
-                ],
             ];
             
             foreach ($companies as $company) {
+                [$defaultSucursalId, $defaultSucursalCode] = $resolveDefaultSucursal($company);
+
+                if ($defaultSucursalId) {
+                    $warehouseBackfill = DB::table('warehouses');
+
+                    if (Schema::hasColumn('warehouses', 'company_id')) {
+                        $warehouseBackfill->where('company_id', $company->id);
+                    }
+
+                    $warehouseBackfill
+                        ->where(function ($query) {
+                            $query->whereNull('sucursal_id')
+                                ->orWhereNull('sucursal_siat');
+                        })
+                        ->update([
+                            'sucursal_id'   => $defaultSucursalId,
+                            'sucursal_siat' => $defaultSucursalCode,
+                            'updated_at'    => now(),
+                        ]);
+                }
+
                 foreach ($warehouses as $index => $warehouse) {
                     // Verificar si ya existe un warehouse similar para esta company
                     $exists = DB::table('warehouses')
                         ->where('company_id', $company->id)
                         ->where('name', $warehouse['name'])
-                        ->exists();
+                        ->first();
                     
                     if (!$exists) {
                         DB::table('warehouses')->insert([
@@ -66,11 +133,19 @@ class WarehousesSeeder extends Seeder
                             'email'         => $warehouse['email'],
                             'address'       => $warehouse['address'],
                             'is_active'     => $warehouse['is_active'],
-                            'sucursal_id'   => null,
-                            'sucursal_siat' => null,
+                            'sucursal_id'   => $defaultSucursalId,
+                            'sucursal_siat' => $defaultSucursalCode,
                             'created_at'    => now(),
                             'updated_at'    => now(),
                         ]);
+                    } elseif ($defaultSucursalId && (empty($exists->sucursal_id) || empty($exists->sucursal_siat))) {
+                        DB::table('warehouses')
+                            ->where('id', $exists->id)
+                            ->update([
+                                'sucursal_id'   => $defaultSucursalId,
+                                'sucursal_siat' => $defaultSucursalCode,
+                                'updated_at'    => now(),
+                            ]);
                     }
                 }
             }

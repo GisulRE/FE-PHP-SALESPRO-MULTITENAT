@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Auth;
 use App\Transfer;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 
 class ViewServiceProvider extends ServiceProvider
 {
@@ -19,7 +20,10 @@ class ViewServiceProvider extends ServiceProvider
         $user = Auth::user();
         $role = Role::find($user->role_id);
 
-        if ($role && $role->hasPermissionTo('accept-transfers')) {
+        // Evitar excepción de Spatie si la permisión no existe aún
+        $permExists = Permission::where('name', 'accept-transfers')->where('guard_name', 'web')->exists();
+
+        if ($role && $permExists && $role->hasPermissionTo('accept-transfers')) {
 
           if ($user->role_id <= 2) {
             $pendingTransfers = Transfer::where('status', 2)->get();

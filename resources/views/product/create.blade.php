@@ -555,6 +555,7 @@
             });
 
             $('select[name="type"]').on('change', function() {
+                toggleAlertQuantityField($(this).val());
                 if ($(this).val() == 'combo') {
                     $("input[name='cost']").prop('required', false);
                     $("select[name='unit_id']").prop('required', false);
@@ -625,6 +626,20 @@
                     $("#basicservice").hide(300);
                 }
             });
+
+            // Solo los productos con stock usan cantidad de alerta
+            function toggleAlertQuantityField(type) {
+                var enabled = (type == 'standard' || type == 'insumo');
+                $('input[name="alert_quantity"]').prop('disabled', !enabled);
+                if (enabled) {
+                    $('#alert-qty').show(300);
+                } else {
+                    $('#alert-qty').hide(300);
+                }
+            }
+
+            // Estado inicial en formulario crear
+            toggleAlertQuantityField($('select[name="type"]').val());
 
             $('select[name="unit_id"]').on('change', function() {
 

@@ -9,11 +9,18 @@ class AddSoftDeletesToAllTables extends Migration
 {
     public function up()
     {
-        // Añade deleted_at a todas las tablas base del esquema actual, excepto migrations
-        $tables = DB::select("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE='BASE TABLE'");
+        $driver = DB::getDriverName();
+        if ($driver === 'pgsql') {
+            $tables = DB::select("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'");
+        } else {
+            $tables = DB::select("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE='BASE TABLE'");
+        }
 
         foreach ($tables as $t) {
-            $name = $t->TABLE_NAME;
+            $name = $t->TABLE_NAME ?? $t->table_name ?? null;
+            if (!$name) {
+                continue;
+            }
             if ($name === 'migrations') {
                 continue;
             }
@@ -28,11 +35,18 @@ class AddSoftDeletesToAllTables extends Migration
 
     public function down()
     {
-        // Elimina deleted_at de las tablas que la tengan
-        $tables = DB::select("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE='BASE TABLE'");
+        $driver = DB::getDriverName();
+        if ($driver === 'pgsql') {
+            $tables = DB::select("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'");
+        } else {
+            $tables = DB::select("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE='BASE TABLE'");
+        }
 
         foreach ($tables as $t) {
-            $name = $t->TABLE_NAME;
+            $name = $t->TABLE_NAME ?? $t->table_name ?? null;
+            if (!$name) {
+                continue;
+            }
             if ($name === 'migrations') {
                 continue;
             }

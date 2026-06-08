@@ -162,6 +162,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	// PDF directo para WhatsApp
 	Route::get('sales/download-factura-pdf/{venta_id}', 'SaleController@downloadFacturaPdf')->name('sales.download-factura-pdf');
 	Route::get('sales/get_estado_p_venta/{biller_id}', 'SaleController@estadoContingenciaPuntoVenta')->name('estado_punto_venta_contingencia');
+	Route::post('sales/activar_modo_contingencia/{biller_id}', 'SaleController@activarModoContingenciaPOS')->name('activar_modo_contingencia_pos');
 	Route::get('sales/get_estado_sin', 'SaleController@getEstadoServiciosSiat')->name('estado_servicios_sin');
 	Route::post('sales/anular_factura', 'SaleController@anularVentaFacturada')->name('sales.anular_factura');
 	Route::post('sales/get_customer_phone', 'SaleController@getCustomerPhone')->name('sales.get_customer_phone');
@@ -190,6 +191,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('sales/paypalSuccess', 'SaleController@paypalSuccess');
 	Route::get('sales/paypalPaymentSuccess/{id}', 'SaleController@paypalPaymentSuccess');
 	Route::get('sales/gen_invoice/{id}', 'SaleController@genInvoice')->name('sale.invoice');
+	Route::get('sales/preview_invoice/{id}', 'SaleController@genInvoicePreview')->name('sale.invoice.preview');
 	Route::post('sales/add_payment', 'SaleController@addPayment')->name('sale.add-payment');
 	Route::get('sales/getpayment/{id}', 'SaleController@getPayment')->name('sale.get-payment');
 	Route::post('sales/updatepayment', 'SaleController@updatePayment')->name('sale.update-payment');
@@ -201,6 +203,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('sales/imprimir_factura_cuf/{cuf}', 'SaleController@getPrintFactura')->name('sales.print-factura');
 	Route::post('sales/pagar_factura', 'SaleController@paymentFactura')->name('sales.pagar-factura');
 	Route::post('sales/revertir_pago_factura', 'SaleController@revertirPaymentFactura')->name('sales.revertirpago-factura');
+	Route::post('sales/revertir_anulacion_factura', 'SaleController@revertirAnulacionFactura')->name('sales.revertir-anulacion-factura');
 	Route::get('sales/factura/{cuf}', 'SaleController@getFacturaCufd')->name('sales.factura');
 	Route::post('sales/reporte_cobranza', 'SaleController@reporteCobranza')->name('sales.reporte.cobranza');
 	Route::post('sales/reporte_revertido', 'SaleController@reporteRevertidos')->name('sales.reporte.revertido');
@@ -235,6 +238,8 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::post('quotations/deletebyselection', 'QuotationController@deleteBySelection');
 	Route::get('quotations/gen_invoice/{id}', 'QuotationController@genInvoice')->name('quotations.invoice');
 	Route::post('quotations/list-data', 'QuotationController@listData');
+	Route::get('quotations/list-for-pos', 'QuotationController@listForPos')->name('quotation.list-for-pos');
+	Route::get('quotations/load-for-pos/{id}', 'QuotationController@loadForPos')->name('quotation.load-for-pos');
 	Route::resource('quotations', 'QuotationController');
 
 	Route::post('purchases/purchase-data', 'PurchaseController@purchaseData');
@@ -371,6 +376,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::post('setting/restore-company-data/preview', 'CompanyDataImportController@preview')->name('setting.restoreCompanyDataPreview');
 	Route::get('setting/restore-company-data/jobs/{importJob}/status', 'CompanyDataImportController@status')->name('setting.restoreCompanyDataStatus');
 	Route::post('setting/restore-company-data/jobs/{importJob}/retry', 'CompanyDataImportController@retry')->name('setting.restoreCompanyDataRetry');
+	Route::post('setting/restore-company-data/jobs/{importJob}/run-now', 'CompanyDataImportController@runNow')->name('setting.restoreCompanyDataRunNow');
 	Route::post('setting/restore-company-data/jobs/{importJob}/cancel', 'CompanyDataImportController@cancel')->name('setting.restoreCompanyDataCancel');
 	Route::get('setting/restore-company-data/queues/status', 'CompanyDataImportController@queuesStatus')->name('setting.restoreCompanyDataQueuesStatus');
 	Route::post('setting/restore-company-data/queues/stop', 'CompanyDataImportController@stopWorkers')->name('setting.restoreCompanyDataQueuesStop');
@@ -397,6 +403,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('accounts/make-default/{id}', 'AccountsController@makeDefault');
 	Route::get('accounts/balancesheet', 'AccountsController@balanceSheet')->name('accounts.balancesheet');
 	Route::get('accounts/list', 'AccountsController@listaccounts');
+	Route::get('accounts/balancesheet_account', 'AccountsController@balanceSheetAccount')->name('accounts.balancesheetaccount.get');
 	Route::post('accounts/balancesheet_account', 'AccountsController@balanceSheetAccount')->name('accounts.balancesheetaccount');
 	Route::post('accounts/account-statement', 'AccountsController@accountStatement')->name('accounts.statement');
 	Route::resource('accounts', 'AccountsController');
@@ -405,6 +412,12 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::post('departments/deletebyselection', 'DepartmentController@deleteBySelection');
 	Route::resource('departments', 'DepartmentController');
 	//Employees routes
+	Route::post('employees/{id}/toggle-public', 'EmployeeController@togglePublic')->name('employees.togglePublic');
+	Route::get('employees/{id}/reservation-schedules', 'EmployeeController@getReservationSchedules')->name('employees.reservation-schedules.get');
+	Route::post('employees/{id}/reservation-schedules', 'EmployeeController@saveReservationSchedules')->name('employees.reservation-schedules.save');
+	// PIN de asistencia para empleados
+	Route::post('employees/{id}/generate-pin', 'EmployeeController@generateAttendancePin')->name('employees.generate-pin');
+	Route::post('employees/{id}/verify-pin', 'EmployeeController@verifyAttendancePin')->name('employees.verify-pin');
 	Route::post('employees/deletebyselection', 'EmployeeController@deleteBySelection');
 	Route::resource('employees', 'EmployeeController');
 	//adjustment account routes (guarded by blocked-module middleware)
@@ -419,7 +432,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::resource('payroll', 'PayrollController');
 
 	Route::post('attendance/attendance-data', 'AttendanceController@attendanceData');
-	Route::get('attendance/checked/{id}', 'AttendanceController@checkin_out');
+	Route::post('attendance/checked/{id}', 'AttendanceController@checkin_out');
 	Route::post('attendance/deletebyselection', 'AttendanceController@deleteBySelection');
 	Route::resource('attendance', 'AttendanceController');
 
@@ -427,6 +440,8 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::resource('attentionshift', 'AttentionShiftController');
 	Route::get('attentionshift/list-data/{filter}', 'AttentionShiftController@list_Data');
 	Route::post('attentionshift/birthday', 'AttentionShiftController@verifyBirthday')->name('attentionshift.birthday');
+	// Eliminar turno con validación de PIN del empleado
+	Route::delete('attentionshift/{id}/secure', 'AttentionShiftController@destroyWithPin')->name('attentionshift.destroy-secure');
 
 	// Reservations routes
 	Route::post('reservations/list-data', 'ReservationController@listData');
@@ -527,6 +542,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('punto_venta/renovar-cuis/{id}/{idPuntoVenta}/{idSucursal}', 'SiatPuntoVentaController@renovarCuis')->name('puntoventa.renovar_cuis');
 	Route::get('punto_venta/renovacion-masiva-cuis', 'SiatPuntoVentaController@renovacionMasivaCuis');
 	Route::get('punto_venta/estado/{id}', 'SiatPuntoVentaController@estadoPuntoVenta')->name('puntoventa.estado');
+	Route::get('punto_venta/sincronizar', 'SiatPuntoVentaController@sincronizarDesdeSiat')->name('puntoventa.sincronizar');
 	Route::resource('punto_venta', 'SiatPuntoVentaController');
 
 	//Método de Pago

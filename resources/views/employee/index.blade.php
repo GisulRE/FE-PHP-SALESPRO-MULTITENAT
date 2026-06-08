@@ -45,6 +45,7 @@
                         <th>{{ trans('file.Phone Number') }}</th>
                         <th>{{ trans('file.Department') }}</th>
                         <th>{{ trans('file.Pre Sale') }}</th>
+                        <th>{{ trans('file.Status') }}</th>
                         <!--<td><th>{{ trans('file.Address') }}</th>-->
                         <th class="not-exported">{{ trans('file.action') }}</th>
                     </tr>
@@ -72,6 +73,15 @@
                             @else
                                 <td>
                                     <div class="badge badge-danger">Inactivo</div>
+                                </td>
+                            @endif
+                            @if (isset($employee->is_public) && $employee->is_public)
+                                <td>
+                                    <div class="badge badge-success">Público</div>
+                                </td>
+                            @else
+                                <td>
+                                    <div class="badge badge-danger">Privado</div>
                                 </td>
                             @endif
                             <!--<td>{{ $employee->address }}
@@ -126,6 +136,18 @@
                                             {{ Form::close() }}
                                         @endif
                                         <li>
+                                            <form method="POST" action="{{ route('employees.togglePublic', $employee->id) }}">
+                                                @csrf
+                                                <button type="submit" class="btn btn-link">
+                                                    @if (isset($employee->is_public) && $employee->is_public)
+                                                        <i class="dripicons-lock"></i> {{ trans('file.make private') }}
+                                                    @else
+                                                        <i class="dripicons-lock-open"></i> {{ trans('file.make public') }}
+                                                    @endif
+                                                </button>
+                                            </form>
+                                        </li>
+                                        <li>
                                             <button type="button" data-id="{{ $employee->id }}"
                                                 data-name="{{ $employee->name }}"
                                                 data-contract_type="{{ $employee->contract_type }}"
@@ -134,6 +156,21 @@
                                                 class="btn btn-link tipoContratoBtn" data-toggle="modal"
                                                 data-target="#tipoContratoModal"><i class="dripicons-document-new"></i>
                                                 {{ trans('file.type of contract') }}</button>
+                                        </li>
+                                        <li>
+                                            <button type="button" data-id="{{ $employee->id }}"
+                                                data-name="{{ $employee->name }}"
+                                                class="btn btn-link scheduleBtn" data-toggle="modal"
+                                                data-target="#reservationScheduleModal"><i class="dripicons-clock"></i>
+                                                Horarios de reservas</button>
+                                        </li>
+                                        <li>
+                                            <button type="button" data-id="{{ $employee->id }}"
+                                                data-name="{{ $employee->name }}"
+                                                data-has-pin="{{ $employee->attendance_pin ? '1' : '0' }}"
+                                                class="btn btn-link pinBtn" data-toggle="modal"
+                                                data-target="#pinModal"><i class="dripicons-lock"></i>
+                                                Gestionar PIN Asistencia</button>
                                         </li>
                                     </ul>
                                 </div>
@@ -145,10 +182,9 @@
         </div>
     </section>
 
-    <div id="editModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true"
-        class="modal fade text-left">
-        <div role="document" class="modal-dialog">
-            <div class="modal-content">
+            <div id="editModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
+                <div role="document" class="modal-dialog">
+                    <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{ trans('file.Update Employee') }}</h5>
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
@@ -280,6 +316,79 @@
         </div>
     </div>
 
+    <div id="reservationScheduleModal" tabindex="-1" role="dialog" aria-labelledby="reservationScheduleLabel"
+        aria-hidden="true" class="modal fade text-left">
+        <div role="document" class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 id="reservationScheduleLabel" class="modal-title">Horarios de reservas por empleado</h5>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
+                            aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info" style="margin-bottom: 15px;">
+                        Empleado: <strong id="scheduleEmployeeName">-</strong>
+                    </div>
+                    <input type="hidden" id="scheduleEmployeeId" />
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Día</th>
+                                    <th>Hora inicio</th>
+                                    <th>Hora fin</th>
+                                    <th>Intervalo (min)</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scheduleTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="form-group" style="margin-top: 10px; margin-bottom: 10px;">
+                        <button type="button" id="addScheduleRow" class="btn btn-info">Agregar turno</button>
+                    </div>
+                    <div id="scheduleSaveMessage"></div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <button type="button" id="saveEmployeeSchedule" class="btn btn-primary">Guardar horarios</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Gestionar PIN de Asistencia -->
+    <div id="pinModal" tabindex="-1" role="dialog" aria-labelledby="pinModalLabel" aria-hidden="true"
+        class="modal fade text-left">
+        <div role="document" class="modal-dialog modal-sm" style="max-width: 420px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 id="pinModalLabel" class="modal-title"><i class="dripicons-lock"></i> Gestionar PIN de Asistencia</h5>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
+                            aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info mb-3">
+                        Empleado: <strong id="pinEmployeeName">-</strong><br>
+                        Estado: <span id="pinStatusBadge"></span>
+                    </div>
+                    <p class="text-muted small">
+                        El PIN autoriza la eliminación de turnos en <strong>Attention Shift</strong>.
+                        Al generar uno nuevo, el anterior quedará invalidado.
+                    </p>
+                    <div class="form-group text-center">
+                        <button type="button" id="btnGeneratePin" class="btn btn-warning">
+                            <i class="dripicons-clockwise"></i> Generar nuevo PIN
+                        </button>
+                    </div>
+                    <div id="pinResult" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="text/javascript">
         $("ul#hrm").siblings('a').attr('aria-expanded', 'true');
         $("ul#hrm").addClass("show");
@@ -287,11 +396,162 @@
         $('#warehouse').hide();
         $('#user').hide();
         var employee_id = [];
+        var scheduleDayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        var scheduleWindow = { start_time: '08:00', end_time: '21:00', interval_minutes: 30 };
+        // ---- PIN Modal ----
+        var _pinEmployeeId = null;
+        $('.pinBtn').on('click', function() {
+            _pinEmployeeId = $(this).data('id');
+            var name      = $(this).data('name');
+            var hasPin    = $(this).data('has-pin') == '1';
+            $('#pinEmployeeName').text(name);
+            $('#pinResult').hide().html('');
+            $('#pinStatusBadge').html(hasPin
+                ? '<span class="badge badge-success">PIN configurado</span>'
+                : '<span class="badge badge-warning">Sin PIN configurado</span>'
+            );
+        });
+
+        $('#btnGeneratePin').on('click', function() {
+            if (!_pinEmployeeId) return;
+            var $btn = $(this);
+            $btn.prop('disabled', true).text('Generando...');
+            $.ajax({
+                type: 'POST',
+                url: '{{ url("employees") }}/' + _pinEmployeeId + '/generate-pin',
+                success: function(resp) {
+                    if (resp.success) {
+                        $('#pinResult').html(
+                            '<div class="alert alert-warning mt-2">'
+                            + '<strong><i class="dripicons-warning"></i> ¡Copia este PIN ahora! No se mostrará nuevamente.</strong><br>'
+                            + 'Código PIN de <em>' + resp.employee + '</em>:<br>'
+                            + '<h2 class="text-center mt-2 mb-2" id="generatedPinCode" style="letter-spacing:8px;font-weight:bold;">' + resp.pin + '</h2>'
+                            + '<button type="button" class="btn btn-sm btn-secondary" id="copyPinBtn"><i class="dripicons-copy"></i> Copiar</button>'
+                            + '</div>'
+                        ).show();
+                        $('#pinStatusBadge').html('<span class="badge badge-success">PIN configurado</span>');
+                        // Actualizar data-has-pin en el botón correspondiente
+                        $(".pinBtn[data-id='" + _pinEmployeeId + "']").data('has-pin', '1');
+                        // Copiar al portapapeles
+                        $('#pinResult').on('click', '#copyPinBtn', function() {
+                            var pin = $('#generatedPinCode').text();
+                            if (navigator.clipboard) {
+                                navigator.clipboard.writeText(pin).then(function() {
+                                    $('#copyPinBtn').text('Copiado!').prop('disabled', true);
+                                });
+                            } else {
+                                var $tmp = $('<input>').val(pin).appendTo('body').select();
+                                document.execCommand('copy');
+                                $tmp.remove();
+                                $('#copyPinBtn').text('Copiado!').prop('disabled', true);
+                            }
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Error al generar PIN';
+                    $('#pinResult').html('<div class="alert alert-danger">' + msg + '</div>').show();
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).text('Generar nuevo PIN');
+                }
+            });
+        });
+        // ---- FIN PIN Modal ----
         $.ajaxSetup({
             headers: {
                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
             }
         });
+
+        function addMinutesToTime(timeStr, minutes) {
+            var parts = (timeStr || '').split(':');
+            var h = parseInt(parts[0], 10);
+            var m = parseInt(parts[1], 10);
+            if (isNaN(h) || isNaN(m)) {
+                return scheduleWindow.end_time;
+            }
+            var total = (h * 60) + m + parseInt(minutes || 30, 10);
+            var hh = Math.floor(total / 60);
+            var mm = total % 60;
+            if (hh > 23) hh = 23;
+            return (hh < 10 ? '0' + hh : '' + hh) + ':' + (mm < 10 ? '0' + mm : '' + mm);
+        }
+
+        function applyScheduleWindow(posWindow) {
+            if (!posWindow) {
+                return;
+            }
+            scheduleWindow.start_time = posWindow.start_time || scheduleWindow.start_time;
+            scheduleWindow.end_time = posWindow.end_time || scheduleWindow.end_time;
+            scheduleWindow.interval_minutes = parseInt(posWindow.interval_minutes, 10) || scheduleWindow.interval_minutes;
+
+            $('#scheduleTableBody .schedule-start').attr('min', scheduleWindow.start_time).attr('max', scheduleWindow.end_time);
+            $('#scheduleTableBody .schedule-end').attr('min', scheduleWindow.start_time).attr('max', scheduleWindow.end_time);
+            $('#scheduleTableBody .schedule-interval').attr('min', 5).attr('max', 120);
+        }
+
+        function buildScheduleRow(item) {
+            var day = (item && item.day_of_week !== undefined) ? parseInt(item.day_of_week, 10) : 0;
+            var interval = (item && item.interval_minutes) ? parseInt(item.interval_minutes, 10) : scheduleWindow.interval_minutes;
+            var start = (item && item.start_time) ? item.start_time : scheduleWindow.start_time;
+            var end = (item && item.end_time) ? item.end_time : addMinutesToTime(start, interval);
+            var options = '';
+            for (var i = 0; i <= 6; i++) {
+                options += '<option value="' + i + '" ' + (i === day ? 'selected' : '') + '>' + scheduleDayNames[i] + '</option>';
+            }
+
+            return '<tr>'
+                + '<td><select class="form-control schedule-day">' + options + '</select></td>'
+                + '<td><input type="time" class="form-control schedule-start" min="' + scheduleWindow.start_time + '" max="' + scheduleWindow.end_time + '" value="' + start + '"></td>'
+                + '<td><input type="time" class="form-control schedule-end" min="' + scheduleWindow.start_time + '" max="' + scheduleWindow.end_time + '" value="' + end + '"></td>'
+                + '<td><input type="number" class="form-control schedule-interval" min="5" max="120" value="' + interval + '"></td>'
+                + '<td><button type="button" class="btn btn-danger btn-sm remove-schedule-row">Eliminar</button></td>'
+                + '</tr>';
+        }
+
+        function renderScheduleRows(schedules) {
+            var tbody = $('#scheduleTableBody');
+            tbody.html('');
+            if (!schedules || !schedules.length) {
+                $('#scheduleSaveMessage').html('<div class="alert alert-info">Sin horarios configurados. Puedes dejarlo vacío o agregar turnos dentro del rango ' + scheduleWindow.start_time + ' - ' + scheduleWindow.end_time + '.</div>');
+                return;
+            }
+            schedules.forEach(function(item) {
+                tbody.append(buildScheduleRow(item));
+            });
+        }
+
+        function validateScheduleRowsClient(rows) {
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                if (!row.start_time || !row.end_time) {
+                    return 'Debe definir hora inicio y fin (fila ' + (i + 1) + ')';
+                }
+                if (row.start_time >= row.end_time) {
+                    return 'La hora fin debe ser mayor a la hora inicio (fila ' + (i + 1) + ')';
+                }
+                if (row.start_time < scheduleWindow.start_time || row.end_time > scheduleWindow.end_time) {
+                    return 'Solo se permiten horarios dentro de ' + scheduleWindow.start_time + ' - ' + scheduleWindow.end_time + ' (fila ' + (i + 1) + ')';
+                }
+            }
+            return null;
+        }
+
+        function collectScheduleRows() {
+            var rows = [];
+            $('#scheduleTableBody tr').each(function() {
+                var $row = $(this);
+                rows.push({
+                    day_of_week: parseInt($row.find('.schedule-day').val(), 10),
+                    is_enabled: true,
+                    start_time: $row.find('.schedule-start').val(),
+                    end_time: $row.find('.schedule-end').val(),
+                    interval_minutes: parseInt($row.find('.schedule-interval').val(), 10) || 30
+                });
+            });
+            return rows;
+        }
 
         function confirmDelete() {
             if (confirm("Are you sure want to delete?")) {
@@ -340,6 +600,75 @@
             $("#tipoContratoModal input[name='percentage']").val($(this).data('percentage'));
             $("#tipoContratoModal select[name='pay_commission']").val($(this).data('pay_commission'));
             $(".selectpicker").selectpicker('refresh');
+        });
+
+        $('.scheduleBtn').on('click', function() {
+            var employeeId = $(this).data('id');
+            var employeeName = $(this).data('name');
+            $('#scheduleEmployeeId').val(employeeId);
+            $('#scheduleEmployeeName').text(employeeName);
+            $('#scheduleSaveMessage').html('');
+            $('#scheduleTableBody').html('<tr><td colspan="5">Cargando horarios...</td></tr>');
+
+            $.get('{{ url("employees") }}/' + encodeURIComponent(employeeId) + '/reservation-schedules', function(resp) {
+                applyScheduleWindow(resp.pos_window || null);
+                renderScheduleRows(resp.schedules || []);
+            }).fail(function(xhr) {
+                var msg = 'No se pudo cargar la configuración de horarios.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                }
+                $('#scheduleTableBody').html('<tr><td colspan="5" class="text-danger">' + msg + '</td></tr>');
+            });
+        });
+
+        $('#addScheduleRow').on('click', function() {
+            $('#scheduleTableBody').append(buildScheduleRow({ day_of_week: 0 }));
+            $('#scheduleSaveMessage').html('');
+        });
+
+        $(document).on('click', '.remove-schedule-row', function() {
+            $(this).closest('tr').remove();
+            if (!$('#scheduleTableBody tr').length) {
+                $('#scheduleSaveMessage').html('<div class="alert alert-info">Sin turnos. Puedes guardar para dejar el día sin horarios o agregar nuevos turnos.</div>');
+            }
+        });
+
+        $('#saveEmployeeSchedule').on('click', function() {
+            var employeeId = $('#scheduleEmployeeId').val();
+            if (!employeeId) {
+                return;
+            }
+
+            var payload = { schedules: collectScheduleRows() };
+            var validationError = validateScheduleRowsClient(payload.schedules || []);
+            if (validationError) {
+                $('#scheduleSaveMessage').html('<div class="alert alert-danger">' + validationError + '</div>');
+                return;
+            }
+            var $btn = $(this);
+            $btn.prop('disabled', true).text('Guardando...');
+            $('#scheduleSaveMessage').html('');
+
+            $.ajax({
+                type: 'POST',
+                url: '{{ url("employees") }}/' + encodeURIComponent(employeeId) + '/reservation-schedules',
+                data: payload,
+                success: function(resp) {
+                    var okMsg = (resp && resp.message) ? resp.message : 'Horarios guardados con éxito';
+                    $('#scheduleSaveMessage').html('<div class="alert alert-success">' + okMsg + '</div>');
+                },
+                error: function(xhr) {
+                    var errMsg = 'No se pudo guardar la configuración';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errMsg = xhr.responseJSON.message;
+                    }
+                    $('#scheduleSaveMessage').html('<div class="alert alert-danger">' + errMsg + '</div>');
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).text('Guardar horarios');
+                }
+            });
         });
 
         $("#tipoContratoModal select[name='contract_type']").on("change", function() {

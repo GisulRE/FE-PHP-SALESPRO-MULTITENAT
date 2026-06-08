@@ -33,6 +33,8 @@ class CashierController extends Controller
         $data['start_date'] = date('Y-m-d H:i:s');
         $data['is_active'] = true;
         $lims_cashier_data = Cashier::create($data);
+        // Mantener el facturador seleccionado para que /pos valide y cargue la caja correcta.
+        session(['pos_biller_id' => (int) $data['biller_id']]);
         return redirect()->route('sale.pos');
         //return redirect('adjustment_account')->with('message', 'Dato Ingresado con éxito');
     }
@@ -61,7 +63,11 @@ class CashierController extends Controller
 
     public function verified_amount($id){
         $account_id = Biller::find($id)->account_id; 
-        $lims_cashier_data = Cashier::select('amount_end')->where([['account_id', $account_id], ['is_active', false]])->first();     
+        $lims_cashier_data = Cashier::select('amount_end')
+            ->where([['account_id', $account_id], ['is_active', false]])
+            ->whereNotNull('end_date')
+            ->orderByDesc('end_date')
+            ->first();     
         $lims_account_data = Account::select('id', 'name', 'account_no')->find($account_id);  
         return $result = array('cashier' => $lims_cashier_data, 'account' => $lims_account_data);     
     }
@@ -70,10 +76,14 @@ class CashierController extends Controller
         $account_id = Biller::find($id)->account_id; 
         $total_old = 0;
         $start_date = date('Y-m-d H:i:s');
-        $lims_cashier_data = Cashier::select('amount_end')->where([['account_id', $account_id], ['is_active', false]])->first();   
+        $lims_cashier_data = Cashier::select('amount_end')
+            ->where([['account_id', $account_id], ['is_active', false]])
+            ->whereNotNull('end_date')
+            ->orderByDesc('end_date')
+            ->first();   
         if($lims_cashier_data == null){
             $startbef_date = date("Y-m-d",strtotime($start_date."- 5 year")); 
-            $endafter_date = date("Y-m-d",strtotime($start_date."1 days"));
+            $endafter_date = date("Y-m-d",strtotime($start_date."- 1 day"));
             /**** Totales Egresos - Ingresos - Saldo Ant */
             $saldoant = 0;
             $credit = 0;

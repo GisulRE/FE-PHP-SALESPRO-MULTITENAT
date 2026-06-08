@@ -35,6 +35,12 @@ class ProcessCompanyImportJob implements ShouldQueue
     {
         $job = ImportJob::find($this->importJobId);
         if ($job) {
+            \Illuminate\Support\Facades\Log::error("Excepción en cola ProcessCompanyImportJob (Job #{$job->id}): " . $exception->getMessage(), [
+                'exception' => get_class($exception),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+                'trace' => $exception->getTraceAsString()
+            ]);
             app(ImportProgressService::class)->failJob($job, $exception->getMessage());
         }
     }

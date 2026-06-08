@@ -9,6 +9,11 @@ class AddCompanyIdToSecondBatchTables extends Migration
 {
     public function up()
     {
+        $driver = DB::getDriverName();
+        $runUpdateFromJoin = function ($mysqlSql, $pgsqlSql) use ($driver) {
+            DB::statement($driver === 'pgsql' ? $pgsqlSql : $mysqlSql);
+        };
+
         $tables = [
             'customer_groups',
             'customer_nit',
@@ -52,7 +57,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('customer_sales', 'company_id')
             && Schema::hasColumn('sales', 'company_id')
         ) {
-            DB::statement('UPDATE customer_sales cs INNER JOIN sales s ON s.id = cs.sale_id SET cs.company_id = s.company_id WHERE cs.company_id IS NULL AND s.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE customer_sales cs INNER JOIN sales s ON s.id = cs.sale_id SET cs.company_id = s.company_id WHERE cs.company_id IS NULL AND s.company_id IS NOT NULL',
+                'UPDATE customer_sales cs SET company_id = s.company_id FROM sales s WHERE s.id = cs.sale_id AND cs.company_id IS NULL AND s.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -61,7 +69,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('customer_sales', 'company_id')
             && Schema::hasColumn('customers', 'company_id')
         ) {
-            DB::statement('UPDATE customer_sales cs INNER JOIN customers c ON c.id = cs.customer_id SET cs.company_id = c.company_id WHERE cs.company_id IS NULL AND c.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE customer_sales cs INNER JOIN customers c ON c.id = cs.customer_id SET cs.company_id = c.company_id WHERE cs.company_id IS NULL AND c.company_id IS NOT NULL',
+                'UPDATE customer_sales cs SET company_id = c.company_id FROM customers c WHERE c.id = cs.customer_id AND cs.company_id IS NULL AND c.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -70,7 +81,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('deliveries', 'company_id')
             && Schema::hasColumn('sales', 'company_id')
         ) {
-            DB::statement('UPDATE deliveries d INNER JOIN sales s ON s.id = d.sale_id SET d.company_id = s.company_id WHERE d.company_id IS NULL AND s.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE deliveries d INNER JOIN sales s ON s.id = d.sale_id SET d.company_id = s.company_id WHERE d.company_id IS NULL AND s.company_id IS NOT NULL',
+                'UPDATE deliveries d SET company_id = s.company_id FROM sales s WHERE s.id = d.sale_id AND d.company_id IS NULL AND s.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -79,7 +93,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('deposits', 'company_id')
             && Schema::hasColumn('customers', 'company_id')
         ) {
-            DB::statement('UPDATE deposits d INNER JOIN customers c ON c.id = d.customer_id SET d.company_id = c.company_id WHERE d.company_id IS NULL AND c.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE deposits d INNER JOIN customers c ON c.id = d.customer_id SET d.company_id = c.company_id WHERE d.company_id IS NULL AND c.company_id IS NOT NULL',
+                'UPDATE deposits d SET company_id = c.company_id FROM customers c WHERE c.id = d.customer_id AND d.company_id IS NULL AND c.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -88,7 +105,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('deposits', 'company_id')
             && Schema::hasColumn('users', 'company_id')
         ) {
-            DB::statement('UPDATE deposits d INNER JOIN users u ON u.id = d.user_id SET d.company_id = u.company_id WHERE d.company_id IS NULL AND u.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE deposits d INNER JOIN users u ON u.id = d.user_id SET d.company_id = u.company_id WHERE d.company_id IS NULL AND u.company_id IS NOT NULL',
+                'UPDATE deposits d SET company_id = u.company_id FROM users u WHERE u.id = d.user_id AND d.company_id IS NULL AND u.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -98,7 +118,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('users', 'company_id')
             && Schema::hasColumn('factura_masiva', 'created_by')
         ) {
-            DB::statement('UPDATE factura_masiva fm INNER JOIN users u ON u.id = fm.created_by SET fm.company_id = u.company_id WHERE fm.company_id IS NULL AND u.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE factura_masiva fm INNER JOIN users u ON u.id = fm.created_by SET fm.company_id = u.company_id WHERE fm.company_id IS NULL AND u.company_id IS NOT NULL',
+                'UPDATE factura_masiva fm SET company_id = u.company_id FROM users u WHERE u.id = fm.created_by AND fm.company_id IS NULL AND u.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -107,7 +130,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('factura_masiva_paquetes', 'company_id')
             && Schema::hasColumn('factura_masiva', 'company_id')
         ) {
-            DB::statement('UPDATE factura_masiva_paquetes fmp INNER JOIN factura_masiva fm ON fm.id = fmp.factura_masiva_id SET fmp.company_id = fm.company_id WHERE fmp.company_id IS NULL AND fm.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE factura_masiva_paquetes fmp INNER JOIN factura_masiva fm ON fm.id = fmp.factura_masiva_id SET fmp.company_id = fm.company_id WHERE fmp.company_id IS NULL AND fm.company_id IS NOT NULL',
+                'UPDATE factura_masiva_paquetes fmp SET company_id = fm.company_id FROM factura_masiva fm WHERE fm.id = fmp.factura_masiva_id AND fmp.company_id IS NULL AND fm.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -116,7 +142,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('gift_cards', 'company_id')
             && Schema::hasColumn('customers', 'company_id')
         ) {
-            DB::statement('UPDATE gift_cards gc INNER JOIN customers c ON c.id = gc.customer_id SET gc.company_id = c.company_id WHERE gc.company_id IS NULL AND c.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE gift_cards gc INNER JOIN customers c ON c.id = gc.customer_id SET gc.company_id = c.company_id WHERE gc.company_id IS NULL AND c.company_id IS NOT NULL',
+                'UPDATE gift_cards gc SET company_id = c.company_id FROM customers c WHERE c.id = gc.customer_id AND gc.company_id IS NULL AND c.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -126,7 +155,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('users', 'company_id')
             && Schema::hasColumn('gift_cards', 'user_id')
         ) {
-            DB::statement('UPDATE gift_cards gc INNER JOIN users u ON u.id = gc.user_id SET gc.company_id = u.company_id WHERE gc.company_id IS NULL AND u.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE gift_cards gc INNER JOIN users u ON u.id = gc.user_id SET gc.company_id = u.company_id WHERE gc.company_id IS NULL AND u.company_id IS NOT NULL',
+                'UPDATE gift_cards gc SET company_id = u.company_id FROM users u WHERE u.id = gc.user_id AND gc.company_id IS NULL AND u.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -135,7 +167,10 @@ class AddCompanyIdToSecondBatchTables extends Migration
             && Schema::hasColumn('gift_card_recharges', 'company_id')
             && Schema::hasColumn('gift_cards', 'company_id')
         ) {
-            DB::statement('UPDATE gift_card_recharges gcr INNER JOIN gift_cards gc ON gc.id = gcr.gift_card_id SET gcr.company_id = gc.company_id WHERE gcr.company_id IS NULL AND gc.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE gift_card_recharges gcr INNER JOIN gift_cards gc ON gc.id = gcr.gift_card_id SET gcr.company_id = gc.company_id WHERE gcr.company_id IS NULL AND gc.company_id IS NOT NULL',
+                'UPDATE gift_card_recharges gcr SET company_id = gc.company_id FROM gift_cards gc WHERE gc.id = gcr.gift_card_id AND gcr.company_id IS NULL AND gc.company_id IS NOT NULL'
+            );
         }
 
         $defaultCompanyId = null;

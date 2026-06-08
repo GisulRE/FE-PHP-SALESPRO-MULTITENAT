@@ -9,6 +9,8 @@ class AddCompanyIdToPaymentChildrenTables extends Migration
 {
     public function up()
     {
+        $driver = DB::getDriverName();
+
         $tables = [
             'payment_with_credit_card',
             'payment_with_gift_card',
@@ -46,7 +48,11 @@ class AddCompanyIdToPaymentChildrenTables extends Migration
                 && Schema::hasTable('payments')
                 && Schema::hasColumn('payments', 'company_id')
             ) {
-                DB::statement("UPDATE {$table} t INNER JOIN payments p ON p.id = t.payment_id SET t.company_id = p.company_id WHERE t.company_id IS NULL AND p.company_id IS NOT NULL");
+                if ($driver === 'pgsql') {
+                    DB::statement("UPDATE {$table} t SET company_id = p.company_id FROM payments p WHERE p.id = t.payment_id AND t.company_id IS NULL AND p.company_id IS NOT NULL");
+                } else {
+                    DB::statement("UPDATE {$table} t INNER JOIN payments p ON p.id = t.payment_id SET t.company_id = p.company_id WHERE t.company_id IS NULL AND p.company_id IS NOT NULL");
+                }
             }
         }
 

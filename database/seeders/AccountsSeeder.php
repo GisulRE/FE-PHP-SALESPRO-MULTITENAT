@@ -28,19 +28,25 @@ class AccountsSeeder extends Seeder
 
                     if ($exists) continue;
 
-                    DB::table('accounts')->insert([
+                    $data = [
                         'account_no'    => 'ACCT-' . $company->id . '-1',
                         'name'          => 'Caja Principal',
                         'initial_balance'=> 0,
                         'total_balance' => 0,
                         'note'          => 'Cuenta creada por seeder',
-                        'is_default'    => true,
                         'is_active'     => true,
-                        'type'          => 'cash',
                         'company_id'    => $company->id,
                         'created_at'    => now(),
                         'updated_at'    => now(),
-                    ]);
+                    ];
+                    if (Schema::hasColumn('accounts', 'is_default')) {
+                        $data['is_default'] = true;
+                    }
+                    if (Schema::hasColumn('accounts', 'type')) {
+                        $data['type'] = 1;
+                    }
+
+                    DB::table('accounts')->insert($data);
                     $this->command->info("  Cuenta 'Caja Principal' creada para empresa [{$company->id}] {$company->name}");
                 }
                 return;
@@ -49,18 +55,24 @@ class AccountsSeeder extends Seeder
             // Fallback: crear una cuenta global si no hay companies
             $exists = DB::table('accounts')->where('name', 'Caja Principal')->exists();
             if (!$exists) {
-                DB::table('accounts')->insert([
+                $data = [
                     'account_no'    => 'ACCT-1',
                     'name'          => 'Caja Principal',
                     'initial_balance'=> 0,
                     'total_balance' => 0,
                     'note'          => 'Cuenta global creada por seeder',
-                    'is_default'    => true,
                     'is_active'     => true,
-                    'type'          => 'cash',
                     'created_at'    => now(),
                     'updated_at'    => now(),
-                ]);
+                ];
+                if (Schema::hasColumn('accounts', 'is_default')) {
+                    $data['is_default'] = true;
+                }
+                if (Schema::hasColumn('accounts', 'type')) {
+                    $data['type'] = 1;
+                }
+
+                DB::table('accounts')->insert($data);
                 $this->command->info("  Cuenta 'Caja Principal' global creada.");
             }
         } catch (\Exception $e) {

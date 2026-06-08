@@ -9,6 +9,8 @@ class EnsureCompanyIdOnProductSupplier extends Migration
 {
     public function up()
     {
+        $driver = DB::getDriverName();
+
         foreach (['product_supplier', 'product_suppliers'] as $table) {
             if (!Schema::hasTable($table) || Schema::hasColumn($table, 'company_id')) {
                 continue;
@@ -29,7 +31,11 @@ class EnsureCompanyIdOnProductSupplier extends Migration
                 && Schema::hasTable('suppliers')
                 && Schema::hasColumn('suppliers', 'company_id')
             ) {
-                DB::statement("UPDATE {$table} ps INNER JOIN suppliers s ON s.id = ps.supplier_id SET ps.company_id = s.company_id WHERE ps.company_id IS NULL AND s.company_id IS NOT NULL");
+                if ($driver === 'pgsql') {
+                    DB::statement("UPDATE {$table} ps SET company_id = s.company_id FROM suppliers s WHERE s.id = ps.supplier_id AND ps.company_id IS NULL AND s.company_id IS NOT NULL");
+                } else {
+                    DB::statement("UPDATE {$table} ps INNER JOIN suppliers s ON s.id = ps.supplier_id SET ps.company_id = s.company_id WHERE ps.company_id IS NULL AND s.company_id IS NOT NULL");
+                }
             }
 
             $defaultCompanyId = Schema::hasTable('companies')

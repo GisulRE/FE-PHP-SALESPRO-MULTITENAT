@@ -11,6 +11,7 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;600;700&display=swap" rel="stylesheet">
+
         <style type="text/css">
             * {
                 font-size: 14px;
@@ -92,10 +93,17 @@
 
         </style>
     </head>
+    @php
+        $isEmbed = request()->boolean('embed');
+        $hiddenPrintStyle = $isEmbed ? 'display:none;' : '';
+        $embedWidth = $isEmbed ? '100%' : '90%';
+        $embedHeight = $isEmbed ? '620' : '500';
+        $wrapperStyle = $isEmbed ? 'max-width:100%; margin:0; padding:0;' : 'max-width:90%; margin:0 auto;';
+    @endphp
     <body>
 
-        <div style="max-width:90%;margin:0 auto">
-            <div class="hidden-print">
+        <div style="{{ $wrapperStyle }}">
+            <div class="hidden-print" style="{{ $hiddenPrintStyle }}">
                 <table>
                     <tr>
                         <td><a href="{{ route('sale.pos')}}" class="btn btn-info"><i class="fa fa-arrow-left"></i> Volver POS</a> </td>
@@ -106,7 +114,7 @@
                 
             <div id="receipt-data">
                 <object>
-                    <embed id="pdfID" type="text/html" width="90%" height="500" src="data:application/pdf;base64,{{$data['bytes']}}" />
+                        <embed id="pdfID" type="text/html" width="{{ $embedWidth }}" height="{{ $embedHeight }}" src="data:application/pdf;base64,{{$data['bytes']}}" />
                 </object>                                
             </div>
         </div>
