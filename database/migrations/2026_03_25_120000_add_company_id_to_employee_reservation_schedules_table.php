@@ -20,10 +20,14 @@ class AddCompanyIdToEmployeeReservationSchedulesTable extends Migration
         }
 
         if (Schema::hasColumn('employee_reservation_schedules', 'company_id')) {
-            DB::table('employee_reservation_schedules as ers')
-                ->leftJoin('employees as e', 'e.id', '=', 'ers.employee_id')
-                ->whereNull('ers.company_id')
-                ->update(['ers.company_id' => DB::raw('e.company_id')]);
+            if (DB::getDriverName() === 'pgsql') {
+                DB::statement('UPDATE employee_reservation_schedules ers SET company_id = e.company_id FROM employees e WHERE e.id = ers.employee_id AND ers.company_id IS NULL');
+            } else {
+                DB::table('employee_reservation_schedules as ers')
+                    ->leftJoin('employees as e', 'e.id', '=', 'ers.employee_id')
+                    ->whereNull('ers.company_id')
+                    ->update(['ers.company_id' => DB::raw('e.company_id')]);
+            }
         }
 
         if (Schema::hasTable('companies')) {

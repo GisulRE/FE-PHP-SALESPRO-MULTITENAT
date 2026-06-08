@@ -1149,6 +1149,7 @@
                                                 <select required id="biller_id" name="biller_id"
                                                     class="selectpicker form-control" data-live-search="true"
                                                     data-live-search-style="contains" title="Select Biller...">
+                                                    <option value=""></option>
                                                     @foreach ($lims_biller_list as $biller)
                                                         <option value="{{ $biller->id }}">
                                                             {{ $biller->name . ' (' . $biller->company_name . ')' }}
@@ -1159,7 +1160,7 @@
                                         </div>
                                         <div id="div_account" class="col-md-4">
                                             <div class="form-group">
-                                                <input type="hidden" name="biller_id" value="{{ $biller_data->id }}">
+                                                <input type="hidden" name="biller_id_hidden" value="{{ $biller_data->id ?? '' }}">
                                                 @if ($account_data)
                                                     <label id="account_id">{{ $account_data }}</label>
                                                 @endif
@@ -1174,25 +1175,40 @@
                                                 <div class="input-group pos">
                                                     @if ($customer_active)
                                                         <?php $deposit = []; ?>
-                                                        <input type="hidden" name="customer_id" id="customer_id" />
-                                                        <input type="text" name="customer_name"
-                                                            id="lims_customerSearch" onfocus="this.select();"
-                                                            onmouseup="return false;"
-                                                            placeholder="Buscar cliente por Nombre/Documento/Codigo"
-                                                            class="form-control" />
+                                                        <select required name="customer_id" id="customer_id"
+                                                            class="selectpicker form-control" data-live-search="true"
+                                                            data-live-search-style="contains" title="Seleccionar cliente..."
+                                                            style="width: 100px">
+                                                            @foreach ($lims_customer_list as $customer)
+                                                                @php $deposit[$customer->id] = ($customer->deposit ?? 0) - ($customer->expense ?? 0); @endphp
+                                                                <option value="{{ $customer->id }}">
+                                                                    {{ $customer->name . ' (' . ($customer->phone_number ?? 'S/T') . ')' }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
                                                         <button type="button" class="btn btn-default btn-sm"
                                                             data-toggle="modal" data-target="#addCustomer"><i
                                                                 class="dripicons-plus"></i></button>
                                                     @else
                                                         <?php $deposit = []; ?>
-                                                        <input type="hidden" name="customer_id" id="customer_id" />
-                                                        <input type="text" name="customer_name"
-                                                            id="lims_customerSearch"
-                                                            placeholder="Buscar cliente por Nombre/Documento/Codigo"
-                                                            onfocus="this.select();" onmouseup="return false;"
-                                                            class="form-control" />
+                                                        <select required name="customer_id" id="customer_id"
+                                                            class="selectpicker form-control" data-live-search="true"
+                                                            data-live-search-style="contains" title="Seleccionar cliente...">
+                                                            @foreach ($lims_customer_list as $customer)
+                                                                @php $deposit[$customer->id] = ($customer->deposit ?? 0) - ($customer->expense ?? 0); @endphp
+                                                                <option value="{{ $customer->id }}">
+                                                                    {{ $customer->name . ' (' . ($customer->phone_number ?? 'S/T') . ')' }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
                                                     @endif
                                                 </div>
+                                            </div>
+                                        </div>
+                                        <div id="div_fecha_venta" class="col-md-4" @if($lims_pos_setting_data && $lims_pos_setting_data->date_sell == 1) style="display:none;" @endif>
+                                            <div class="form-group">
+                                                <label>Fecha venta</label>
+                                                <input type="datetime-local" id="date_sell_input" class="form-control">
                                             </div>
                                         </div>
                                         <div class="col-md-12">
@@ -1262,6 +1278,7 @@
                                                 <input type="hidden" name="date_sell" />
                                                 <input type="hidden" name="pos" value="1" />
                                                 <input type="hidden" name="presale_id" value="0" />
+                                                <input type="hidden" name="quotation_id_loaded" value="0" />
                                                 <input type="hidden" name="attentionshift_id" value="0" />
                                                 <input type="hidden" name="draft" value="0" />
                                                 <input type="hidden" name="total_tips" value="0" />
@@ -1350,6 +1367,13 @@
                                             class="fa fa-money"></i> Efectivo</button>
                                 </div>
                             @endif
+                            @if (in_array('pos_payment_cash', $all_permission))
+                                <div class="column-5">
+                                    <button style="background: #1f6feb" type="button" class="btn btn-custom payment-btn"
+                                        data-toggle="modal" data-target="#add-payment" id="multiple-pay-btn"><i
+                                            class="fa fa-random"></i> Pago Múltiple</button>
+                                </div>
+                            @endif
                             @if (in_array('pos_payment_qrcash', $all_permission))
                                 <div class="column-5">
                                     <button style="background: #b130ec" type="button" class="btn btn-custom payment-btn"
@@ -1436,17 +1460,53 @@
                                         Generar Pro-Forma</button>
                                 </div>
                             @endif
+                            @if (in_array('quotes-index', $all_permission))
+                                <div class="column-5">
+                                    <button id="showproforma-list-btn" style="background-color: #6c5ce7;" type="button"
+                                        class="btn btn-custom" data-toggle="modal" data-target="#proformaListModal">
+                                        <i class="fa fa-list-alt"></i>
+                                        Cargar Proforma</button>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
                 <!-- payment modal -->
                 <div id="add-payment" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
                     data-backdrop="static" data-keyboard="false" aria-hidden="true" class="modal fade text-left">
+                    <style>
+                        #add-payment .payment-select .dropdown-toggle,
+                        #add-payment .payment-select,
+                        #add-payment .payment-list-input {
+                            height: calc(2.25rem + 2px) !important;
+                            min-height: calc(2.25rem + 2px);
+                        }
+
+                        #add-payment .payment-list-wrapper {
+                            border: 1px solid #dee2e6;
+                            border-radius: 8px;
+                            padding: 10px;
+                            background: #f8fafc;
+                            width: 100%;
+                        }
+
+                        #add-payment .payment-list-item {
+                            border-bottom: 1px dashed #d7dce2;
+                            padding-bottom: 8px;
+                            margin-bottom: 8px;
+                        }
+
+                        #add-payment .payment-list-item:last-child {
+                            border-bottom: 0;
+                            margin-bottom: 0;
+                            padding-bottom: 0;
+                        }
+                    </style>
                     <div role="document" class="modal-dialog" style="max-width: 80%; margin: 1rem auto;">
                         @include('layout.partials.spinner-ajax')
                         @include('layout.partials.spinner-contingencia-ajax')
-                        <div class="modal-content">
-                            <div class="modal-header bg-light" style="padding: 0.75rem 1rem;">
+                        <div class="modal-content" style="max-height: 90vh; height: auto; display: flex;">
+                            <div class="modal-header bg-light " style="padding: 0.75rem 1rem;">
                                 <h6 id="exampleModalLabel" class="modal-title font-weight-bold" style="font-size: 0.95rem;">
                                     @if (session()->has('token_siat'))
                                         <i class="fa fa-file-invoice"></i> Facturar Venta
@@ -1456,16 +1516,26 @@
                                 </h6>
                                 <div style="display:none;">
                                     @if (session()->has('token_siat'))
-                                        <input id="toggle-event" type="checkbox" checked data-toggle="toggle"
+                                        <input id="toggle-event" type="checkbox" data-toggle="toggle"
                                             data-on="Si" data-off="No" data-onstyle="primary"
                                             data-offstyle="secondary">
                                     @endif
                                 </div>
+                                @if (session()->has('token_siat'))
+                                <div id="btn_modeOnline" class="d-flex align-items-center mr-3" style="display:none;">
+                                    <div class="mode-toggle-container">
+                                        <small id="text_modo_pos" class="mode-label">Modo: Online</small>
+                                        <input id="toggle-event-mode" type="checkbox" data-toggle="toggle"
+                                            data-on="Online" data-off="Offline" data-onstyle="success"
+                                            data-offstyle="danger" data-size="sm" data-width="72">
+                                    </div>
+                                </div>
+                                @endif
                                 <button type="button" data-dismiss="modal" aria-label="Close" class="close">
                                     <span aria-hidden="true"><i class="dripicons-cross"></i></span>
                                 </button>
                             </div>
-                            <div class="modal-body" style="padding: 1rem; max-height: 70vh; overflow-y: auto; font-size: 0.875rem;">
+                            <div class="modal-body" style="padding: 1rem; overflow-y: auto; overflow-x: hidden; font-size: 0.875rem; flex: 1 1 auto; min-height: 0; max-height:75vh;">
 
                                 {{-- se mostrará si solo si, tiene credenciales siat --}}
                                 <input type="hidden" name="facturacion_id_hidden"
@@ -1562,7 +1632,7 @@
                                                         <label>{{ trans('file.Paid By') }}</label>
                                                         @if (session()->has('token_siat'))
                                                             <select name="paid_by_id_select"
-                                                                class="form-control selectpicker" data-live-search="true"
+                                                                class="form-control selectpicker payment-select" data-live-search="true"
                                                                 data-live-search-style="contains"
                                                                 id="paid_by_id_select_select">
                                                                 @foreach ($lista_metodo_pago as $method)
@@ -1574,7 +1644,7 @@
                                                             </select>
                                                         @else
                                                             <select name="paid_by_id_select"
-                                                                class="form-control selectpicker" data-live-search="true"
+                                                                class="form-control selectpicker payment-select" data-live-search="true"
                                                                 data-live-search-style="contains"
                                                                 id="paid_by_id_select_select" disabled>
                                                                 @foreach ($lims_methodpay_list as $method)
@@ -1584,6 +1654,21 @@
                                                                 @endforeach
                                                             </select>
                                                         @endif
+                                                    </div>
+                                                    <div class="col-md-12 mt-2" id="multiple-pay-selector" style="display: none;">
+                                                        <label>Seleccionar hasta 3 formas de pago</label>
+                                                        <div class="row">
+                                                            <div class="col-md-4 mt-1">
+                                                                <select id="multi_pay_method_1" class="form-control selectpicker payment-select multi-pay-method" data-live-search="true" data-live-search-style="contains" title="Forma 1"></select>
+                                                            </div>
+                                                            <div class="col-md-4 mt-1">
+                                                                <select id="multi_pay_method_2" class="form-control selectpicker payment-select multi-pay-method" data-live-search="true" data-live-search-style="contains" title="Forma 2"></select>
+                                                            </div>
+                                                            <div class="col-md-4 mt-1">
+                                                                <select id="multi_pay_method_3" class="form-control selectpicker payment-select multi-pay-method" data-live-search="true" data-live-search-style="contains" title="Forma 3"></select>
+                                                            </div>
+                                                        </div>
+                                                        <small class="text-muted">La primera forma seleccionada se usará como método principal.</small>
                                                     </div>
 
                                                     @include('sale.partials-sale-datos-metodopago')
@@ -1624,8 +1709,15 @@
                                                         <input type="number" class="form-control" name="invoice_no"
                                                             value="0" />
                                                     </div>
-                                                    <div class="d-flex flex-wrap" id="html_montos_metodos_de_pago">
-                                                        {{-- se insertarán los input --}}
+                                                    <div class="col-md-12 mt-2">
+                                                        <label class="mb-1">Lista de pagos</label>
+                                                        <div class="payment-list-wrapper" id="html_montos_metodos_de_pago">
+                                                            {{-- se insertarán los input --}}
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6 mt-2">
+                                                        <label>Total pagado por métodos</label>
+                                                        <input type="text" id="monto_total_pagado" class="form-control payment-list-input" value="0.00" readonly>
                                                     </div>
                                                     {{-- <div class="form-group col-md-12">
                                                         <label>{{ trans('file.Payment Note') }}</label>
@@ -1691,13 +1783,13 @@
                                         <div class="tab-pane fade" id="segundoTab" role="tabpanel">
                                             <div class="row">
                                                 <div class="col-md-12">
-                                                    <div class="text-center mb-3">
-                                                        <button type="button" class="btn btn-primary btn-sm" id="btn-print-preview">
-                                                            <i class="dripicons-print"></i> Imprimir Vista Previa
-                                                        </button>
-                                                    </div>
                                                     {{-- contenedor donde se inyectará el HTML imprimible devuelto por AJAX --}}
-                                                    <div id="print_preview_container"></div>
+                                                    <div id="print_preview_container" style="max-height:60vh; overflow-y:auto; overflow-x:hidden; padding: 0 1rem;">
+                                                        <style>
+                                                            #print_preview_container img, #print_preview_container object, #print_preview_container embed { max-width:100%; height:auto; }
+                                                            #print_preview_container table { width:100% !important; table-layout:auto; word-break:break-word; }
+                                                        </style>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1943,11 +2035,14 @@
 
                                         <ul class="nav-menu list-unstyled d-flex flex-md-row align-items-md-center">
                                             @if (in_array('quotes-add', $all_permission))
-                                                <li class="nav-item">PROFORMA
-                                                    <input id="toggle-event-pro" type="checkbox" data-toggle="toggle"
-                                                        data-on="Si" data-off="No" data-onstyle="primary"
-                                                        data-offstyle="secondary">
-                                                </li>
+                                                <li class="nav-item proforma-switch-item">
+                                                <div class="proforma-toggle-container">
+                                                    <span class="proforma-label">Proforma</span>
+                                                    <input id="toggle-event-pro" class="proforma-toggle" type="checkbox" data-toggle="toggle"
+                                                        data-on="Sí" data-off="No" data-onstyle="success"
+                                                        data-offstyle="secondary" data-size="sm" data-width="60">
+                                                </div>
+                                            </li>
                                             @endif
                                             <li class="nav-item"><a id="btnFullscreen" title="Full Screen"><i
                                                         class="dripicons-expand"></i></a></li>
@@ -2300,26 +2395,28 @@
                                         <label>{{ trans('file.name') }} *</strong> </label>
                                         <input type="text" name="name" required class="form-control">
                                     </div>
-                                    <div class="row">
-                                        <div class="form-group col">
-                                            <label>{{ trans('file.Email') }}</label>
-                                            <input type="email" name="email" placeholder="example@example.com"
-                                                class="form-control">
-                                        </div>
-                                        <div class="form-group col">
-                                            <label>{{ trans('file.Phone Number') }}</label>
-                                            <input type="text" name="phone_number" class="form-control">
-                                        </div>
+                                    <div class="form-group">
+                                        <label>{{ trans('file.Phone Number') }}</label>
+                                        <input type="text" name="phone_number" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Fecha Nacimiento (Opcional)</label>
+                                        <input type="date" name="date_birh" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>{{ trans('file.Address') }}</label>
+                                        <input type="text" name="address" class="form-control">
                                     </div>
                                     {{-- Formularios para tipoDocumento + Razón social --}}
                                     @include('sale.partials-sale-tipo-documento')
                                     {{-- Formularios para tipoDocumento + Razón social --}}
+                                    <div class="form-group">
+                                        <label>{{ trans('file.Email') }}</label>
+                                        <input type="email" name="email" placeholder="example@example.com"
+                                            class="form-control">
+                                    </div>
                                     @if (in_array('pos_customer_advanced', $all_permission))
                                         <div class="row">
-                                            <div class="form-group col">
-                                                <label>{{ trans('file.Address') }}</label>
-                                                <input type="text" name="address" class="form-control">
-                                            </div>
                                             <div class="form-group col">
                                                 <label>{{ trans('file.City') }}</label>
                                                 <input type="text" name="city" class="form-control">
@@ -2558,6 +2655,75 @@
                     </div>
                 </div>
 
+                <!-- =============================================
+                     Modal: Cargar Proforma en POS
+                ============================================== -->
+                <div id="proformaListModal" tabindex="-1" role="dialog" aria-labelledby="proformaListModalLabel"
+                    aria-hidden="true" class="modal fade text-left">
+                    <div role="document" class="modal-dialog modal-xl" style="max-width: 900px;">
+                        <div class="modal-content">
+                            <div class="modal-header" style="background: linear-gradient(135deg, #6c5ce7, #a29bfe); padding: 12px 20px;">
+                                <h5 id="proformaListModalLabel" class="modal-title text-white mb-0">
+                                    <i class="fa fa-list-alt"></i>&nbsp; Proformas Pendientes
+                                </h5>
+                                <button type="button" data-dismiss="modal" aria-label="Close" class="close text-white" style="opacity:0.9">
+                                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                                </button>
+                            </div>
+                            <div class="modal-body" style="padding:16px;">
+                                <!-- Filtros -->
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label class="small font-weight-bold">Desde</label>
+                                        <input type="date" id="pf-fecha-desde" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="small font-weight-bold">Hasta</label>
+                                        <input type="date" id="pf-fecha-hasta" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="small font-weight-bold">Buscar (Ref. / Cliente)</label>
+                                        <input type="text" id="pf-search" class="form-control form-control-sm" placeholder="Ej: QUO-0001, Juan...">
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button class="btn btn-sm btn-primary w-100" onclick="filterProformaList()">
+                                            <i class="fa fa-search"></i> Buscar
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Tabla -->
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped table-sm" style="font-size:0.85rem;">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Referencia</th>
+                                                <th>Fecha</th>
+                                                <th>Cliente</th>
+                                                <th>Almacén</th>
+                                                <th class="text-right">Total</th>
+                                                <th>Válido hasta</th>
+                                                <th>Nota</th>
+                                                <th class="text-center">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pf-list-body">
+                                            <tr><td colspan="9" class="text-center py-3">
+                                                <i class="fa fa-spinner fa-spin"></i> Cargando...
+                                            </td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fa fa-info-circle"></i>
+                                    Se muestran solo proformas <strong>Pendientes</strong> con fecha de validez <strong>vigente</strong>.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Fin modal proformaListModal -->
+
                 <!-- attentionshift selector before create presale -->
                 <div id="selecturno-modal" tabindex="-1" role="dialog" aria-labelledby="mySmallModalLabel"
                     aria-hidden="true" class="modal fade bd-example-modal-sm">
@@ -2771,55 +2937,300 @@
         #add-payment .form-text {
             font-size: 0.75rem;
         }
+
+        /* ==== ESTILOS PARA SWITCHES MEJORADOS (COMPACTOS) ==== */
+
+        /* Switch Online/Offline - Modo de Contingencia (compacto) */
+        /* Contenedor externo del switch: usa flex y centra todo */
+        #btn_modeOnline {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px;
+        }
+
+        .mode-toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 2px 6px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+
+        .mode-label {
+            display: block;
+            margin: 0;
+            font-weight: 600;
+            color: #495057;
+            white-space: nowrap;
+            font-size: 0.78rem;
+            letter-spacing: 0.2px;
+            text-align: center;
+        }
+
+        /* Compactar los botones del toggle mode */
+        #btn_modeOnline .toggle.btn {
+            margin: 0 !important;
+            padding: 2px 8px !important;
+            min-height: 28px !important;
+            height: auto !important;
+        }
+
+        #btn_modeOnline .toggle-group label {
+            padding: 0 6px !important;
+            font-size: 0.72rem !important;
+            font-weight: 600;
+            letter-spacing: 0.08px;
+            line-height: 1 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+        }
+
+        /* Transición suave */
+        #btn_modeOnline .toggle {
+            transition: all 0.18s ease;
+        }
+
+        /* Switch Proforma Si/No (compacto) */
+        .proforma-switch-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            padding: 0;
+        }
+
+        .proforma-toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 1px 4px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 5px;
+        }
+
+        .proforma-label {
+            font-weight: 700;
+            color: #495057;
+            font-size: 0.78rem;
+            white-space: nowrap;
+            letter-spacing: 0.2px;
+        }
+
+        .proforma-switch-item .toggle.btn {
+            margin: 0 !important;
+            display: inline-block !important;
+            padding: 2px 6px !important;
+            min-height: 26px !important;
+        }
+
+        .proforma-switch-item .toggle-group {
+            display: inline-flex !important;
+        }
+        
+        .proforma-switch-item .toggle-group .btn {
+            margin: 0 !important;
+            width: auto !important;
+            padding: 2px 6px !important;
+            line-height: 1 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 0.72rem !important;
+            font-weight: 600 !important;
+            text-align: center !important;
+        }
+
+        /* Transición rápida para UI compacta */
+        .proforma-switch-item .toggle {
+            transition: all 0.18s ease;
+        }
+
+        /* Hover ligero */
+        .mode-toggle-container:hover,
+        .proforma-toggle-container:hover {
+            box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+        }
+
+        /* ==== COLORES PERSONALIZADOS (compactos) ==== */
+        #btn_modeOnline .toggle-group .btn.btn-success {
+            background-color: #28a745 !important;
+            border-color: #28a745 !important;
+            color: white !important;
+            font-weight: 600;
+        }
+        
+        #btn_modeOnline .toggle-group .btn.btn-danger {
+            background-color: #dc3545 !important;
+            border-color: #dc3545 !important;
+            color: white !important;
+            font-weight: 600;
+        }
+
+        #btn_modeOnline .toggle-group .btn-success:hover {
+            background-color: #218838 !important;
+            border-color: #218838 !important;
+        }
+
+        #btn_modeOnline .toggle-group .btn-danger:hover {
+            background-color: #c82333 !important;
+            border-color: #c82333 !important;
+        }
+
+        .proforma-switch-item .toggle-group .btn.btn-success {
+            background-color: #28a745 !important;
+            border-color: #28a745 !important;
+            color: white !important;
+            font-weight: 600;
+        }
+
+        .proforma-switch-item .toggle-group .btn.btn-secondary {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: white !important;
+            font-weight: 600;
+        }
+
+        /* Ajustes globales compactos */
+        .toggle.btn {
+            border-radius: 4px !important;
+            padding: 3px 6px !important;
+            font-size: 0.72rem !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.18px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+        }
+
+        /* Asegurar que los textos ON/OFF dentro del toggle estén centrados */
+        .toggle.btn .on, .toggle.btn .off, .toggle-group .btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            height: 28px !important;
+            line-height: 1 !important;
+            padding: 0 6px !important;
+        }
+        
+        .toggle-handle {
+            border-radius: 3px !important;
+            min-width: 12px !important;
+            min-height: 12px !important;
+        }
     </style>
+
+    {{-- SweetAlert2 (v2): expone Swal.fire() utilizado en el JS del POS --}}
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script type="text/javascript">
         let date = new Date();
-        let day = date.getDate();
-        let month = date.getMonth() + 1;
-        let year = date.getFullYear();
         var timerIntervalId;
         var checkStatusIntervalId;
         var presale_id = [];
         var changedate = <?php echo json_encode($lims_pos_setting_data->date_sell); ?>;
         $('input[name="presale_id"]').val(0);
+        $('input[name="quotation_id_loaded"]').val(0);
         $('input[name="attentionshift_id"]').val(0);
         $('input[name="total_discount"]').val(0);
         $('input[name="total_tips"]').val(0);
         $('input[name="tips"]').val('');
         $('input[name="invoice_no"]').val(0);
         $('input[name="order_discount"]').val('');
-        if (month < 10) {
-            datef = day + "-0" + month + "-" + year;
-        } else {
-            datef = day + "-" + month + "-" + year;
+        function pad2(number) {
+            return String(number).padStart(2, '0');
+        }
+
+        function toDateTimeLocalValue(dateValue) {
+            return dateValue.getFullYear() + '-' +
+                pad2(dateValue.getMonth() + 1) + '-' +
+                pad2(dateValue.getDate()) + 'T' +
+                pad2(dateValue.getHours()) + ':' +
+                pad2(dateValue.getMinutes());
+        }
+
+        function toSqlDateTime(dateValue) {
+            return dateValue.getFullYear() + '-' +
+                pad2(dateValue.getMonth() + 1) + '-' +
+                pad2(dateValue.getDate()) + ' ' +
+                pad2(dateValue.getHours()) + ':' +
+                pad2(dateValue.getMinutes()) + ':' +
+                pad2(dateValue.getSeconds());
         }
         var permission_turno = <?php echo json_encode(in_array('attentionshift', $all_permission)); ?>;
         var permission_proforma = <?php echo json_encode(in_array('quotes-add', $all_permission)); ?>;
         var permission_discount_item = <?php echo json_encode(in_array('pos_discount_item', $all_permission)); ?>;
+        const hasSiat = <?php echo json_encode((bool)($hasSiat ?? false)); ?>;
 
         var baseUrl = "<?php echo url('/'); ?>";
         $("ul#sale").siblings('a').attr('aria-expanded', 'true');
         $("ul#sale").addClass("show");
         $("ul#sale #sale-pos-menu").addClass("active");
-        if (changedate) {
-            $("#date_format").val(sessionStorage.getItem('datesell'));
-            $('input[name="date_sell"]').val(sessionStorage.getItem('datesell'));
+        var dateSellInput = $('#date_sell_input');
+        var nowLocal = toDateTimeLocalValue(date);
+        // Clave única por biller para evitar conflictos entre distintos cajeros/sucursales
+        var dateSellStorageKey = 'datesell_biller_' + biller_id;
+
+        if (changedate == 1) {
+            // "Mantener Fecha de Venta" ACTIVADO: ocultar campo, siempre usar fecha actual
+            $('#div_fecha_venta').hide();
+            dateSellInput.val(nowLocal);
+            $('input[name="date_sell"]').val(toSqlDateTime(new Date()));
         } else {
-            $("#date_format").val($.datepicker.formatDate('dd-mm-yy', new Date()));
-            sessionStorage.setItem("datesell", datef);
-            $('input[name="date_sell"]').val(document.getElementById("date_format").value);
+            // "Mantener Fecha de Venta" DESACTIVADO: mostrar campo, permitir fechas pasadas
+            $('#div_fecha_venta').show();
+            // Sin restricción de máximo para permitir fechas pasadas
+            dateSellInput.removeAttr('max');
+
+            // localStorage persiste entre recargas y cierres de pestaña
+            var storedDateSell = localStorage.getItem(dateSellStorageKey);
+            if (storedDateSell) {
+                dateSellInput.val(storedDateSell);
+            } else {
+                dateSellInput.val(nowLocal);
+                localStorage.setItem(dateSellStorageKey, nowLocal);
+            }
         }
-        var date_sell = $('#date_format');
-        date_sell.datepicker({
-            format: "dd-mm-yyyy",
-            autoclose: true,
-            todayHighlight: true,
-            startDate: '01/01/1996'
-        }).on('changeDate', function(e) {
-            sessionStorage.setItem('datesell', document.getElementById("date_format").value);
-            $('input[name="date_sell"]').val(document.getElementById("date_format").value);
-        });
+
+        function syncDateSellFromInput() {
+            var currentValue = dateSellInput.val();
+            if (!currentValue) {
+                currentValue = toDateTimeLocalValue(new Date());
+                dateSellInput.val(currentValue);
+            }
+
+            var parsedDate = new Date(currentValue);
+            if (isNaN(parsedDate.getTime())) {
+                parsedDate = new Date();
+                dateSellInput.val(toDateTimeLocalValue(parsedDate));
+            }
+
+            // Persistir en localStorage para que la siguiente venta arranque con esta misma fecha
+            localStorage.setItem(dateSellStorageKey, dateSellInput.val());
+            $('input[name="date_sell"]').val(toSqlDateTime(parsedDate));
+        }
+
+        if (changedate == 1) {
+            // Actualizar la fecha oculta en tiempo real cuando está en modo automático
+            setInterval(function() {
+                var now = new Date();
+                dateSellInput.val(toDateTimeLocalValue(now));
+                $('input[name="date_sell"]').val(toSqlDateTime(now));
+            }, 60000); // actualizar cada minuto
+        } else {
+            syncDateSellFromInput();
+            dateSellInput.on('change', function() {
+                syncDateSellFromInput();
+            });
+        }
 
         // $( document ).ready(function() {
         //     $("#lims_productcodeSearch").focus();
@@ -2906,8 +3317,23 @@
         
         // Inicializar el toggle después de que el DOM esté listo
         $(document).ready(function() {
-            // Asegurar que el toggle esté en OFF al iniciar
-            $('#toggle-event-pro').bootstrapToggle('off');
+            var $toggleProforma = $('#toggle-event-pro');
+            if ($toggleProforma.length) {
+                // Inicializar de forma segura para evitar deformación por doble inicialización.
+                if (typeof $toggleProforma.bootstrapToggle === 'function') {
+                    if (!$toggleProforma.parent().hasClass('toggle')) {
+                        $toggleProforma.bootstrapToggle();
+                    }
+                    $toggleProforma.bootstrapToggle('off');
+                } else {
+                    $toggleProforma.prop('checked', false);
+                }
+
+                modo_proforma = $toggleProforma.prop('checked');
+                $toggleProforma.off('change.proforma').on('change.proforma', function() {
+                    modo_proforma = $(this).prop('checked');
+                });
+            }
             
             console.log('[INIT] Toggle inicializado. modo_proforma:', modo_proforma);
             
@@ -3054,17 +3480,6 @@
                 }
             });
 
-            $('#lims_customerSearch').keyboard().autocomplete().addAutocomplete({
-                // add autocomplete window positioning
-                // options here (using position utility)
-                position: {
-                    of: '#lims_customerSearch',
-                    my: 'top+30px',
-                    at: 'right',
-                    collision: 'flip'
-                }
-            });
-
         }
 
         if (role_id > 2) {
@@ -3082,8 +3497,7 @@
             $('select[name=biller_id]').val($("input[name='biller_id_hidden']").val());
         }
 
-        $('input[name=customer_id]').val($("input[name='customer_id_hidden']").val());
-        $('input[name=customer_name]').val('{{ $customer_data->name }}');
+        $('#customer_id').val($("input[name='customer_id_hidden']").val());
         $('.selectpicker').selectpicker('refresh');
 
         var id_c = $("#customer_id").val();
@@ -3353,40 +3767,35 @@
             };
         /** end search product **/
 
-        /** search customer **/
-        var lims_customerSearch = $('#lims_customerSearch');
-
-        lims_customerSearch.autocomplete({
-                source: "customer/customer_search",
-                focus: function(event, ui) {
-                    $("#lims_customerSearch").val(ui.item.name);
-                    $("#customer_id").val(ui.item.id);
-                    return false;
-                },
-                response: function(event, ui) {
-                    if (ui.content.length == 1) {
-                        $("#lims_customerSearch").val(ui.content[0].name);
-                        $("#customer_id").val(ui.content[0].id);
-                    }
-                    return false;
-                },
-                select: function(event, ui) {
-                    $("#lims_customerSearch").val(ui.item.name);
-                    $("#customer_id").val(ui.item.id);
-                    return false;
-                }
-            })
-            .autocomplete("instance")._renderItem = function(ul, item) {
-                return $("<li>")
-                    .append("<div>" + item.name + " - " + item.valor_documento + " - " + item.codigofijo + "</div>")
-                    .appendTo(ul);
-            };
+        /** customer selector **/
+        $('#customer_id').on('change', function() {
+            consultarClientePOS();
+            var id = $(this).val();
+            var id_w = $('select[name="warehouse_id"]').val();
+            $.get('sales/getcustomergroup/' + id, function(data) {
+                customer_group_rate = (data / 100);
+            });
+            $.get('sales/getproduct_customer/' + id_w + '/' + id, function(data) {
+                lims_product_array = [];
+                product_code = data[0];
+                product_name = data[1];
+                product_qty = data[2];
+                product_type = data[3];
+                product_id = data[4];
+                product_list = data[5];
+                qty_list = data[6];
+                $.each(product_code, function(index) {
+                    lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')' +
+                        ` - Precio: ${getPriceProduct(data, index)} - Stock: ${product_qty[index]}`
+                    );
+                });
+            });
+        });
 
         function consultarClientePOS() {
             console.log("Cargando Cliente Visual...");
             var cliente_id = $('#customer_id').val();
             $.get('sales/getcliente/' + cliente_id, function(data) {
-                $("#lims_customerSearch").val(data.name);
                 $("input[name='sales_razon_social']").val(data.name);
                 $("input[name='sales_email']").val(data.email);
                 $("input[name='sales_valor_documento']").val(data.valor_documento);
@@ -3463,10 +3872,6 @@
                     id_warehouse: $('select[name="warehouse_id"]').val(),  
                 }, 
                 function(res) {
-                    if (!res || res.length === 0) {
-                        Swal.fire('Aviso', 'Producto no encontrado o sin stock en el almacén seleccionado.', 'warning');
-                        return;
-                    }
                     filter.push(data[0]);
                     filter.push(customer_id);
                     product_code.push(res[0].code);
@@ -3766,7 +4171,7 @@
                                         });
                                 } else {
                                     Swal.fire("Mensaje", data.message, data.message_code);
-                                    location.reload(true);
+                                    window.location.href = '{{ url("pos") }}';
                                 }
                             } else {
                                 Swal.fire("Mensaje", "Error al guardar/actualizar intente de nuevo",
@@ -3908,11 +4313,23 @@
 
         $("#cash-btn").on("click", function() {
             $("#number_card").prop("required", false)
+            if (window.desactivarPagoMultiple) {
+                window.desactivarPagoMultiple();
+            }
             $('select[name="paid_by_id_select"]').val(1);
             $('.selectpicker').selectpicker('refresh');
             MPefectivo();
             $('div.qc').show();
             // unblockAmounts();
+            bloqueoSegundoTabs();
+        });
+
+        $("#multiple-pay-btn").on("click", function() {
+            $("#number_card").prop("required", false)
+            $('input[name="tipo_pago_btn"]').val('multiple');
+            if (window.activarPagoMultiple) {
+                window.activarPagoMultiple();
+            }
             bloqueoSegundoTabs();
         });
 
@@ -3933,6 +4350,9 @@
 
         $("#deposit-btn").on("click", function() {
             $("#number_card").prop("required", false)
+            if (window.desactivarPagoMultiple) {
+                window.desactivarPagoMultiple();
+            }
             $('input[name="tipo_pago_btn"]').val('deposito');
             if (bandera_siat == 1)
                 $('select[name="paid_by_id_select"]').val(8);
@@ -3947,6 +4367,9 @@
 
         $("#qrsimple-btn").on("click", function() {
             $("#number_card").prop("required", false)
+            if (window.desactivarPagoMultiple) {
+                window.desactivarPagoMultiple();
+            }
             $('input[name="tipo_pago_btn"]').val('qr');
             if (bandera_siat == 1)
                 $('select[name="paid_by_id_select"]').val(8);
@@ -3960,6 +4383,9 @@
 
         $("#qrcash-btn").on("click", function() {
             $("#number_card").prop("required", false)
+            if (window.desactivarPagoMultiple) {
+                window.desactivarPagoMultiple();
+            }
             $('input[name="tipo_pago_btn"]').val('qrcash');
             if (bandera_siat == 1)
                 $('select[name="paid_by_id_select"]').val(14);
@@ -3979,6 +4405,11 @@
             $('#myTab a[href="#primerTab"]').tab('show');
             // re-deshabilitar tabs de pasos siguientes para un inicio limpio
             $('#tab_preview, #tab_billing, #tab_final').addClass('disabled');
+            if (!hasSiat) {
+                $('#tab_preview, #tab_billing, #tab_final').closest('.nav-item').hide();
+            } else {
+                $('#tab_preview, #tab_billing, #tab_final').closest('.nav-item').show();
+            }
             // siempre iniciar el switch de facturar en OFF
             if ($('#toggle-event').length) {
                 try { $('#toggle-event').bootstrapToggle('off'); } catch(e) {
@@ -3986,7 +4417,7 @@
                 }
             }
             // si existe la pestaña de facturación, mostrar 'Siguiente'
-            if ($('#segundoTab').length) {
+            if (hasSiat && $('#segundoTab').length) {
                 $('#submit-btn').text('Siguiente');
             } else {
                 $('#submit-btn').text('Confirmar Venta');
@@ -3997,13 +4428,13 @@
         $('#myTab a').on('shown.bs.tab', function(e) {
             var target = $(e.target).attr('href');
             if (target == '#primerTab') {
-                if ($('#segundoTab').length) $('#submit-btn').text('Siguiente');
+                if (hasSiat && $('#segundoTab').length) $('#submit-btn').text('Siguiente');
                 else $('#submit-btn').text('Confirmar Venta');
-            } else if (target == '#segundoTab') {
+            } else if (hasSiat && target == '#segundoTab') {
                 $('#submit-btn').text('Siguiente');
-            } else if (target == '#tercerTab') {
+            } else if (hasSiat && target == '#tercerTab') {
                 $('#submit-btn').text('Finalizar e Imprimir');
-            } else if (target == '#cuartoTab') {
+            } else if (hasSiat && target == '#cuartoTab') {
                 $('#submit-btn').text('Cerrar');
             }
         });
@@ -4016,9 +4447,9 @@
                 $('#add-payment').modal('hide');
                 return;
             }
-
+            
             // 1) Sin SIAT: interceptar, crear venta via AJAX y abrir recibo en la misma página
-            if (!$('#segundoTab').length) {
+            if (!hasSiat) {
                 e.preventDefault();
                 $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
                 var formData = $('#formPayment').serializeArray();
@@ -4029,6 +4460,7 @@
                     .done(function(res) {
                         try { $('#spinner-div').hide(); } catch (err) {}
                         if (res.status) {
+                            // Abrir recibo en la misma página (navega a gen_invoice)
                             window.location.href = '{{ url("sales/gen_invoice") }}/' + res.sale_id;
                         } else {
                             Swal.fire('Error', res.message || 'Error al procesar la venta', 'error');
@@ -4041,7 +4473,7 @@
             }
 
             // 1b) Con SIAT: primer paso -> crear venta en modo preview via AJAX y mostrar imprimible
-            if ($('#segundoTab').length && $('.tab-pane#primerTab').hasClass('show')) {
+            if (hasSiat && $('#segundoTab').length && $('.tab-pane#primerTab').hasClass('show')) {
                 e.preventDefault();
                 $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
                 var formData = $('#formPayment').serializeArray();
@@ -4070,14 +4502,14 @@
             }
 
             // 2) Si estamos en segundo paso (preview) -> avanzar a datos de facturación
-            if ($('#segundoTab').length && $('.tab-pane#segundoTab').hasClass('show')) {
+            if (hasSiat && $('#segundoTab').length && $('.tab-pane#segundoTab').hasClass('show')) {
                 e.preventDefault();
                 $('#myTab a[href="#tercerTab"]').tab('show');
                 return;
             }
 
             // 3) Si estamos en tercer paso -> finalizar facturación via AJAX y mostrar resultado
-            if ($('.tab-pane#tercerTab').hasClass('show')) {
+            if (hasSiat && $('.tab-pane#tercerTab').hasClass('show')) {
                 e.preventDefault();
                 var finalizeData = $('#formPayment').serializeArray();
                 finalizeData.push({ name: 'sale_id', value: $('input[name="ajax_sale_id"]').val() });
@@ -4089,18 +4521,24 @@
                         if (res.status) {
                             $('#final_print_message').text(res.message || 'Facturación completada');
                             if (res.print_url) {
-                                $.get(res.print_url, function(html) {
-                                    $('#final_print_container').html(html);
-                                }).fail(function() {
-                                    $('#final_print_link').attr('href', res.print_url).show();
-                                    $('#final_print_message').text('Error al cargar vista previa. Use el botón para abrir la factura.');
-                                });
+                                // Render embebido para evitar inyectar HTML completo con estilos/botones externos.
+                                var printUrlEmbed = res.print_url + (res.print_url.indexOf('?') === -1 ? '?embed=1' : '&embed=1');
+                                var titulo = $('<div/>').text(res.message || 'Factura Generada Exitosamente').html();
+                                var htmlFinal = '' +
+                                    '<p class="text-center font-weight-bold mb-3" style="font-size:1.1rem; color:#28a745;">' + titulo + '</p>' +
+                                    '<iframe src="' + printUrlEmbed + '" style="display:block; width:100%; height:72vh; min-height:620px; border:none; border-radius:8px; background:#fff;"></iframe>';
+                                $('#final_print_container').html(htmlFinal);
+
+                                // Link de respaldo para abrir fuera del modal
                                 $('#final_print_link').attr('href', res.print_url).text('Abrir en nueva ventana').show();
                             }
                             $('#tab_final').removeClass('disabled');
                             $('#myTab a[href="#cuartoTab"]').tab('show');
+                            // Cambiar texto del botón para indicar que cerrará el modal
                             $('#submit-btn').text('Cerrar');
+                            // Reiniciar pedido: limpiar tabla y arreglos para evitar que queden productos después del pago
                             try {
+                                // Limpiar arrays JS que mantienen el pedido
                                 product_price = [];
                                 product_discount = [];
                                 tax_rate = [];
@@ -4110,7 +4548,11 @@
                                 unit_operator = [];
                                 unit_operation_value = [];
                                 product_description = [];
+
+                                // Vaciar tabla de items
                                 $('table.order-list tbody').empty();
+
+                                // Resetear totales visibles y campos ocultos
                                 $('input[name="total_qty"]').val(0);
                                 $('input[name="total_price"]').val('0.00');
                                 $('input[name="grand_total"]').val('0.00');
@@ -4244,6 +4686,8 @@
             $(this).modal("hide");
             if (checkStatusIntervalId) clearInterval(checkStatusIntervalId);
             if (timerIntervalId) clearInterval(timerIntervalId);
+            var activeStep = $('#myTab .nav-link.active').attr('href');
+            var shouldCleanPosRoute = hasSiat && (activeStep === '#segundoTab' || activeStep === '#tercerTab' || activeStep === '#cuartoTab');
             mostrarPanelMontosModal();
             // reset stepper to primer tab
             try {
@@ -4251,6 +4695,10 @@
                 if ($('#segundoTab').length) $('#submit-btn').text('Siguiente');
                 else $('#submit-btn').text('Confirmar Venta');
             } catch (err) {}
+
+            if (shouldCleanPosRoute) {
+                window.location.href = '{{ url("pos") }}';
+            }
         });
 
         function blockAmounts() {
@@ -4496,13 +4944,15 @@
             var newRow = $("<tr>");
             var cols = '';
             var pre = 0;
+            var isPresaleItem = (presale != false);
             if (employee)
                 var emp = employee;
             else
                 var emp = 0;
 
-            if (presale != false) {
-                //data[2] = presale.net_unit_price;
+            if (isPresaleItem) {
+                // Mantener el precio guardado en la preventa y no el precio actual del catálogo.
+                data[2] = parseFloat(presale.net_unit_price || 0);
                 pre = presale.presale_id;
             }
             temp_unit_name = (data[6]).split(',');
@@ -4561,10 +5011,15 @@
             } else
                 $("table.order-list tbody").append(newRow);
 
-            product_price.push(parseFloat(data[2]) + parseFloat(data[2] * customer_group_rate));
-            product_discount.push('0.00');
+            if (isPresaleItem) {
+                product_price.push(parseFloat(data[2]));
+            } else {
+                product_price.push(parseFloat(data[2]) + parseFloat(data[2] * customer_group_rate));
+            }
+
+            product_discount.push(isPresaleItem ? parseFloat(presale.discount || 0).toFixed(2) : '0.00');
             product_description.push('');
-            tax_rate.push(parseFloat(data[3]));
+            tax_rate.push(isPresaleItem ? parseFloat(presale.tax_rate || 0) : parseFloat(data[3]));
             tax_name.push(data[4]);
             tax_method.push(data[5]);
             unit_name.push(data[6]);
@@ -4584,10 +5039,6 @@
                                 id_warehouse: $('select[name="warehouse_id"]').val(),  
                             }, 
                             function(res) {
-                                if (!res || res.length === 0) {
-                                    Swal.fire('Aviso', 'Producto cortesía no encontrado o sin stock.', 'warning');
-                                    return;
-                                }
                                 filter.push($(this).val());
                                 filter.push(customer_id);
                                 product_code.push(res[0].code);
@@ -4754,12 +5205,57 @@
         }
 
         function mostrarPorcentaDesdeMontoManual() {
+            var unitPrice = parseFloat($('input[name="edit_unit_price"]').val());
             var montoDescuentoManual = parseFloat($('input[name="edit_discount"]').val());
-            var montoDescuentoPorcentaje = (montoDescuentoManual * 100) / parseFloat($('input[name="edit_unit_price"]')
-                .val());
+
+            if (!isFinite(unitPrice) || unitPrice <= 0) {
+                $("#porcentaje_discount").val('0.00');
+                $("#descuento_unit_price").val('0.00');
+                return;
+            }
+
+            if (!isFinite(montoDescuentoManual) || montoDescuentoManual < 0) {
+                montoDescuentoManual = 0;
+                $('input[name="edit_discount"]').val('0');
+            }
+
+            var montoDescuentoPorcentaje = (montoDescuentoManual * 100) / unitPrice;
             $("#porcentaje_discount").val(montoDescuentoPorcentaje.toFixed(2));
-            var montoTotalConDescuento = parseFloat($('input[name="edit_unit_price"]').val()) - montoDescuentoManual;
+            var montoTotalConDescuento = unitPrice - montoDescuentoManual;
             $("#descuento_unit_price").val(montoTotalConDescuento.toFixed(cantDecimal));
+
+        }
+
+        function mostrarMontoDesdePorcentaje() {
+            var unitPrice = parseFloat($('input[name="edit_unit_price"]').val());
+            var porcentaje = parseFloat($('#porcentaje_discount').val());
+
+            if (!isFinite(unitPrice) || unitPrice <= 0) {
+                $('input[name="edit_discount"]').val('0');
+                $('#descuento_unit_price').val('0.00');
+                return;
+            }
+
+            if (!isFinite(porcentaje) || porcentaje < 0) {
+                porcentaje = 0;
+            }
+
+            if (porcentaje > 100) {
+                porcentaje = 100;
+                $('#porcentaje_discount').val('100');
+            }
+
+            var montoDescuentoManual = (unitPrice * porcentaje) / 100;
+
+            if (isFinite(max_monto_permitido) && montoDescuentoManual > max_monto_permitido) {
+                montoDescuentoManual = max_monto_permitido;
+                var porcentajeAjustado = unitPrice > 0 ? (montoDescuentoManual * 100) / unitPrice : 0;
+                $('#porcentaje_discount').val(porcentajeAjustado.toFixed(2));
+            }
+
+            $('input[name="edit_discount"]').val(montoDescuentoManual.toFixed(cantDecimal));
+            var montoTotalConDescuento = unitPrice - montoDescuentoManual;
+            $('#descuento_unit_price').val(montoTotalConDescuento.toFixed(cantDecimal));
 
         }
 
@@ -4784,6 +5280,10 @@
                 Swal.fire('error', 'Monto mínimo permitido 0')
             }
             mostrarPorcentaDesdeMontoManual();
+        });
+
+        $(document).on('keyup change', '#porcentaje_discount', function() {
+            mostrarMontoDesdePorcentaje();
         });
 
         function couponDiscount() {
@@ -5228,6 +5728,7 @@
                     if (res) {
                         cancel($('table.order-list tbody tr:last').index());
                         $('input[name="presale_id"]').val(0);
+                        $('input[name="quotation_id_loaded"]').val(0);
                         $("input[name=attentionshift_id]").val(0);
                         $("input[name=attentionshift_id]").val(0);
                     } else {
@@ -5491,6 +5992,8 @@
 
                 var customer_id = data.head.customer_id;
                 $('#customer_id').val(customer_id);
+                $('.selectpicker').selectpicker('refresh');
+                $('#customer_id').trigger('change');
                 $('input[name="presale_id"]').val(data.head.id);
                 var warehouse_id = data.head.warehouse_id;
                 $('select[name="warehouse_id"]').val(warehouse_id);
@@ -5526,7 +6029,6 @@
                                 id_warehouse: $('select[name="warehouse_id"]').val(),  
                             }, 
                             function(res) {
-                                if (!res || res.length === 0) return;
                                 filter.push(element.code);
                                 filter.push(customer_id);
                                 product_code.push(res[0].code);
@@ -5553,6 +6055,155 @@
         }
 
 
+
+        // =====================================================================
+        // PROFORMA EN POS: Listar proformas pendientes y cargar en carrito
+        // =====================================================================
+
+        // Abrir modal → cargar lista automáticamente
+        $('#proformaListModal').on('show.bs.modal', function () {
+            loadProformaList();
+        });
+
+        // Llamada al aplicar filtros
+        function filterProformaList() {
+            loadProformaList();
+        }
+
+        // AJAX para cargar lista de proformas con filtros opcionales
+        function loadProformaList() {
+            $('#pf-list-body').html(
+                '<tr><td colspan="9" class="text-center py-3">' +
+                '<i class="fa fa-spinner fa-spin"></i> Cargando...</td></tr>'
+            );
+
+            var params = {
+                fecha_desde: $('#pf-fecha-desde').val() || '',
+                fecha_hasta: $('#pf-fecha-hasta').val() || '',
+                search:      $('#pf-search').val() || '',
+            };
+
+            $.get(baseUrl + '/quotations/list-for-pos', params, function(response) {
+                var rows = '';
+                if (response.data && response.data.length > 0) {
+                    $.each(response.data, function(i, q) {
+                        var noteCell = q.note
+                            ? '<span title="' + q.note + '" style="cursor:help;"><i class="fa fa-comment-o text-muted"></i></span>'
+                            : '<span class="text-muted">—</span>';
+                        rows +=
+                            '<tr>' +
+                            '<td>' + q.key + '</td>' +
+                            '<td><strong class="text-primary">' + q.reference_no + '</strong></td>' +
+                            '<td>' + q.date + '</td>' +
+                            '<td>' + q.customer + '</td>' +
+                            '<td>' + q.warehouse + '</td>' +
+                            '<td class="text-right font-weight-bold">' + q.grand_total + '</td>' +
+                            '<td>' + q.valid_date + '</td>' +
+                            '<td>' + noteCell + '</td>' +
+                            '<td class="text-center">' +
+                                '<button class="btn btn-sm btn-success" onclick="loadQuotationInPos(' + q.id + ', \'' + q.reference_no + '\')">' +
+                                    '<i class="fa fa-download"></i> Cargar' +
+                                '</button>' +
+                            '</td>' +
+                            '</tr>';
+                    });
+                } else {
+                    rows = '<tr><td colspan="9" class="text-center py-3 text-muted">' +
+                           '<i class="fa fa-inbox"></i> No se encontraron proformas pendientes con los filtros aplicados.' +
+                           '</td></tr>';
+                }
+                $('#pf-list-body').html(rows);
+            }).fail(function() {
+                $('#pf-list-body').html(
+                    '<tr><td colspan="9" class="text-center text-danger py-3">' +
+                    '<i class="fa fa-exclamation-triangle"></i> Error al cargar las proformas. Intente de nuevo.' +
+                    '</td></tr>'
+                );
+            });
+        }
+
+        // Cargar proforma seleccionada en el carrito del POS
+        function loadQuotationInPos(quotationId, referenceNo) {
+            $.get(baseUrl + '/quotations/load-for-pos/' + quotationId, function(response) {
+                // 1. Cerrar modal
+                $('#proformaListModal').modal('hide');
+                $('body').removeClass('modal-open');
+                $('.modal-backdrop').remove();
+
+                // 2. Limpiar carrito actual
+                cancel($('table.order-list tbody tr:last').index());
+
+                // 3. Guardar referencia de la proforma cargada para marcarla al completar
+                $('input[name="quotation_id_loaded"]').val(quotationId);
+
+                // 4. Activar modo proforma (permite productos sin stock, habilita flujo de factulación)
+                if (permission_proforma) {
+                    var $togglePro = $('#toggle-event-pro');
+                    if ($togglePro.length && typeof $togglePro.bootstrapToggle === 'function') {
+                        try { $togglePro.bootstrapToggle('on'); } catch(e) {
+                            $togglePro.prop('checked', true).trigger('change');
+                        }
+                    } else {
+                        $togglePro.prop('checked', true).trigger('change');
+                    }
+                }
+
+                // 5. Setear cliente
+                var customer_id = response.head.customer_id;
+                if (customer_id) {
+                    $('#customer_id').val(customer_id);
+                    $('.selectpicker').selectpicker('refresh');
+                    $('#customer_id').trigger('change');
+                }
+
+                // 6. Setear almacén
+                var warehouse_id = response.head.warehouse_id;
+                if (warehouse_id) {
+                    $('select[name="warehouse_id"]').val(warehouse_id);
+                    $('.selectpicker').selectpicker('refresh');
+                }
+
+                // 7. Cargar productos usando el mismo mecanismo que loadPresale
+                var list_item = response.body;
+                if (!customer_id) {
+                    Swal.fire('Información', 'La proforma no tiene cliente asignado. Por favor seleccione uno.', 'info');
+                } else if (!warehouse_id) {
+                    Swal.fire('Información', 'La proforma no tiene almacén asignado. Por favor seleccione uno.', 'info');
+                } else {
+                    list_item.forEach(function(element) {
+                        var filter = [];
+                        $.get(baseUrl + '/sales/search_product', {
+                            term:          element.product_code,
+                            id_customer:   customer_id,
+                            id_warehouse:  warehouse_id,
+                        }, function(res) {
+                            if (res && res.length > 0) {
+                                filter.push(element.product_code);
+                                filter.push(customer_id);
+                                product_code.push(res[0].code);
+                                product_name.push(res[0].name);
+                                product_qty.push(res[0].qty);
+                                product_type.push(res[0].type);
+                                product_id.push(res[0].id);
+                                product_list.push(res[0].product_list);
+                                qty_list.push(res[0].qty_list);
+                                productSearch(filter, false, null, element);
+                            }
+                        });
+                    });
+                }
+
+                if (typeof toastr !== 'undefined') {
+                    toastr.success('Proforma <strong>' + referenceNo + '</strong> cargada en el carrito.', '', { timeOut: 4000, enableHtml: true });
+                }
+            }).fail(function() {
+                Swal.fire('Error', 'No se pudo cargar la proforma. Intente de nuevo.', 'error');
+            });
+        }
+
+        // =====================================================================
+        // FIN: Proforma en POS
+        // =====================================================================
 
         function choose_turno() {
             $("#turno_id").empty();
@@ -5677,7 +6328,7 @@
             var url = '{{ route('estado_servicios_sin') }}';
             console.log('funcion getEstadoSIN, para determinar los Servicios de Impuestos Nacionales');
             $('#label_contingencia').hide();
-            $('#btn_modeOnline').hide();
+            $('#btn_modeOnline').show();
             $.ajax({
                 url: url,
                 type: "GET",
@@ -5686,11 +6337,7 @@
                     if (data == true) {
                         console.log('Servicios SIN en línea => ' + data);
                         bandera_servicio_sin = true;
-                        /** Mostrar Boton para Modo Online y enviar paquetes contingencia **/
-                        console.log(bandera_puntoventa_contingencia + '|' + tipo_evento_contigencia)
-                        if (bandera_puntoventa_contingencia == true && tipo_evento_contigencia == 2) {
-                            $('#btn_modeOnline').show();
-                        }
+                        sincronizarSwitchModoPOS();
                     } else {
                         console.log('Falso, los servicios no están funcionando, SIN caído => ' + data);
                         bandera_servicio_sin = false;
@@ -5742,12 +6389,15 @@
                         // el punto de venta se encuentra en modo contingencia
                         console.log('mostrarLabelContingencia ')
                         $('#label_contingencia').show();
+                        $('#btn_modeOnline').show();
                         bandera_puntoventa_contingencia = true;
+                        sincronizarSwitchModoPOS();
                         consultarEventoContingencia();
                     } else {
                         $('#label_contingencia').hide();
-                        $('#toggle-event-mode').addClass("disabled noselect");
+                        $('#btn_modeOnline').show();
                         bandera_puntoventa_contingencia = false;
+                        sincronizarSwitchModoPOS();
                     }
                 }
             });
@@ -5803,13 +6453,84 @@
                         mostrarLabelContingencia();
                     } else {
                         Swal.fire("Mensaje", " " + data.mensaje, 'warning');
-                        $('#toggle-event-mode').prop('checked', false);
+                        $('#toggle-event-mode').bootstrapToggle('off');
                         $("#toggle-event-mode").prop('disabled', false);
                         bandera_evento_contingencia = false;
+                        sincronizarSwitchModoPOS();
                     }
                 }
             });
         }
+
+        function sincronizarSwitchModoPOS() {
+            if (!$('#toggle-event-mode').length) {
+                return;
+            }
+
+            var modoOnline = !bandera_puntoventa_contingencia;
+            if (modoOnline) {
+                $('#toggle-event-mode').bootstrapToggle('on', true);
+                $('#text_modo_pos').text('Modo: Online');
+            } else {
+                $('#toggle-event-mode').bootstrapToggle('off', true);
+                $('#text_modo_pos').text('Modo: Offline');
+            }
+        }
+
+        function activarModoContingenciaPOS() {
+            var id = $('select[name=biller_id]').val();
+            var codigo_documento_sector = $('input[name="bandera_codigo_documento_sector_hidden"]').val();
+            var url_data = '{{ route('activar_modo_contingencia_pos', ':id') }}';
+            url_data = url_data.replace(':id', id);
+
+            $("#spinner-contigencia-div").show();
+            $("#submit-btn").addClass("disabled noselect");
+            $.ajax({
+                url: url_data,
+                type: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                data: {
+                    codigo_documento_sector: codigo_documento_sector,
+                    codigo_evento: 4,
+                },
+                success: function(data) {
+                    if (data.estado == true) {
+                        bandera_puntoventa_contingencia = true;
+                        Swal.fire('Modo Contingencia', data.mensaje, 'success');
+                        mostrarLabelContingencia();
+                    } else {
+                        Swal.fire('Modo Contingencia', data.mensaje, 'warning');
+                        bandera_puntoventa_contingencia = false;
+                        sincronizarSwitchModoPOS();
+                    }
+                },
+                error: function() {
+                    Swal.fire('Error', 'No se pudo activar modo contingencia.', 'error');
+                    bandera_puntoventa_contingencia = false;
+                    sincronizarSwitchModoPOS();
+                },
+                complete: function() {
+                    $("#spinner-contigencia-div").hide();
+                    $("#submit-btn").removeClass("disabled noselect");
+                }
+            });
+        }
+
+        $(document).on('change', '#toggle-event-mode', function() {
+            var modoOnline = $(this).prop('checked');
+            if (modoOnline) {
+                return;
+            }
+
+            if (bandera_puntoventa_contingencia === true) {
+                sincronizarSwitchModoPOS();
+                return;
+            }
+
+            activarModoContingenciaPOS();
+        });
 
         function consultarMinimoFechaManualCafc() {
 
@@ -6506,7 +7227,7 @@
                                     });
                             } else {
                                 Swal.fire("Mensaje", data.message, data.message_code);
-                                location.reload(true);
+                                window.location.href = '{{ url("pos") }}';
                             }
                         } else {
                             Swal.fire("Mensaje", "Error al guardar/actualizar intente de nuevo",
@@ -6558,8 +7279,17 @@
                     console.log(data);
                     if (data.status) {
                         document.getElementById("frmAddCustomer").reset();
-                        $("#lims_customerSearch").val(data.customer.name);
+                        if ($('#customer_id option[value="' + data.customer.id + '"]').length === 0) {
+                            $('#customer_id').append(
+                                $('<option>', {
+                                    value: data.customer.id,
+                                    text: data.customer.name + ' (' + (data.customer.phone_number || 'S/T') + ')'
+                                })
+                            );
+                        }
                         $("#customer_id").val(data.customer.id);
+                        $('.selectpicker').selectpicker('refresh');
+                        $('#customer_id').trigger('change');
                         Swal.fire("Mensaje", data.message, 'success');
                         $('#addCustomer').modal('hide')
                         if (bandera_siat == 1)
@@ -6592,10 +7322,13 @@
         });
     </script>
     <script type="text/javascript">
-        // Botón para imprimir la vista previa sin recargar la página
-        $(document).on('click', '#btn-print-preview', function() {
+        // Imprime únicamente el contenido de la vista previa dentro del modal.
+        window.printPreviewFromModal = function() {
             var printContent = document.getElementById('print_preview_container').innerHTML;
-            var originalContent = document.body.innerHTML;
+            if (!printContent) {
+                window.print();
+                return;
+            }
             
             // Crear iframe oculto para imprimir
             var printFrame = document.createElement('iframe');
@@ -6628,6 +7361,11 @@
                     document.body.removeChild(printFrame);
                 }, 100);
             }, 500);
+        };
+
+        // Compatibilidad si reaparece el botón superior en alguna plantilla.
+        $(document).on('click', '#btn-print-preview', function() {
+            window.printPreviewFromModal();
         });
         
         // ============ DEBUG FINAL: Test de eventos WhatsApp ============
@@ -6836,6 +7574,37 @@
             }
         }, 3000);
         // ================================================================
+    </script>
+    <script>
+    // Manejo global de errores AJAX para POS: loguea en consola y muestra mensaje del servidor
+    $(document).ajaxError(function (event, jqxhr, settings, thrownError) {
+        try {
+            console.error('AJAX error:', {
+                url: settings.url,
+                status: jqxhr.status,
+                responseText: jqxhr.responseText,
+                thrownError: thrownError
+            });
+            var msg = 'Error de red';
+            if (jqxhr && jqxhr.responseText) {
+                try {
+                    var json = JSON.parse(jqxhr.responseText);
+                    if (json && json.message) msg = json.message;
+                } catch (e) {
+                    msg = jqxhr.responseText.substr(0, 200);
+                }
+            }
+            if (typeof Swal === 'function') {
+                Swal.fire({ icon: 'error', title: 'Error', text: msg });
+            } else if (typeof swal === 'function') {
+                swal('Error', msg, 'error');
+            } else {
+                alert('Error: ' + msg);
+            }
+        } catch (e) {
+            console.error('Error manejando ajaxError', e);
+        }
+    });
     </script>
     <script type="text/javascript" src="/public/sale/mp/metodos_pagos.js"></script>
     <div id="imprimir-factura-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"

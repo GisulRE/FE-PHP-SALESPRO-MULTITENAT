@@ -37,12 +37,29 @@ use PhpOffice\PhpSpreadsheet\Writer\Csv;
 trait SiatTrait
 {
 
+    private function writeSiatDebug(string $event, array $context = []): void
+    {
+        try {
+            $line = sprintf(
+                "[%s] %s %s%s",
+                date('Y-m-d H:i:s'),
+                $event,
+                json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                PHP_EOL
+            );
+            file_put_contents(storage_path('logs/pos_siat_debug.log'), $line, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $e) {
+            // No romper el flujo funcional por un fallo de logging.
+        }
+    }
+
     public function getToken()
     {
         $pos_setting = PosSetting::latest()->first();
-        $user_siat = $pos_setting->user_siat;
-        $pass_siat = $pos_setting->pass_siat;
-        $url_siat = $pos_setting->url_siat;
+        
+        $user_siat = optional($pos_setting)->user_siat ?? '';
+        $pass_siat = optional($pos_setting)->pass_siat ?? '';
+        $url_siat = optional($pos_setting)->url_siat ?? '';
 
         if ($user_siat && $pass_siat && $url_siat) {
             try {
@@ -85,20 +102,15 @@ trait SiatTrait
     }
 
     //retorna el response
-    public function getResponse(string $operacion, $sucursal_id, $p_venta, $cuis, $nit)
+    public function getResponse($nit, $sucursal_id, $p_venta)
     {
         $pos_setting = PosSetting::latest()->first();
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
-        $path = '/sincronizacion/sincronizacion';
-        $punto_venta = '?codigoPuntoVenta=' . $p_venta;
-        $sucursal = '&codigoSucursal=' . $sucursal_id;
-        $codigo_cuis = '&cuis=' . $cuis;
-        $nit_emisor = '&nit=' . $nit;
-        $ope = '&operacion=' . $operacion;
-        $query = $punto_venta . $sucursal . $codigo_cuis . $nit_emisor . $ope;
+        $path = '/sincronizacion/v1/registrossincronizar/nit';
+        $query = '?nit=' . $nit . '&puntoVenta=' . $p_venta . '&sucursal=' . $sucursal_id;
         
-        Log::info("SINCRONIZACION SIAT - " . strtoupper($operacion));
+        Log::info("SINCRONIZACION SIAT");
         Log::info("URL => " . $host . $path . $query);
         
         try {
@@ -412,15 +424,74 @@ trait SiatTrait
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
+
+        Log::info('SIAT generarFacturaIndividual: contexto de búsqueda CUFD', [
+            'sale_id' => $venta_id,
+            'biller_id' => optional($data_biller)->id,
+            'sucursal' => optional($data_biller)->sucursal,
+            'punto_venta_siat' => optional($data_biller)->punto_venta_siat,
+            'punto_venta_encontrado' => (bool) $data_p_venta,
+        ]);
+
+        if (!$data_p_venta) {
+            Log::error('SIAT generarFacturaIndividual: no se encontró punto de venta SIAT', [
+                'sale_id' => $venta_id,
+                'biller_id' => optional($data_biller)->id,
+                'sucursal' => optional($data_biller)->sucursal,
+                'punto_venta_siat' => optional($data_biller)->punto_venta_siat,
+            ]);
+            return array('mensaje' => 'Error Punto de venta SIAT no encontrado, revise configuración. ', 'status' => false);
+        }
+
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
         if (!$data_siat_cufd) {
+            $ultimos_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                ->orderBy('fecha_registro', 'desc')
+                ->limit(3)
+                ->get(['id', 'codigo_cufd', 'codigo_control', 'estado', 'fecha_registro'])
+                ->toArray();
+
+            Log::error('SIAT generarFacturaIndividual: no existe CUFD activo para el punto de venta', [
+                'sale_id' => $venta_id,
+                'sucursal' => $data_p_venta->sucursal,
+                'codigo_punto_venta' => $data_p_venta->codigo_punto_venta,
+                'total_cufd_registrados' => SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                    ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                    ->count(),
+                'ultimos_cufd' => $ultimos_cufd,
+            ]);
+
+            $this->writeSiatDebug('SIAT request abortado antes de envio', [
+                'metodo' => __FUNCTION__,
+                'endpoint' => $path,
+                'url' => $host . $path,
+                'sale_id' => $venta_id,
+                'sucursal' => $data_p_venta->sucursal,
+                'codigo_punto_venta' => $data_p_venta->codigo_punto_venta,
+                'motivo' => 'No existe CUFD activo para este punto de venta',
+                'total_cufd_registrados' => SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                    ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                    ->count(),
+            ]);
             return array('mensaje' => 'Error Codigo Control no existe, renovar CUFD. ', 'status' => false);
         }
+
+        Log::info('SIAT generarFacturaIndividual: CUFD activo encontrado', [
+            'sale_id' => $venta_id,
+            'sucursal' => $data_p_venta->sucursal,
+            'codigo_punto_venta' => $data_p_venta->codigo_punto_venta,
+            'cufd_id' => $data_siat_cufd->id,
+            'codigo_cufd' => $data_siat_cufd->codigo_cufd,
+            'codigo_control' => $data_siat_cufd->codigo_control,
+            'estado' => $data_siat_cufd->estado,
+            'fecha_registro' => $data_siat_cufd->fecha_registro,
+        ]);
         $tipo_impresion = 'rollo';
         $nro_impresion = $pos_setting->type_print;
         $tipo_impresion = $this->formatoImpresion($nro_impresion);
@@ -511,6 +582,11 @@ trait SiatTrait
         if ($data_venta->sale_note != null || $data_venta->sale_note != '') {
             $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
         }
+
+        $periodoFacturado = trim((string) ($data_cliente->glosa_periodo_facturado ?? ''));
+        if ($periodoFacturado === '' && !empty($data_cliente->mes) && !empty($data_cliente->gestion)) {
+            $periodoFacturado = trim((string) $data_cliente->mes) . '/' . trim((string) $data_cliente->gestion);
+        }
         
         // Construir data_body base
         $data_body = [
@@ -566,8 +642,18 @@ trait SiatTrait
             $data_body['cufd'] = $data_siat_cufd->codigo_cufd;
         }
         
-        Log::info("URL => " . $host . $path);
-        Log::info(json_encode($data_body, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        Log::info('SIAT request facturacion', [
+            'metodo' => __FUNCTION__,
+            'endpoint' => $path,
+            'url' => $host . $path,
+            'payload' => $data_body,
+        ]);
+        $this->writeSiatDebug('SIAT request facturacion', [
+            'metodo' => __FUNCTION__,
+            'endpoint' => $path,
+            'url' => $host . $path,
+            'payload' => $data_body,
+        ]);
         
         try {
             $response = Http::withHeaders([
@@ -668,7 +754,7 @@ trait SiatTrait
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
 
         $nro_impresion = $pos_setting->type_print;
         $tipo_impresion = $this->formatoImpresion($nro_impresion);
@@ -817,8 +903,18 @@ trait SiatTrait
         $data_body_log = $data_body;
 
         $url_completa = $host . $path;
-        Log::info("URL => " . $url_completa);
-        Log::info(json_encode($data_body, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        Log::info('SIAT request facturacion', [
+            'metodo' => __FUNCTION__,
+            'endpoint' => $path,
+            'url' => $url_completa,
+            'payload' => $data_body,
+        ]);
+        $this->writeSiatDebug('SIAT request facturacion', [
+            'metodo' => __FUNCTION__,
+            'endpoint' => $path,
+            'url' => $url_completa,
+            'payload' => $data_body,
+        ]);
 
         try {
             $response = Http::timeout(30)->withHeaders([
@@ -928,7 +1024,7 @@ trait SiatTrait
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
 
         $tipo_impresion = 'rollo';
         $nro_impresion = $pos_setting->type_print;
@@ -1151,7 +1247,7 @@ trait SiatTrait
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
 
         $tipo_impresion = 'rollo';
         $nro_impresion = $pos_setting->type_print;
@@ -1286,7 +1382,7 @@ trait SiatTrait
                 "cafc" => $codigo_cafc,
                 "codigoCliente" => $data_cliente->codigofijo,
                 "email" => $data_cliente->email,
-                "periodoFacturado" => $data_cliente->glosa_periodo_facturado,
+                "periodoFacturado" => $periodoFacturado !== '' ? $periodoFacturado : null,
                 "codigoDocumentoSector" => $data_cliente->codigo_documento_sector,
                 "codigoExcepcion" => $data_cliente->codigo_excepcion,
                 "codigoMoneda" => 1,
@@ -1301,7 +1397,11 @@ trait SiatTrait
                 "mes" => $data_cliente->mes,
                 "gestion" => $data_cliente->gestion,
                 "ciudad" => $data_cliente->ciudad,
+                "zona" => $data_cliente->zona,
+                "categoria" => $data_cliente->categoria,
                 "numeroMedidor" => $data_cliente->numero_medidor,
+                "lecturaMedidorAnterior" => $data_cliente->lectura_medidor_anterior,
+                "lecturaMedidorActual" => $data_cliente->lectura_medidor_actual,
                 "domicilioCliente" => $data_cliente->domicilio_cliente,
                 "consumoPeriodo" => $data_cliente->consumo_periodo,
                 "beneficiarioLey1886" => $data_cliente->beneficiario_ley_1886,
@@ -1402,7 +1502,7 @@ trait SiatTrait
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
 
         $tipo_impresion = 'rollo';
         $nro_impresion = $pos_setting->type_print;
@@ -2107,7 +2207,7 @@ Descripción: " . $data_response['descripcion'];
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
 
         $data_gift_card = new Payment();
         // obteniendo los productos vendidos
@@ -2365,7 +2465,7 @@ Descripción: " . $data_response['descripcion'];
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
 
         $data_gift_card = new Payment();
         // obteniendo los productos vendidos
@@ -2905,7 +3005,7 @@ Descripción: " . $data_response['descripcion'];
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
 
         $tipo_impresion = 'rollo';
         $nro_impresion = $pos_setting->type_print;
@@ -3106,7 +3206,7 @@ Descripción: " . $data_response['descripcion'];
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
 
         $tipo_impresion = 'rollo';
         $nro_impresion = $pos_setting->type_print;
@@ -3193,6 +3293,12 @@ Descripción: " . $data_response['descripcion'];
         if ($data_venta->sale_note != null || $data_venta->sale_note != '') {
             $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
         }
+
+        $periodoFacturado = trim((string) ($data_cliente->glosa_periodo_facturado ?? ''));
+        if ($periodoFacturado === '' && !empty($data_cliente->mes) && !empty($data_cliente->gestion)) {
+            $periodoFacturado = trim((string) $data_cliente->mes) . '/' . trim((string) $data_cliente->gestion);
+        }
+
         // Construir data_body base
         $data_body = [
             'codigoControl' => $data_siat_cufd->codigo_control,
@@ -3225,7 +3331,7 @@ Descripción: " . $data_response['descripcion'];
                 "cafc" => "",
                 "codigoCliente" => $data_cliente->codigofijo,
                 "email" => $data_cliente->email,
-                "periodoFacturado" => $data_cliente->glosa_periodo_facturado,
+                "periodoFacturado" => $periodoFacturado !== '' ? $periodoFacturado : null,
                 "codigoDocumentoSector" => $data_cliente->codigo_documento_sector,
                 "codigoExcepcion" => $data_cliente->codigo_excepcion,
                 "codigoMoneda" => 1,
@@ -3240,7 +3346,11 @@ Descripción: " . $data_response['descripcion'];
                 "mes" => $data_cliente->mes,
                 "gestion" => $data_cliente->gestion,
                 "ciudad" => $data_cliente->ciudad,
+                "zona" => $data_cliente->zona,
+                "categoria" => $data_cliente->categoria,
                 "numeroMedidor" => $data_cliente->numero_medidor,
+                "lecturaMedidorAnterior" => $data_cliente->lectura_medidor_anterior,
+                "lecturaMedidorActual" => $data_cliente->lectura_medidor_actual,
                 "domicilioCliente" => $data_cliente->domicilio_cliente,
                 "consumoPeriodo" => $data_cliente->consumo_periodo,
                 "beneficiarioLey1886" => $data_cliente->beneficiario_ley_1886,
@@ -3435,7 +3545,7 @@ Descripción: " . $data_response['descripcion'];
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
 
         $data_gift_card = new Payment();
         // obteniendo los productos vendidos
@@ -4598,7 +4708,7 @@ Descripción: " . $data_response['descripcion'];
         }
         }*/
         $leyendas = SiatLeyendaFactura::all();
-        $data_leyenda = $leyendas->random();
+        $data_leyenda = $this->pickRandomLeyenda($leyendas);
         $fechaemision = str_replace('-', '/', $factura['fechaEmision']);
         $tipo_impresion = 'rollo';
         $nro_impresion = $pos_setting->type_print;
@@ -5247,3 +5357,4 @@ Descripción: " . $data_response['descripcion'];
         DB::select('CALL check_year_resetcount_pv()');
     }
 }
+

@@ -7,6 +7,7 @@ use App\ImportJobDetail;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 class CompanySqlImportService
 {
@@ -32,160 +33,170 @@ class CompanySqlImportService
 
     public function run(ImportJob $job)
     {
-        ini_set('memory_limit', '1024M');
+        try {
+            ini_set('memory_limit', '1024M');
 
-        if ($this->abortIfCancelled($job)) {
-            return;
-        }
-
-        // Marcar ejecucion al inicio para reflejar actividad aunque el preprocesado tome tiempo.
-        $this->progressService->startJob($job);
-        $this->progressService->log($job, 'info', 'Worker de importacion iniciado. Preparando archivo SQL...');
-
-        $absolutePath = storage_path('app/' . $job->source_path);
-        if (!file_exists($absolutePath)) {
-            throw new \RuntimeException('No se encontró el archivo fuente para la importación.');
-        }
-
-        $splitSummary = null;
-        $tablesFromSplit = [];
-        $shouldSplit = true;
-
-        if (is_array($job->options) && array_key_exists('split_before_import', $job->options)) {
-            $shouldSplit = (bool) $job->options['split_before_import'];
-        }
-
-        if ($shouldSplit) {
-            $splitFolder = storage_path('app/import_splits/job_' . $job->id);
-            if (File::exists($splitFolder)) {
-                File::deleteDirectory($splitFolder);
-            }
-
-            $splitSummary = $this->dumpSplitService->split($absolutePath, $splitFolder, true);
-            foreach ($splitSummary['tables'] as $tableInfo) {
-                $tablesFromSplit[$tableInfo['table']] = [
-                    'rows' => (int) $tableInfo['rows'],
-                    'path' => $tableInfo['path'],
-                ];
-            }
-        }
-
-        $parsedTables = [];
-        $parseIssues = [];
-
-        if ($splitSummary !== null) {
-            foreach ($tablesFromSplit as $tableName => $tableInfo) {
-                if ($tableInfo['rows'] <= 0) {
-                    continue;
-                }
-
-                $parsedTableResult = $this->parserService->parseFile($tableInfo['path']);
-                if (!empty($parsedTableResult['issues'])) {
-                    $parseIssues = array_merge($parseIssues, $parsedTableResult['issues']);
-                }
-
-                if (isset($parsedTableResult['tables'][$tableName])) {
-                    $parsedTables[$tableName] = $parsedTableResult['tables'][$tableName];
-                }
-            }
-        } else {
-            $parsed = $this->parserService->parseFile($absolutePath);
-            $parsedTables = $parsed['tables'];
-            $parseIssues = $parsed['issues'];
-        }
-
-        $parsedTables = $this->filterParsedTables($parsedTables);
-        $tableNames = array_keys($parsedTables);
-        $metadata = $this->schemaService->getTableMetadata($tableNames);
-        $knownTables = array_keys($metadata);
-        $unknownTables = array_values(array_diff($tableNames, $knownTables));
-        $order = $this->schemaService->resolveMigrationOrder($tableNames);
-
-        if (empty($tableNames)) {
-            $this->progressService->completeJob($job, 'failed', 'No se encontraron tablas importables en el archivo SQL.');
-            return;
-        }
-
-        $this->progressService->log($job, 'info', 'Orden de migración resuelto.', [
-            'order' => $order,
-            'tables' => $tableNames,
-        ]);
-
-        if ($splitSummary !== null) {
-            $this->progressService->log($job, 'info', 'Dump SQL dividido por tablas antes de migrar.', [
-                'split_folder' => storage_path('app/import_splits/job_' . $job->id),
-                'tables_detected' => $splitSummary['tables_detected'],
-                'generated_files' => $splitSummary['generated_files'],
-                'summary_path' => $splitSummary['summary_path'],
-            ]);
-        }
-
-        if (!empty($parseIssues)) {
-            $this->progressService->log($job, 'warning', 'Se detectaron inconsistencias durante el parseo.', ['issues' => $parseIssues]);
-        }
-
-        $details = $job->details()->get()->keyBy('table_name');
-
-        // Idempotencia: si una tabla no existe en el esquema destino, se omite y no se detiene el job.
-        if (!empty($unknownTables)) {
-            foreach ($unknownTables as $unknownTable) {
-                if (isset($details[$unknownTable])) {
-                    $this->progressService->completeTable(
-                        $details[$unknownTable],
-                        'cancelled',
-                        [
-                            'processed_rows' => 0,
-                            'failed_rows' => 0,
-                        ],
-                        'Tabla omitida: no existe en el esquema destino.'
-                    );
-                }
-
-                $this->progressService->log($job, 'warning', 'Tabla omitida durante importacion por no existir en destino.', [
-                    'table' => $unknownTable,
-                ]);
-
-                unset($parsedTables[$unknownTable]);
-            }
-
-            $tableNames = array_values(array_intersect($tableNames, $knownTables));
-            $order = array_values(array_intersect($order, $tableNames));
-        }
-
-        foreach ($order as $index => $tableName) {
             if ($this->abortIfCancelled($job)) {
                 return;
             }
 
-            if (!isset($parsedTables[$tableName]) || !isset($details[$tableName])) {
-                continue;
+            // Marcar ejecucion al inicio para reflejar actividad aunque el preprocesado tome tiempo.
+            $this->progressService->startJob($job);
+            $this->progressService->log($job, 'info', 'Worker de importacion iniciado. Preparando archivo SQL...');
+
+            $absolutePath = storage_path('app/' . $job->source_path);
+            if (!file_exists($absolutePath)) {
+                throw new \RuntimeException('No se encontró el archivo fuente para la importación.');
             }
 
-            $pendingTables = array_slice($order, $index + 1);
+            $splitSummary = null;
+            $tablesFromSplit = [];
+            $shouldSplit = true;
 
-            $shouldContinue = $this->processTable(
-                $job,
-                $details[$tableName],
-                $tableName,
-                $parsedTables[$tableName],
-                isset($metadata[$tableName]) ? $metadata[$tableName] : null,
-                $tableNames,
-                $pendingTables
-            );
+            if (is_array($job->options) && array_key_exists('split_before_import', $job->options)) {
+                $shouldSplit = (bool) $job->options['split_before_import'];
+            }
 
-            if (!$shouldContinue) {
+            if ($shouldSplit) {
+                $splitFolder = storage_path('app/import_splits/job_' . $job->id);
+                if (File::exists($splitFolder)) {
+                    File::deleteDirectory($splitFolder);
+                }
+
+                $splitSummary = $this->dumpSplitService->split($absolutePath, $splitFolder, true);
+                foreach ($splitSummary['tables'] as $tableInfo) {
+                    $tablesFromSplit[$tableInfo['table']] = [
+                        'rows' => (int) $tableInfo['rows'],
+                        'path' => $tableInfo['path'],
+                    ];
+                }
+            }
+
+            $parsedTables = [];
+            $parseIssues = [];
+
+            if ($splitSummary !== null) {
+                foreach ($tablesFromSplit as $tableName => $tableInfo) {
+                    if ($tableInfo['rows'] <= 0) {
+                        continue;
+                    }
+
+                    $parsedTableResult = $this->parserService->parseFile($tableInfo['path']);
+                    if (!empty($parsedTableResult['issues'])) {
+                        $parseIssues = array_merge($parseIssues, $parsedTableResult['issues']);
+                    }
+
+                    if (isset($parsedTableResult['tables'][$tableName])) {
+                        $parsedTables[$tableName] = $parsedTableResult['tables'][$tableName];
+                    }
+                }
+            } else {
+                $parsed = $this->parserService->parseFile($absolutePath);
+                $parsedTables = $parsed['tables'];
+                $parseIssues = $parsed['issues'];
+            }
+
+            $parsedTables = $this->filterParsedTables($parsedTables);
+            $tableNames = array_keys($parsedTables);
+            $metadata = $this->schemaService->getTableMetadata($tableNames);
+            $knownTables = array_keys($metadata);
+            $unknownTables = array_values(array_diff($tableNames, $knownTables));
+            $order = $this->schemaService->resolveMigrationOrder($tableNames);
+
+            if (empty($tableNames)) {
+                $this->progressService->completeJob($job, 'failed', 'No se encontraron tablas importables en el archivo SQL.');
                 return;
             }
-        }
 
-        $job->refresh();
-        $hasFailures = $job->details()->whereIn('status', ['failed', 'partial'])->exists();
-        $this->progressService->completeJob($job, $hasFailures ? 'partial' : 'completed');
-        $this->progressService->log($job, 'info', 'Importación finalizada.', [
-            'status' => $hasFailures ? 'partial' : 'completed',
-            'processed_rows' => $job->fresh()->processed_rows,
-            'failed_rows' => $job->fresh()->failed_rows,
-        ]);
+            $this->progressService->log($job, 'info', 'Orden de migración resuelto.', [
+                'order' => $order,
+                'tables' => $tableNames,
+            ]);
+
+            if ($splitSummary !== null) {
+                $this->progressService->log($job, 'info', 'Dump SQL dividido por tablas antes de migrar.', [
+                    'split_folder' => storage_path('app/import_splits/job_' . $job->id),
+                    'tables_detected' => $splitSummary['tables_detected'],
+                    'generated_files' => $splitSummary['generated_files'],
+                    'summary_path' => $splitSummary['summary_path'],
+                ]);
+            }
+
+            if (!empty($parseIssues)) {
+                $this->progressService->log($job, 'warning', 'Se detectaron inconsistencias durante el parseo.', ['issues' => $parseIssues]);
+            }
+
+            $details = $job->details()->get()->keyBy('table_name');
+
+            // Idempotencia: si una tabla no existe en el esquema destino, se omite y no se detiene el job.
+            if (!empty($unknownTables)) {
+                foreach ($unknownTables as $unknownTable) {
+                    if (isset($details[$unknownTable])) {
+                        $this->progressService->completeTable(
+                            $details[$unknownTable],
+                            'cancelled',
+                            [
+                                'processed_rows' => 0,
+                                'failed_rows' => 0,
+                            ],
+                            'Tabla omitida: no existe en el esquema destino.'
+                        );
+                    }
+
+                    $this->progressService->log($job, 'warning', 'Tabla omitida durante importacion por no existir en destino.', [
+                        'table' => $unknownTable,
+                    ]);
+
+                    unset($parsedTables[$unknownTable]);
+                }
+
+                $tableNames = array_values(array_intersect($tableNames, $knownTables));
+                $order = array_values(array_intersect($order, $tableNames));
+            }
+
+            foreach ($order as $index => $tableName) {
+                if ($this->abortIfCancelled($job)) {
+                    return;
+                }
+
+                if (!isset($parsedTables[$tableName]) || !isset($details[$tableName])) {
+                    continue;
+                }
+
+                $pendingTables = array_slice($order, $index + 1);
+
+                $shouldContinue = $this->processTable(
+                    $job,
+                    $details[$tableName],
+                    $tableName,
+                    $parsedTables[$tableName],
+                    isset($metadata[$tableName]) ? $metadata[$tableName] : null,
+                    $tableNames,
+                    $pendingTables
+                );
+
+                if (!$shouldContinue) {
+                    return;
+                }
+            }
+
+            $job->refresh();
+            $hasFailures = $job->details()->whereIn('status', ['failed', 'partial'])->exists();
+            $this->progressService->completeJob($job, $hasFailures ? 'partial' : 'completed');
+            $this->progressService->log($job, 'info', 'Importación finalizada.', [
+                'status' => $hasFailures ? 'partial' : 'completed',
+                'processed_rows' => $job->fresh()->processed_rows,
+                'failed_rows' => $job->fresh()->failed_rows,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("[Import Job #{$job->id}] Error crítico e inesperado durante la importación: " . $e->getMessage(), [
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
     }
 
     protected function isCancellationRequested(ImportJob $job)
@@ -300,8 +311,15 @@ class CompanySqlImportService
 
                 if ($result['status'] === 'deferred') {
                     $nextPending[] = $row;
+                    $oldId = isset($row['id']) ? $row['id'] : 'unknown';
 
-                    // Registramos una muestra acotada de diferimientos para facilitar el diagnostico.
+                    // Loggear en laravel.log siempre para debuguear sin saturar la BD
+                    Log::warning("[Import Job #{$job->id}] Fila diferida en tabla '{$tableName}' (ID original: {$oldId}): " . (isset($result['reason']) ? $result['reason'] : 'Fila diferida sin motivo reportado.'), [
+                        'table' => $tableName,
+                        'row_data' => $row,
+                    ]);
+
+                    // Registramos una muestra acotada de diferimientos para facilitar el diagnostico en la BD/UI.
                     if ($deferredReasonsLogged < 5) {
                         $deferredReasonsLogged++;
                         $this->progressService->log($job, 'warning', 'Fila diferida en ' . $tableName . '.', [
@@ -316,6 +334,14 @@ class CompanySqlImportService
 
                 $hardFailures++;
                 $this->progressService->incrementTable($detail, 0, 1, count($nextPending));
+                $oldId = isset($row['id']) ? $row['id'] : 'unknown';
+
+                // Loggear en laravel.log con severidad error
+                Log::error("[Import Job #{$job->id}] Fila rechazada definitivamente en tabla '{$tableName}' (ID original: {$oldId}): " . $result['reason'], [
+                    'table' => $tableName,
+                    'row_data' => $row,
+                ]);
+
                 $this->progressService->log($job, 'error', 'Fila rechazada en ' . $tableName . '.', [
                     'table' => $tableName,
                     'reason' => $result['reason'],
@@ -342,9 +368,31 @@ class CompanySqlImportService
             $remaining = count($pendingRows);
             $hardFailures += $remaining;
             $this->progressService->incrementTable($detail, 0, $remaining, 0);
+
+            // Analizar cada una de las filas que no pudieron resolverse al finalizar los intentos
+            $unresolvedDetails = [];
+            foreach ($pendingRows as $row) {
+                $oldId = isset($row['id']) ? $row['id'] : 'unknown';
+                $transform = $this->transformRow($job, $tableName, $row, $tableMeta, $importedTables, $pendingTables);
+                $reason = ($transform['status'] !== 'ready') ? $transform['reason'] : 'Error desconocido de persistencia en base de datos';
+                
+                $unresolvedDetails[] = [
+                    'id_original' => $oldId,
+                    'motivo' => $reason,
+                    // Filtramos datos clave para no guardar un log gigantesco en la BD, pero guardamos lo esencial
+                    'datos_clave' => array_intersect_key($row, array_flip(['id', 'name', 'code', 'reference', 'parent_id', 'user_id', 'product_id', 'category_id', 'tax_id'])),
+                ];
+
+                Log::error("[Import Job #{$job->id}] Fila sin resolver permanentemente en tabla '{$tableName}' (ID original: {$oldId}): {$reason}", [
+                    'table' => $tableName,
+                    'row_data' => $row,
+                ]);
+            }
+
             $this->progressService->log($job, 'error', 'Quedaron filas sin resolver en ' . $tableName . '.', [
                 'table' => $tableName,
                 'remaining_rows' => $remaining,
+                'unresolved_details' => $unresolvedDetails,
             ], $detail);
         }
 
@@ -412,6 +460,16 @@ class CompanySqlImportService
                 }
             }
 
+            // Registrar error de consulta detallado en los logs de Laravel
+            Log::error("[Import Job #{$job->id}] Error de consulta al insertar fila en la tabla '{$tableName}': " . $exception->getMessage(), [
+                'table' => $tableName,
+                'row_data' => $row,
+                'sql' => $exception->getSql(),
+                'bindings' => $exception->getBindings(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine()
+            ]);
+
             return ['status' => 'failed', 'reason' => $exception->getMessage()];
         }
     }
@@ -442,6 +500,7 @@ class CompanySqlImportService
         foreach ($tableMeta['foreign_keys'] as $foreignKey) {
             $column = $foreignKey['column'];
             $referencedTable = $foreignKey['referenced_table'];
+            $isPhysical = isset($foreignKey['is_physical']) ? (bool) $foreignKey['is_physical'] : false;
 
             if (!array_key_exists($column, $row)) {
                 continue;
@@ -467,6 +526,21 @@ class CompanySqlImportService
                 continue;
             }
 
+            // Si es un valor de ID especial indicando "sin relación" (0 o '0')
+            if ($value === 0 || $value === '0') {
+                if ($isNullableColumn) {
+                    $row[$column] = null;
+                } elseif ($isPhysical) {
+                    // Si tiene constraint físico en PostgreSQL, debemos poner un ID válido
+                    $fallbackId = $this->getFallbackId($referencedTable, $job->company_id);
+                    if ($fallbackId !== null) {
+                        $row[$column] = $fallbackId;
+                    }
+                }
+                // Si no es físico, lo dejamos en 0 / '0' y continuamos sin validar
+                continue;
+            }
+
             $mappedId = $this->mapService->findMappedId($job->id, $job->company_id, $referencedTable, $value);
             if ($mappedId !== null) {
                 $row[$column] = $mappedId;
@@ -485,10 +559,23 @@ class CompanySqlImportService
             if (!$this->referenceExists($referencedTable, $value, $job->company_id)) {
                 if ($isNullableColumn) {
                     $row[$column] = null;
-                    continue;
+                } else {
+                    // La referencia no existe en el dump.
+                    if ($isPhysical) {
+                        // Si hay constraint físico en BD, asignamos un fallback válido para evitar que PostgreSQL rechace la inserción
+                        $fallbackId = $this->getFallbackId($referencedTable, $job->company_id);
+                        if ($fallbackId !== null) {
+                            $row[$column] = $fallbackId;
+                        } else {
+                            return ['status' => 'deferred', 'reason' => 'Referencia inexistente física sin fallback disponible: ' . $referencedTable . '.' . $value];
+                        }
+                    } else {
+                        // Si NO hay constraint físico en BD, mantenemos el valor original (ej. id huérfano) sin diferir el registro
+                        // para que la fila no se quede atascada.
+                        Log::warning("[Import Job #{$job->id}] Mapeo de relación lógica huérfana en tabla '{$tableName}', columna '{$column}'. Se mantiene ID original {$value} ya que no existe restricción física FK en base de datos para la tabla {$referencedTable}.");
+                    }
                 }
-
-                return ['status' => 'deferred', 'reason' => 'Referencia inexistente: ' . $referencedTable . '.' . $value];
+                continue;
             }
         }
 
@@ -501,6 +588,24 @@ class CompanySqlImportService
         $row = $this->normalizeRequiredColumns($row, $tableMeta);
 
         return ['status' => 'ready', 'row' => $row];
+    }
+
+    protected function getFallbackId($tableName, $companyId)
+    {
+        $metadata = $this->schemaService->getTableMetadata([$tableName]);
+        if (!isset($metadata[$tableName])) {
+            return null;
+        }
+
+        $tableMeta = $metadata[$tableName];
+        $primaryKey = $tableMeta['primary_key'] ?: 'id';
+        
+        $query = DB::table($tableName);
+        if ($tableMeta['has_company_id']) {
+            $query->where('company_id', $companyId);
+        }
+
+        return $query->value($primaryKey);
     }
 
     protected function normalizeRequiredColumns(array $row, $tableMeta)
@@ -541,7 +646,7 @@ class CompanySqlImportService
 
             $dataType = strtolower(isset($columnMeta['data_type']) ? $columnMeta['data_type'] : '');
 
-            if (in_array($dataType, ['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint', 'decimal', 'double', 'float', 'numeric', 'real', 'bit'], true)) {
+            if (in_array($dataType, ['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint', 'decimal', 'double', 'float', 'numeric', 'real', 'bit', 'double precision'], true)) {
                 $row[$columnName] = 0;
                 continue;
             }
@@ -551,12 +656,13 @@ class CompanySqlImportService
                 continue;
             }
 
-            if (in_array($dataType, ['datetime', 'timestamp'], true)) {
+            // Soporta tipos timestamp de MySQL y PostgreSQL ('timestamp with time zone', 'timestamp without time zone')
+            if (in_array($dataType, ['datetime', 'timestamp'], true) || strpos($dataType, 'timestamp') !== false) {
                 $row[$columnName] = now()->toDateTimeString();
                 continue;
             }
 
-            if ($dataType === 'time') {
+            if ($dataType === 'time' || strpos($dataType, 'time') !== false) {
                 $row[$columnName] = '00:00:00';
                 continue;
             }
@@ -620,12 +726,10 @@ class CompanySqlImportService
         $primaryKey = $tableMeta['primary_key'];
         $usesAutoIncrement = $primaryKey && in_array($primaryKey, $tableMeta['auto_increment_columns'], true);
 
-        // Remove NULL values for columns with DEFAULT to allow DB defaults to apply
+        // Eliminar valores NULL en columnas con DEFAULT para que la BD aplique el default en lugar de rechazar
         foreach (array_keys($row) as $columnName) {
             if ($row[$columnName] === null && isset($tableMeta['columns'][$columnName])) {
                 $columnMeta = $tableMeta['columns'][$columnName];
-                // If column has a default and is NOT nullable, remove the NULL value
-                // so MySQL applies the DEFAULT instead of rejecting with NOT NULL error
                 if (!$columnMeta['nullable'] && isset($columnMeta['default'])) {
                     unset($row[$columnName]);
                 }
@@ -633,7 +737,9 @@ class CompanySqlImportService
         }
 
         if ($usesAutoIncrement) {
-            return DB::table($tableName)->insertGetId($row);
+            // En PostgreSQL, insertGetId necesita el nombre de la PK para leer el valor de la sequence.
+            // En MySQL el segundo argumento es ignorado pero no causa errores.
+            return DB::table($tableName)->insertGetId($row, $primaryKey);
         }
 
         DB::table($tableName)->insert($row);
@@ -661,11 +767,15 @@ class CompanySqlImportService
     protected function isForeignKeyError(QueryException $exception)
     {
         $message = $exception->getMessage();
-        return strpos($message, 'foreign key constraint fails') !== false || strpos($message, 'Cannot add or update a child row') !== false;
+        return strpos($message, 'foreign key constraint fails') !== false            // MySQL
+            || strpos($message, 'Cannot add or update a child row') !== false       // MySQL (alternativo)
+            || strpos($message, 'violates foreign key constraint') !== false;        // PostgreSQL
     }
 
     protected function isDuplicateKeyError(QueryException $exception)
     {
-        return strpos($exception->getMessage(), 'Duplicate entry') !== false;
+        $message = $exception->getMessage();
+        return strpos($message, 'Duplicate entry') !== false                                      // MySQL
+            || strpos($message, 'duplicate key value violates unique constraint') !== false;     // PostgreSQL
     }
 }

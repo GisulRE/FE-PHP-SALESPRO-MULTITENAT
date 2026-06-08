@@ -30,13 +30,19 @@ class SucursalSiatSeeder extends Seeder
             }
 
             foreach ($companies as $company) {
-                $exists = DB::table('sucursal_siat')
-                    ->where('id_empresa', $company->id)
-                    ->where('sucursal', '0')
-                    ->exists();
+                $existsQuery = DB::table('sucursal_siat')
+                    ->where('sucursal', '0');
+
+                if (Schema::hasColumn('sucursal_siat', 'company_id')) {
+                    $existsQuery->where('company_id', $company->id);
+                } else {
+                    $existsQuery->where('id_empresa', $company->id);
+                }
+
+                $exists = $existsQuery->exists();
 
                 if (!$exists) {
-                    DB::table('sucursal_siat')->insert([
+                    $insertData = [
                         'sucursal'                    => '0',
                         'nombre'                      => 'CASA MATRIZ - ' . strtoupper($company->name),
                         'descripcion_sucursal'        => 'Casa Matriz de ' . $company->name,
@@ -51,9 +57,25 @@ class SucursalSiatSeeder extends Seeder
                         'id_empresa'                  => $company->id,
                         'created_at'                  => now(),
                         'updated_at'                  => now(),
-                    ]);
+                    ];
+
+                    if (Schema::hasColumn('sucursal_siat', 'company_id')) {
+                        $insertData['company_id'] = $company->id;
+                    }
+
+                    DB::table('sucursal_siat')->insert($insertData);
                     $this->command->info("  Sucursal 0 creada para [{$company->id}] {$company->name}");
                 } else {
+                    if (Schema::hasColumn('sucursal_siat', 'company_id')) {
+                        DB::table('sucursal_siat')
+                            ->where('sucursal', '0')
+                            ->where(function ($q) use ($company) {
+                                $q->where('id_empresa', $company->id)
+                                  ->orWhere('company_id', $company->id);
+                            })
+                            ->whereNull('company_id')
+                            ->update(['company_id' => $company->id, 'updated_at' => now()]);
+                    }
                     $this->command->line("  Sucursal 0 ya existe para [{$company->id}] {$company->name}");
                 }
             }

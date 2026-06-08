@@ -19,12 +19,12 @@ class AutorizacionFacturacionController extends Controller
     public function index()
     {
         $respuesta = $this->listaAutorizacionFacturacion(); // SiatTrait
-        $formato_fecha = GeneralSetting::first()->date_format;
+        $formato_fecha = GeneralSetting::currentDateFormat();
 
         
         $items = [];
         if ($respuesta['status']) {
-            $formato_fecha = GeneralSetting::first()->date_format;
+            $formato_fecha = GeneralSetting::currentDateFormat();
             $items = $respuesta['data'];
             return view('autorizacion-facturacion.index', compact('items', 'formato_fecha'));
 

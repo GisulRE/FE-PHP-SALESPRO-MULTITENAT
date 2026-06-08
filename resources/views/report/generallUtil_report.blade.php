@@ -63,6 +63,13 @@
                         </div>
                     </div>
                     <div class="col-md-1 offset-md-0 mt-5">
+                        <div class="form-group">
+                            <button type="button" class="btn btn-danger" onclick="openCloseCashierModal('{{ date('d-m-Y H:i:s') }}')" data-toggle="modal" data-target="#closeCashierModal">
+                                <i class="dripicons-closed"></i> Cerrar Caja
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-1 offset-md-0 mt-5">
                         <button id="print-btn" type="button" class="btn btn-default btn-sm" onclick="print()"><i class="dripicons-print"></i> {{trans('file.Print')}}</button>
                     </div>
                 </div>
@@ -193,6 +200,14 @@
                     <td class="center" style="font-weight: bold;"><span id="totalegresos">0.00</span> Bs.</td>
                 </tr>
                 <tr>
+                    <td style="font-weight: bold;"> TOTAL INGRESO EFECTIVO (B1): </td>
+                    <td class="center" style="font-weight: bold;"><span id="totalingefectivo">0.00</span> Bs.</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;color:#0d6efd"> TOTAL EFECTIVO (B1 - G): </td>
+                    <td class="center" style="font-weight: bold;"><span id="totalefectivo">0.00</span> Bs.</td>
+                </tr>
+                <tr>
                     <td style="font-weight: bold;color:teal"> TOTAL GENERAL (I - G): </td>
                     <td class="center" style="font-weight: bold;"><span id="totalgral">0.00</span> Bs.</td>
                 </tr>
@@ -202,6 +217,43 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+</div>
+
+<div id="closeCashierModal" tabindex="-1" role="dialog" aria-labelledby="closeCashierModalLabel" aria-hidden="true" class="modal fade text-left">
+    <div role="document" class="modal-dialog modal-sm" style="width: 45%;">
+        <div class="modal-content">
+            {{ Form::open(['route' => ['accounts-cashier.close'], 'method' => 'PUT']) }}
+            <div class="modal-header">
+                <h5 id="title_cerrar" class="modal-title">Cerrar Caja</h5>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Caja:</label>
+                    <select id="cashier_account_select" class="selectpicker form-control" data-live-search="true" data-live-search-style="contains" title="Seleccione una caja" onchange="loadCashierTotalForClose()">
+                        @foreach($lims_biller_list as $biller)
+                            @if(!empty($biller->account_id))
+                                <option value="{{$biller->account_id}}">{{$biller->name}} [PV-{{$biller->punto_venta_siat}}]</option>
+                            @endif
+                        @endforeach
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Cuenta:</label>
+                    <input required type="text" name="account_name" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Monto a Cerrar:</label>
+                    <input required type="number" name="amount_end" step="any" class="form-control" readonly>
+                </div>
+                <input type="hidden" name="account_id_cerrar">
+                <div class="form-group mb-0">
+                    <input id="btn-close-cashier" type="submit" value="Cerrar Ahora" class="btn btn-primary" disabled>
+                </div>
+            </div>
+            {{ Form::close() }}
+        </div>
     </div>
 </div>
 
@@ -249,6 +301,8 @@
     var totaling = <?php echo $total_ingreso ?>;
     var totalieg = <?php echo $total_egreso ?>;
     var totalcost = <?php echo $total_costo ?>;
+    var totalingefectivo = <?php echo $total_ingreso_efectivo ?>;
+    var totalefectivo = <?php echo $total_efectivo ?>;
     var totaltarjcred = 0;
     var totalqr = 0;
     var totalcheq = 0;
@@ -273,6 +327,8 @@
     $('#totaldevol').text(totaldevols.toFixed(2));
     $('#totalingresos').text(totaling.toFixed(2));
     $('#totalegresos').text(totalieg.toFixed(2));
+    $('#totalingefectivo').text(totalingefectivo.toFixed(2));
+    $('#totalefectivo').text(totalefectivo.toFixed(2));
     $('#totalcostos').text(totalcost.toFixed(2));
     $('#totalutilidad').text(totalutilidad.toFixed(2));
     $('#totalgral').text(totalgeneral.toFixed(2));
@@ -344,6 +400,58 @@
         '.center{text-align: center;} .table, .table thead th, .table td{border: 2px solid #3971A5;} .bold{font-weight: bold;}'
         });
         //$('#report_print').hide();
+    }
+
+    function openCloseCashierModal(date_now){
+        $('#cashier_account_select').selectpicker('refresh');
+        var selectedAccountId = $('#cashier_account_select').val();
+        if(selectedAccountId){
+            loadCashierTotalForClose(date_now);
+        }else{
+            $('#title_cerrar').text('Cerrar Caja');
+            $('input[name="account_id_cerrar"]').val('');
+            $('input[name="amount_end"]').val('');
+            $('input[name="account_name"]').val('');
+            $('#btn-close-cashier').prop('disabled', true);
+        }
+    }
+
+    function loadCashierTotalForClose(date_now){
+        var accountId = $('#cashier_account_select').val();
+        var nowText = date_now || '{{ date('d-m-Y H:i:s') }}';
+
+        if(!accountId){
+            $('#title_cerrar').text('Cerrar Caja');
+            $('input[name="account_id_cerrar"]').val('');
+            $('input[name="amount_end"]').val('');
+            $('input[name="account_name"]').val('');
+            $('#btn-close-cashier').prop('disabled', true);
+            return;
+        }
+
+        var url = "{{ url('accounts/cashier/total') }}/" + accountId;
+        $.get(url, function(data) {
+            if(data && data.account){
+                var start = data.start_date || nowText;
+                $('#title_cerrar').text("Cerrar Desde: " + start + " Hasta: " + nowText);
+                $('input[name="account_id_cerrar"]').val(accountId);
+                $('input[name="amount_end"]').val(data.totalbalance);
+                $('input[name="account_name"]').val(data.account.name + "[" + data.account.account_no + "]");
+                $('#btn-close-cashier').prop('disabled', false);
+            }else{
+                $('#title_cerrar').text('Caja sin apertura activa');
+                $('input[name="account_id_cerrar"]').val('');
+                $('input[name="amount_end"]').val('');
+                $('input[name="account_name"]').val('');
+                $('#btn-close-cashier').prop('disabled', true);
+            }
+        }).fail(function(){
+            $('#title_cerrar').text('No se pudo obtener datos de la caja');
+            $('input[name="account_id_cerrar"]').val('');
+            $('input[name="amount_end"]').val('');
+            $('input[name="account_name"]').val('');
+            $('#btn-close-cashier').prop('disabled', true);
+        });
     }
 
 </script>

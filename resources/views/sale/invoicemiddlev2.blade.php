@@ -139,6 +139,18 @@
 </head>
 
 <body>
+    @php
+        $service_employee_name = null;
+        foreach ($lims_product_sale_data as $service_product_sale_data) {
+            if ($service_product_sale_data->employee_id) {
+                $service_employee_data = \App\Employee::find($service_product_sale_data->employee_id);
+                if ($service_employee_data) {
+                    $service_employee_name = $service_employee_data->name;
+                    break;
+                }
+            }
+        }
+    @endphp
 
     <div class="invoice-ticket-container" style="max-width:100%;margin:0 auto">
         @if (preg_match('~[0-9]~', url()->previous()))
@@ -178,7 +190,9 @@
                             {{ trans('file.reference') }}: <span
                                 style="font-size: 15px;font-weight: bold;">{{ $lims_sale_data->reference_no }}</span><br>
                             {{ trans('file.Date') }}: {{ $lims_sale_data->date_sell }}<br>
-                            {{ trans('file.Biller') }}: {{ $lims_biller_data->name }}<br>
+                            @if ($service_employee_name)
+                                Servicio por: {{ $service_employee_name }}<br>
+                            @endif
                             @if ($lims_sale_data->sale_status == 4)
                                 {{ trans('file.Status') }}: {{ trans('file.Receivable') }}<br>
                             @endif
@@ -219,6 +233,9 @@
                                 $product_name = $lims_product_data->name . ' [' . $variant_data->name . ']';
                             } else {
                                 $product_name = $lims_product_data->name;
+                            }
+                            if (!empty($product_sale_data->description)) {
+                                $product_name .= ' - ' . $product_sale_data->description;
                             }
                         @endphp
 

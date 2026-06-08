@@ -4,18 +4,20 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class RolesPermissionsSeeder extends Seeder
 {
     public function run()
     {
         try {
-            if (!\Schema::hasTable('permissions') || !\Schema::hasTable('roles') || !\Schema::hasTable('role_has_permissions')) {
+            if (!Schema::hasTable('permissions') || !Schema::hasTable('roles') || !Schema::hasTable('role_has_permissions')) {
                 return;
             }
 
-            // Use insertOrIgnore to avoid duplicate errors - will skip existing records
-            DB::table('permissions')->insertOrIgnore([
+                // Use insertOrIgnore to avoid duplicate errors - will skip existing records
+                $permissions = [
                     ['id'=>4, 'name'=>'products-edit', 'guard_name'=>'web', 'created_at'=>'2018-06-03 01:00:09', 'updated_at'=>'2018-06-03 01:00:09'],
                     ['id'=>5, 'name'=>'products-delete', 'guard_name'=>'web', 'created_at'=>'2018-06-03 22:54:22', 'updated_at'=>'2018-06-03 22:54:22'],
                     ['id'=>6, 'name'=>'products-add', 'guard_name'=>'web', 'created_at'=>'2018-06-04 00:34:14', 'updated_at'=>'2018-06-04 00:34:14'],
@@ -169,7 +171,23 @@ class RolesPermissionsSeeder extends Seeder
                     ['id'=>156, 'name'=>'qty_adjustment-edit', 'guard_name'=>'web', 'created_at'=>'2024-10-08 23:39:59', 'updated_at'=>'2024-10-08 23:39:59'],
                     ['id'=>157, 'name'=>'qty_adjustment-delete', 'guard_name'=>'web', 'created_at'=>'2024-10-08 23:39:59', 'updated_at'=>'2024-10-08 23:39:59'],
                     ['id'=>158, 'name'=>'accept-transfers', 'guard_name'=>'web', 'created_at'=>'2025-11-07 21:59:01', 'updated_at'=>'2025-11-07 21:59:01'],
-                ]);
+                ];
+
+            // PostgreSQL does not accept zero-date timestamps (0000-00-00 00:00:00).
+            $permissions = array_map(function ($permission) {
+                foreach (['created_at', 'updated_at'] as $field) {
+                    if (
+                        isset($permission[$field])
+                        && in_array($permission[$field], ['0000-00-00 00:00:00', '0000-00-00'], true)
+                    ) {
+                        $permission[$field] = now();
+                    }
+                }
+
+                return $permission;
+            }, $permissions);
+
+            DB::table('permissions')->insertOrIgnore($permissions);
 
             // Roles - use insertOrIgnore to skip existing
             DB::table('roles')->insertOrIgnore([
@@ -179,6 +197,11 @@ class RolesPermissionsSeeder extends Seeder
                     ['id'=>5, 'name'=>'Supervisor Comercial', 'description'=>'Supervisor de todas las tiendas', 'guard_name'=>'web', 'is_active'=>1, 'created_at'=>'2023-07-08 14:11:33', 'updated_at'=>'2023-07-08 15:53:21', 'blocked_modules'=>null],
                     ['id'=>6, 'name'=>'RespVentasTienda', 'description'=>'Responsable de la tienda', 'guard_name'=>'web', 'is_active'=>1, 'created_at'=>'2023-07-08 15:59:52', 'updated_at'=>'2023-07-08 15:59:52', 'blocked_modules'=>null],
                 ]);
+
+            if (DB::getDriverName() === 'pgsql') {
+                DB::statement("SELECT setval(pg_get_serial_sequence('permissions', 'id'), COALESCE((SELECT MAX(id) FROM permissions), 1), true)");
+                DB::statement("SELECT setval(pg_get_serial_sequence('roles', 'id'), COALESCE((SELECT MAX(id) FROM roles), 1), true)");
+            }
 
             // role_has_permissions - use insertOrIgnore to skip existing
             $mappings = [
@@ -193,8 +216,25 @@ class RolesPermissionsSeeder extends Seeder
                 DB::table('role_has_permissions')->insertOrIgnore($insert);
             }
 
+            // Asegurar idempotentemente que el rol 'Administrador' tenga todas las permisos existentes.
+            $adminRole = DB::table('roles')->where('name', 'Administrador')->first();
+            if ($adminRole) {
+                $permIds = DB::table('permissions')->pluck('id')->toArray();
+                $map = [];
+                foreach ($permIds as $pid) {
+                    $map[] = ['permission_id' => $pid, 'role_id' => $adminRole->id];
+                }
+                if (!empty($map)) {
+                    DB::table('role_has_permissions')->insertOrIgnore($map);
+                }
+            }
+
         } catch (\Exception $e) {
-            // ignore errors during seeding to avoid breaking other seeds
+            Log::error('RolesPermissionsSeeder failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
         }
     }
 }

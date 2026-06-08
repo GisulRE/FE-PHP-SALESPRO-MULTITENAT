@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\MoneyTransfer;
 use App\Account;
+use App\Cashier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
-use Auth;
 
 class MoneyTransferController extends Controller
 {
@@ -31,6 +32,12 @@ class MoneyTransferController extends Controller
     public function store(Request $request)
     {
         $data = $request->all();
+
+        $cashierValidation = $this->validateOpenCashierForSourceAccount($data['from_account_id'] ?? null);
+        if (!$cashierValidation['ok']) {
+            return redirect()->back()->with('not_permitted', $cashierValidation['message']);
+        }
+
         $data['reference_no'] = 'mtr-' . date("Ymd") . '-'. date("his");
         MoneyTransfer::create($data);
         return redirect()->back()->with('message', 'Registrado con éxito');
@@ -49,6 +56,12 @@ class MoneyTransferController extends Controller
     public function update(Request $request, $id)
     {
         $data = $request->all();
+
+        $cashierValidation = $this->validateOpenCashierForSourceAccount($data['from_account_id'] ?? null);
+        if (!$cashierValidation['ok']) {
+            return redirect()->back()->with('not_permitted', $cashierValidation['message']);
+        }
+
         MoneyTransfer::find($data['id'])->update($data);
         return redirect()->back()->with('message', 'Tranferencia de Dinero actualizado con éxito');
     }
@@ -57,5 +70,41 @@ class MoneyTransferController extends Controller
     {
         MoneyTransfer::find($id)->delete();
         return redirect()->back()->with('not_permitted', 'Registro eliminado con éxito');
+    }
+
+    private function validateOpenCashierForSourceAccount($fromAccountId)
+    {
+        if (empty($fromAccountId)) {
+            return [
+                'ok' => false,
+                'message' => 'Debe seleccionar una cuenta de origen válida.'
+            ];
+        }
+
+        // Si esta cuenta nunca manejó caja, no se bloquea por estado de caja.
+        $hasCashierHistory = Cashier::where('account_id', $fromAccountId)->exists();
+        if (!$hasCashierHistory) {
+            return [
+                'ok' => true,
+                'message' => ''
+            ];
+        }
+
+        $openCashier = Cashier::where('account_id', $fromAccountId)
+            ->where('is_active', true)
+            ->whereNull('end_date')
+            ->first();
+
+        if (!$openCashier) {
+            return [
+                'ok' => false,
+                'message' => 'La caja de origen está cerrada. Debe abrir caja para realizar transferencias.'
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'message' => ''
+        ];
     }
 }

@@ -9,6 +9,11 @@ class AddCompanyIdToProductRelatedTablesBatch extends Migration
 {
     public function up()
     {
+        $driver = DB::getDriverName();
+        $runUpdateFromJoin = function ($mysqlSql, $pgsqlSql) use ($driver) {
+            DB::statement($driver === 'pgsql' ? $pgsqlSql : $mysqlSql);
+        };
+
         $tables = [
             'pre_sale',
             'product_associated',
@@ -46,7 +51,10 @@ class AddCompanyIdToProductRelatedTablesBatch extends Migration
             && Schema::hasTable('customers')
             && Schema::hasColumn('customers', 'company_id')
         ) {
-            DB::statement('UPDATE pre_sale ps INNER JOIN customers c ON c.id = ps.customer_id SET ps.company_id = c.company_id WHERE ps.company_id IS NULL AND c.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE pre_sale ps INNER JOIN customers c ON c.id = ps.customer_id SET ps.company_id = c.company_id WHERE ps.company_id IS NULL AND c.company_id IS NOT NULL',
+                'UPDATE pre_sale ps SET company_id = c.company_id FROM customers c WHERE c.id = ps.customer_id AND ps.company_id IS NULL AND c.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -56,7 +64,10 @@ class AddCompanyIdToProductRelatedTablesBatch extends Migration
             && Schema::hasTable('warehouses')
             && Schema::hasColumn('warehouses', 'company_id')
         ) {
-            DB::statement('UPDATE pre_sale ps INNER JOIN warehouses w ON w.id = ps.warehouse_id SET ps.company_id = w.company_id WHERE ps.company_id IS NULL AND w.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE pre_sale ps INNER JOIN warehouses w ON w.id = ps.warehouse_id SET ps.company_id = w.company_id WHERE ps.company_id IS NULL AND w.company_id IS NOT NULL',
+                'UPDATE pre_sale ps SET company_id = w.company_id FROM warehouses w WHERE w.id = ps.warehouse_id AND ps.company_id IS NULL AND w.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -66,7 +77,10 @@ class AddCompanyIdToProductRelatedTablesBatch extends Migration
             && Schema::hasTable('products')
             && Schema::hasColumn('products', 'company_id')
         ) {
-            DB::statement('UPDATE product_associated pa INNER JOIN products p ON p.id = pa.product_courtesy_id SET pa.company_id = p.company_id WHERE pa.company_id IS NULL AND p.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE product_associated pa INNER JOIN products p ON p.id = pa.product_courtesy_id SET pa.company_id = p.company_id WHERE pa.company_id IS NULL AND p.company_id IS NOT NULL',
+                'UPDATE product_associated pa SET company_id = p.company_id FROM products p WHERE p.id = pa.product_courtesy_id AND pa.company_id IS NULL AND p.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -76,7 +90,10 @@ class AddCompanyIdToProductRelatedTablesBatch extends Migration
             && Schema::hasTable('products')
             && Schema::hasColumn('products', 'company_id')
         ) {
-            DB::statement('UPDATE product_associated pa INNER JOIN products p ON p.id = pa.product_associated_id SET pa.company_id = p.company_id WHERE pa.company_id IS NULL AND p.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE product_associated pa INNER JOIN products p ON p.id = pa.product_associated_id SET pa.company_id = p.company_id WHERE pa.company_id IS NULL AND p.company_id IS NOT NULL',
+                'UPDATE product_associated pa SET company_id = p.company_id FROM products p WHERE p.id = pa.product_associated_id AND pa.company_id IS NULL AND p.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -86,7 +103,10 @@ class AddCompanyIdToProductRelatedTablesBatch extends Migration
             && Schema::hasTable('products')
             && Schema::hasColumn('products', 'company_id')
         ) {
-            DB::statement('UPDATE product_lot pl INNER JOIN products p ON p.id = pl.idproducto SET pl.company_id = p.company_id WHERE pl.company_id IS NULL AND p.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE product_lot pl INNER JOIN products p ON p.id = pl.idproducto SET pl.company_id = p.company_id WHERE pl.company_id IS NULL AND p.company_id IS NOT NULL',
+                'UPDATE product_lot pl SET company_id = p.company_id FROM products p WHERE p.id = pl.idproducto AND pl.company_id IS NULL AND p.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -96,7 +116,10 @@ class AddCompanyIdToProductRelatedTablesBatch extends Migration
             && Schema::hasTable('pre_sale')
             && Schema::hasColumn('pre_sale', 'company_id')
         ) {
-            DB::statement('UPDATE product_pre_sale pps INNER JOIN pre_sale ps ON ps.id = pps.presale_id SET pps.company_id = ps.company_id WHERE pps.company_id IS NULL AND ps.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE product_pre_sale pps INNER JOIN pre_sale ps ON ps.id = pps.presale_id SET pps.company_id = ps.company_id WHERE pps.company_id IS NULL AND ps.company_id IS NOT NULL',
+                'UPDATE product_pre_sale pps SET company_id = ps.company_id FROM pre_sale ps WHERE ps.id = pps.presale_id AND pps.company_id IS NULL AND ps.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -106,7 +129,10 @@ class AddCompanyIdToProductRelatedTablesBatch extends Migration
             && Schema::hasTable('quotations')
             && Schema::hasColumn('quotations', 'company_id')
         ) {
-            DB::statement('UPDATE product_quotation pq INNER JOIN quotations q ON q.id = pq.quotation_id SET pq.company_id = q.company_id WHERE pq.company_id IS NULL AND q.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE product_quotation pq INNER JOIN quotations q ON q.id = pq.quotation_id SET pq.company_id = q.company_id WHERE pq.company_id IS NULL AND q.company_id IS NOT NULL',
+                'UPDATE product_quotation pq SET company_id = q.company_id FROM quotations q WHERE q.id = pq.quotation_id AND pq.company_id IS NULL AND q.company_id IS NOT NULL'
+            );
         }
 
         if (
@@ -116,7 +142,10 @@ class AddCompanyIdToProductRelatedTablesBatch extends Migration
             && Schema::hasTable('suppliers')
             && Schema::hasColumn('suppliers', 'company_id')
         ) {
-            DB::statement('UPDATE product_supplier ps INNER JOIN suppliers s ON s.id = ps.supplier_id SET ps.company_id = s.company_id WHERE ps.company_id IS NULL AND s.company_id IS NOT NULL');
+            $runUpdateFromJoin(
+                'UPDATE product_supplier ps INNER JOIN suppliers s ON s.id = ps.supplier_id SET ps.company_id = s.company_id WHERE ps.company_id IS NULL AND s.company_id IS NOT NULL',
+                'UPDATE product_supplier ps SET company_id = s.company_id FROM suppliers s WHERE s.id = ps.supplier_id AND ps.company_id IS NULL AND s.company_id IS NOT NULL'
+            );
         }
 
         $defaultCompanyId = null;

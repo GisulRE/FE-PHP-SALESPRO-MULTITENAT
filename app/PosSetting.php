@@ -49,7 +49,11 @@ class PosSetting extends Model
         "whatsapp_access_token",
         "whatsapp_refresh_token",
         "require_transfer_authorization",
-        "company_id"
+        "company_id",
+        "hora_inicio_atencion",
+        "hora_fin_atencion",
+        "intervalo_reserva_minutos",
+        "keybord_presale"
     ];
 
     protected static function boot()

@@ -31,6 +31,7 @@ use App\PaymentWithGiftCard;
 use App\PaymentWithPaypal;
 use App\PosSetting;
 use App\PreSale;
+use App\Quotation;
 use App\PrinterConfig;
 use App\Product;
 use App\Product_Sale;
@@ -76,6 +77,51 @@ class SaleController extends Controller
 {
     use SiatTrait, CufdTrait;
 
+    private function writePosSiatDebug(string $event, array $context = []): void
+    {
+        try {
+            $line = sprintf(
+                "[%s] %s %s%s",
+                date('Y-m-d H:i:s'),
+                $event,
+                json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                PHP_EOL
+            );
+            file_put_contents(storage_path('logs/pos_siat_debug.log'), $line, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $e) {
+            // No interrumpir el flujo de venta si el log auxiliar falla.
+        }
+    }
+
+    private function resolveSucursalCode($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        $textValue = trim((string) $value);
+        if ($textValue === '') {
+            return null;
+        }
+
+        if (strpos($textValue, '|') !== false) {
+            $textValue = trim(explode('|', $textValue)[0]);
+        }
+
+        $upperValue = strtoupper($textValue);
+
+        $sucursal = SiatSucursal::whereRaw('UPPER(nombre) = ?', [$upperValue])
+            ->orWhereRaw('UPPER(descripcion_sucursal) = ?', [$upperValue])
+            ->orWhereRaw('UPPER(domicilio_tributario) = ?', [$upperValue])
+            ->first();
+
+        return $sucursal ? (int) $sucursal->sucursal : null;
+    }
+
     public function index()
     {
         $start_date = date('Y-m-d', strtotime(' -7 day'));
@@ -100,6 +146,26 @@ class SaleController extends Controller
             return view('sale.index', compact('lims_gift_card_list', 'lims_pos_setting_data', 'lims_account_list', 'all_permission', 'start_date', 'end_date', 'lims_methodpay_list', 'lista_documentos'));
         } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
+    }
+
+    /**
+     * Fallback: devuelve una leyenda aleatoria o por defecto.
+     * Se añadió para prevenir errores cuando alguna vista/JS espera este método.
+     */
+    public function pickRandomLeyenda()
+    {
+        try {
+            $leyendas = [
+                'Gracias por su compra.',
+                '¡Vuelva pronto!',
+                'Operación realizada correctamente.'
+            ];
+            $selected = $leyendas[array_rand($leyendas)];
+            return response()->json(['leyenda' => $selected]);
+        } catch (\Throwable $e) {
+            Log::warning('pickRandomLeyenda fallback error: ' . $e->getMessage());
+            return response()->json(['leyenda' => 'Gracias por su compra.']);
         }
     }
 
@@ -354,7 +420,9 @@ class SaleController extends Controller
                             <span class="sr-only">Toggle Dropdown</span>
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
-                                <li><a href="' . route('sale.invoice', $sale->id) . '" target="_blank" class="btn btn-link"><i class="fa fa-copy"></i> ' . trans('file.Print Sale') . '</a></li>
+                                <li>
+                                    <button type="button" class="btn btn-link print-sale-modal" data-url="' . route('sale.invoice.preview', $sale->id) . '"><i class="fa fa-copy"></i> ' . trans('file.Print Sale') . '</button>
+                                </li>
                                 <li>
                                     <button type="button" class="btn btn-link view"><i class="fa fa-eye"></i> ' . trans('file.View') . '</button>
                                 </li>';
@@ -605,13 +673,80 @@ class SaleController extends Controller
     public function store(Request $request)
     {
         $is_ajax = $request->input('_ajax_flag') === '1';
+        $rawDateSell = trim((string) $request->input('date_sell', ''));
+        $now = Carbon::now();
+        $dateSell = null;
+
+        if ($rawDateSell !== '') {
+            $dateOnlyPatterns = [
+                '/^\d{2}-\d{2}-\d{4}$/',
+                '/^\d{4}-\d{2}-\d{2}$/',
+            ];
+            $isDateOnly = false;
+            foreach ($dateOnlyPatterns as $pattern) {
+                if (preg_match($pattern, $rawDateSell)) {
+                    $isDateOnly = true;
+                    break;
+                }
+            }
+
+            $formats = [
+                'Y-m-d H:i:s',
+                'Y-m-d H:i',
+                'Y-m-d\TH:i',
+                'd-m-Y H:i:s',
+                'd-m-Y H:i',
+                'd-m-Y',
+                'Y-m-d',
+            ];
+            foreach ($formats as $format) {
+                try {
+                    $dateSell = Carbon::createFromFormat($format, $rawDateSell);
+                    if ($dateSell !== false) {
+                        break;
+                    }
+                } catch (\Throwable $e) {
+                    $dateSell = null;
+                }
+            }
+
+            if (!$dateSell) {
+                $timestamp = strtotime($rawDateSell);
+                if ($timestamp !== false) {
+                    $dateSell = Carbon::createFromTimestamp($timestamp);
+                }
+            }
+
+            if (!$dateSell) {
+                $message = 'Fecha de venta invalida.';
+                if ($is_ajax || $request->ajax() || $request->wantsJson() || $request->input('ajax_preview')) {
+                    return response()->json(['status' => false, 'message' => $message], 422);
+                }
+
+                return redirect()->back()->with('not_permitted', $message);
+            }
+
+            if ($isDateOnly) {
+                $dateSell->setTimeFrom($now);
+            }
+        } else {
+            $dateSell = $now;
+        }
+
+        if ($dateSell->greaterThan($now)) {
+            $message = 'La fecha de venta no puede ser futura.';
+            if ($is_ajax || $request->ajax() || $request->wantsJson() || $request->input('ajax_preview')) {
+                return response()->json(['status' => false, 'message' => $message], 422);
+            }
+
+            return redirect()->back()->with('not_permitted', $message);
+        }
+
         try {
             DB::beginTransaction();
             $data = $request->all();
             $data['user_id'] = Auth::id();
-            $datesell = date('Y-m-d', strtotime($data['date_sell']));
-            $time = date('H:i:s');
-            $data['date_sell'] = $datesell . " " . $time;
+            $data['date_sell'] = $dateSell->format('Y-m-d H:i:s');
             $last_ref = Sale::get()->last();
 
             if ($last_ref != null) {
@@ -670,15 +805,26 @@ class SaleController extends Controller
                 $lims_coupon_data->save();
             }
 
+            $selected_customer_id = isset($data['customer_id']) ? (int) $data['customer_id'] : 0;
+
             /** Get customer by document or else by id */
             if (isset($data['sales_valor_documento']) && $data['sales_valor_documento'] != null) {
-                $lims_customer_data = Customer::where([['valor_documento', $data['sales_valor_documento']], ['is_active', true]])->first();
-                if ($lims_customer_data)
-                    $data['customer_id'] = $lims_customer_data->id;
-                else
-                    $lims_customer_data = Customer::find($data['customer_id']);
+                if ($selected_customer_id > 0) {
+                    $lims_customer_data = Customer::find($selected_customer_id);
+                    $data['customer_id'] = $selected_customer_id;
+                } else {
+                    $lims_customer_data = Customer::where([['valor_documento', $data['sales_valor_documento']], ['is_active', true]])->first();
+                    if ($lims_customer_data) {
+                        $data['customer_id'] = $lims_customer_data->id;
+                    } else {
+                        $lims_customer_data = Customer::find($data['customer_id']);
+                    }
+                }
             } else {
-                $lims_customer_data = Customer::find($data['customer_id']);
+                $lims_customer_data = Customer::find($selected_customer_id ?: $data['customer_id']);
+                if ($selected_customer_id > 0) {
+                    $data['customer_id'] = $selected_customer_id;
+                }
             }
             if (!$lims_customer_data) {
                 $lims_customer_data = Customer::find($data['customer_id']);
@@ -692,7 +838,17 @@ class SaleController extends Controller
                 }
             }
 
+            // Vincular con proforma si fue cargada desde el POS
+            if (!empty($data['quotation_id_loaded']) && is_numeric($data['quotation_id_loaded']) && (int)$data['quotation_id_loaded'] > 0) {
+                $data['quotation_id'] = (int)$data['quotation_id_loaded'];
+            } else {
+                $data['quotation_id'] = null;
+            }
+            // Limpiar campo auxiliar que no existe en la tabla sales
+            unset($data['quotation_id_loaded']);
+
             $lims_sale_data = Sale::create($data);
+
 
             //collecting mail data
             $mail_data['email'] = $lims_customer_data->email;
@@ -830,6 +986,17 @@ class SaleController extends Controller
                 $product_sale['sale_id'] = $lims_sale_data->id;
                 $product_sale['product_id'] = $id;
                 $product_sale['category_id'] = $lims_product_data->category_id;
+                if (empty($product_sale['category_id'])) {
+                    try {
+                        $defaultCategory = Category::where('is_active', true)->first();
+                        $product_sale['category_id'] = $defaultCategory ? $defaultCategory->id : 1;
+                        $warn = "[" . date('Y-m-d H:i:s') . "] WARNING: product_id {$id} missing category_id, using fallback category_id {$product_sale['category_id']}\n";
+                        file_put_contents(storage_path('logs/pos_errors.log'), $warn, FILE_APPEND | LOCK_EX);
+                    } catch (\Throwable $ex) {
+                        // no bloquear si el logging falla
+                        $product_sale['category_id'] = 1;
+                    }
+                }
                 $product_sale['qty'] = $mail_data['qty'][$i] = $qty[$i];
                 
                 if ($sale_unit_id == 0) {
@@ -861,9 +1028,12 @@ class SaleController extends Controller
                 
                 $role = Role::find(Auth::user()->role_id);
                 if ($role->hasPermissionTo('presale-edit') && $product_sale['employee_id'] == null) {
-                    $lims_presale_data = PreSale::where('status', 1)->find($presale[$i]);
-                    if ($lims_presale_data) {
-                        $product_sale['employee_id'] = $lims_presale_data->employee_id;
+                    // Solo buscar si el presale_id del ítem es un entero válido
+                    if (is_numeric($presale[$i]) && (int)$presale[$i] > 0) {
+                        $lims_presale_data = PreSale::where('status', 1)->find((int)$presale[$i]);
+                        if ($lims_presale_data) {
+                            $product_sale['employee_id'] = $lims_presale_data->employee_id;
+                        }
                     }
                 }
 
@@ -924,8 +1094,10 @@ class SaleController extends Controller
             $role = Role::find(Auth::user()->role_id);
             /** Update PreSale */
             if ($role->hasPermissionTo('presale-edit')) {
-                if ($data['presale_id'] != '0' && $lims_sale_data->sale_status == '1') {
-                    $lims_presale_data = PreSale::find($data['presale_id']);
+                // Sanitizar presale_id: solo procesar si es un entero válido > 0
+                $presale_id_val = isset($data['presale_id']) ? $data['presale_id'] : '0';
+                if (is_numeric($presale_id_val) && (int)$presale_id_val > 0 && $lims_sale_data->sale_status == '1') {
+                    $lims_presale_data = PreSale::find((int)$presale_id_val);
                     if ($lims_presale_data && ($lims_presale_data->tips != null && $lims_presale_data->tips > 0)) {
                         $tip_data['sale_id'] = $lims_sale_data->id;
                         $tip_data['presale_id'] = $lims_presale_data->id;
@@ -933,11 +1105,14 @@ class SaleController extends Controller
                         $tip_data['amount'] = $lims_presale_data->tips;
                         Tip::create($tip_data);
                     }
-                    $lims_presale_data->status = 0;
-                    $lims_presale_data->save();
+                    if ($lims_presale_data) {
+                        $lims_presale_data->status = 0;
+                        $lims_presale_data->save();
+                    }
                     foreach ($presale as $pre) {
-                        if ($pre > 0) {
-                            $lims_presale_data = PreSale::where('status', 1)->find($pre);
+                        // Ignorar valores no numéricos (ej: 'undefined', '', '0')
+                        if (is_numeric($pre) && (int)$pre > 0) {
+                            $lims_presale_data = PreSale::where('status', 1)->find((int)$pre);
                             if ($lims_presale_data) {
                                 if ($lims_presale_data->tips != null && $lims_presale_data->tips > 0) {
                                     $tip_data['sale_id'] = $lims_sale_data->id;
@@ -955,17 +1130,50 @@ class SaleController extends Controller
                 }
             }
 
+            /** Marcar Proforma como Completada (quotation_status = 2) */
+            if (!empty($lims_sale_data->quotation_id) && $lims_sale_data->sale_status == '1') {
+                $lims_quotation_data = Quotation::find($lims_sale_data->quotation_id);
+                if ($lims_quotation_data && $lims_quotation_data->quotation_status == 1) {
+                    $lims_quotation_data->quotation_status = 2; // Enviada/Completada
+                    $lims_quotation_data->save();
+                    $message = $message . ' | Proforma ' . $lims_quotation_data->reference_no . ' marcada como completada';
+                }
+            }
+
             if ($data['payment_status'] == 3 || $data['payment_status'] == 4 || ($data['payment_status'] == 2 && $data['pos'] && $data['paid_amount'] > 0)) {
+                // Priorizar el facturador activo de la venta/POS para enviar cada pago a su cuenta correcta.
+                $selected_biller_id = null;
+                if (!empty($data['biller_id'])) {
+                    $selected_biller_id = (int) $data['biller_id'];
+                } elseif (!empty($lims_sale_data->biller_id)) {
+                    $selected_biller_id = (int) $lims_sale_data->biller_id;
+                } elseif (!empty(session('pos_biller_id'))) {
+                    $selected_biller_id = (int) session('pos_biller_id');
+                } elseif (!empty($user->biller_id)) {
+                    $selected_biller_id = (int) $user->biller_id;
+                }
+
+                $selected_biller = null;
+                if (!empty($selected_biller_id)) {
+                    $selected_biller = Biller::find($selected_biller_id);
+                }
+
                 // Función helper para obtener account_id de forma segura
-                $getAccountId = function($biller_account_field, $payment_method_id = null) use ($user) {
-                    if ($user->biller_id != null) {
-                        $biller_data = Biller::find($user->biller_id);
-                        $account = Account::select('id as account_id')->find($biller_data->$biller_account_field);
-                        if ($account) return $account->account_id;
-                    } else if ($payment_method_id) {
-                        $account_payment = AccountPayment::where([['is_active', true], ['methodpay_id', $payment_method_id]])->first();
-                        if ($account_payment) return $account_payment->account_id;
+                $getAccountId = function($biller_account_field, $payment_method_id = null) use ($selected_biller) {
+                    if ($selected_biller && !empty($selected_biller->$biller_account_field)) {
+                        $account = Account::select('id as account_id')->find($selected_biller->$biller_account_field);
+                        if ($account) {
+                            return $account->account_id;
+                        }
                     }
+
+                    if ($payment_method_id) {
+                        $account_payment = AccountPayment::where([['is_active', true], ['methodpay_id', $payment_method_id]])->first();
+                        if ($account_payment) {
+                            return $account_payment->account_id;
+                        }
+                    }
+
                     // Fallback: usar cuenta por defecto
                     $default_account = Account::where('is_default', true)->first();
                     return $default_account ? $default_account->id : null;
@@ -1269,7 +1477,7 @@ class SaleController extends Controller
                 $lims_customer_data = Customer::find($lims_sale_data->customer_id);
                 $lims_payment_data = Payment::where('sale_id', $lims_sale_data->id)->get();
                 $lims_pos_setting_data = PosSetting::latest()->first();
-                $formato_fecha = GeneralSetting::first()->date_format;
+                $formato_fecha = GeneralSetting::currentDateFormat();
                 $lims_sale_data->setAttribute('formato_fecha', "$formato_fecha H:i:s");
                 $numberToWords = new NumberToWords();
                 if (\App::getLocale() == 'ar' || \App::getLocale() == 'hi' || \App::getLocale() == 'vi' || \App::getLocale() == 'en-gb') {
@@ -1594,17 +1802,26 @@ class SaleController extends Controller
             }
         } catch (\Throwable $e) {
             DB::rollback();
-            
+
             $error_message = 'Falló al registrar la venta';
-            
-            // Si es petición AJAX, retornar JSON
+
+            // Escribir detalle del error en un log específico para depuración rápida
+            try {
+                $logPath = storage_path('logs/pos_errors.log');
+                $content = "[" . date('Y-m-d H:i:s') . "] ERROR en SaleController::store - " . $e->getMessage() . "\n" . $e->__toString() . "\n\n";
+                file_put_contents($logPath, $content, FILE_APPEND | LOCK_EX);
+            } catch (\Throwable $writeEx) {
+                // No bloquear la ejecución si falla el log
+            }
+
+            // Si es petición AJAX, retornar JSON con mensaje (el detalle está en el log)
             if ($is_ajax || $request->ajax() || $request->wantsJson() || (isset($request->ajax_preview) && $request->ajax_preview)) {
                 return response()->json([
                     'status' => false,
                     'message' => $error_message . ': ' . $e->getMessage()
                 ], 500);
             }
-            
+
             return redirect()->to('sales')->with('not_permitted', $error_message);
         }
     }
@@ -1629,6 +1846,22 @@ class SaleController extends Controller
             DB::beginTransaction();
 
             $sale_id = $request->input('sale_id');
+            Log::info('POS finalizeAjax: inicio de paso 3', [
+                'sale_id' => $sale_id,
+                'biller_id' => $request->input('biller_id'),
+                'codigo_emision_hidden' => $request->input('codigo_emision_hidden'),
+                'bandera_codigo_documento_sector_hidden' => $request->input('bandera_codigo_documento_sector_hidden'),
+                'customer_id' => $request->input('customer_id'),
+                'user_id' => optional(Auth::user())->id,
+            ]);
+            $this->writePosSiatDebug('POS finalizeAjax: inicio de paso 3', [
+                'sale_id' => $sale_id,
+                'biller_id' => $request->input('biller_id'),
+                'codigo_emision_hidden' => $request->input('codigo_emision_hidden'),
+                'bandera_codigo_documento_sector_hidden' => $request->input('bandera_codigo_documento_sector_hidden'),
+                'customer_id' => $request->input('customer_id'),
+                'user_id' => optional(Auth::user())->id,
+            ]);
             if (!$sale_id) {
                 return response()->json(['status' => false, 'message' => 'sale_id requerido']);
             }
@@ -1645,6 +1878,15 @@ class SaleController extends Controller
             $sector_val         = (int) ($data['bandera_codigo_documento_sector_hidden'] ?? 1);
             $excepcion_val      = (int) ($data['bandera_codigo_excepcion_hidden'] ?? 0);
             $metodo_pago_val    = max(1, (int) ($data['paid_by_id'] ?? 1));
+
+            Log::info('POS finalizeAjax: campos normalizados', [
+                'sale_id' => $sale_id,
+                'tipo_documento' => $tipo_documento_val,
+                'caso_especial' => $caso_especial_val,
+                'codigo_documento_sector' => $sector_val,
+                'codigo_excepcion' => $excepcion_val,
+                'tipo_metodo_pago' => $metodo_pago_val,
+            ]);
 
             // ─── Eliminar CustomerSale previo si existe (reintento) ───────────
             CustomerSale::where('sale_id', $sale_id)->delete();
@@ -1718,6 +1960,15 @@ class SaleController extends Controller
                 'sucursal'           => $data_biller->sucursal,
                 'codigo_punto_venta' => $data_biller->punto_venta_siat,
             ])->first();
+
+            Log::info('POS finalizeAjax: punto de venta resuelto', [
+                'sale_id' => $sale_id,
+                'biller_id' => $data_biller->id,
+                'biller_sucursal' => $data_biller->sucursal,
+                'biller_punto_venta_siat' => $data_biller->punto_venta_siat,
+                'siat_punto_encontrado' => (bool) $data_p_venta,
+            ]);
+
             if (!$data_p_venta) {
                 DB::rollback();
                 return response()->json(['status' => false, 'message' => 'Punto de venta SIAT no encontrado para sucursal ' . $data_biller->sucursal]);
@@ -1819,26 +2070,58 @@ class SaleController extends Controller
 
             if ($data_p_venta->modo_contingencia) {
                 $codigoEvento = $this->getTipoEventoContingenciaPuntoVenta($data['biller_id']);
-                if ($obj_cliente->codigo_documento_sector == 1)
+                Log::info('POS finalizeAjax: generación en contingencia', [
+                    'sale_id' => $sale_id,
+                    'codigo_documento_sector' => $obj_cliente->codigo_documento_sector,
+                    'codigo_evento' => $codigoEvento,
+                ]);
+                if ($obj_cliente->codigo_documento_sector == 1) {
+                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
+                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
                     $respuesta = $this->generarFacturaIndividualOffline($sale_id, $codigoEvento);
-                elseif ($obj_cliente->codigo_documento_sector == 13)
+                } elseif ($obj_cliente->codigo_documento_sector == 13) {
+                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasicoOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
+                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasicoOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
                     $respuesta = $this->generarFacturaServicioBasicoOffline($sale_id, $codigoEvento);
-                elseif ($obj_cliente->codigo_documento_sector == 2)
+                } elseif ($obj_cliente->codigo_documento_sector == 2) {
+                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaAlquilerOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
+                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaAlquilerOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
                     $respuesta = $this->generarFacturaAlquilerOffline($sale_id, $codigoEvento);
+                }
             } else {
                 $lims_pos_setting_data = PosSetting::latest()->first();
+                Log::info('POS finalizeAjax: generación en modo normal', [
+                    'sale_id' => $sale_id,
+                    'codigo_documento_sector' => $obj_cliente->codigo_documento_sector,
+                    'cufd_centralizado' => (int) ($lims_pos_setting_data->cufd_centralizado ?? 0),
+                    'modo_contingencia' => (bool) $data_p_venta->modo_contingencia,
+                ]);
                 if ($obj_cliente->codigo_documento_sector == 1) {
                     if (($lims_pos_setting_data->cufd_centralizado ?? 0) != 0) {
+                        Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualComisionista', 'endpoint' => '/factura.venta/factura.individual.comisionista']);
+                        $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualComisionista', 'endpoint' => '/factura.venta/factura.individual.comisionista']);
                         $respuesta = $this->generarFacturaIndividualComisionista($sale_id);
                     } else {
+                        Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividual', 'endpoint' => '/factura.venta/factura.individual']);
+                        $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividual', 'endpoint' => '/factura.venta/factura.individual']);
                         $respuesta = $this->generarFacturaIndividual($sale_id);
                     }
                 } elseif ($obj_cliente->codigo_documento_sector == 2) {
+                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualAlquiler', 'endpoint' => '/factura.venta/factura.individual']);
+                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualAlquiler', 'endpoint' => '/factura.venta/factura.individual']);
                     $respuesta = $this->generarFacturaIndividualAlquiler($sale_id);
                 } elseif ($obj_cliente->codigo_documento_sector == 13) {
+                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasico', 'endpoint' => '/factura.venta/factura.individual']);
+                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasico', 'endpoint' => '/factura.venta/factura.individual']);
                     $respuesta = $this->generarFacturaServicioBasico($sale_id);
                 }
             }
+
+            Log::info('POS finalizeAjax: resultado de generación DFe', [
+                'sale_id' => $sale_id,
+                'status' => (bool) ($respuesta['status'] ?? false),
+                'mensaje' => $respuesta['mensaje'] ?? null,
+            ]);
 
             if ($respuesta && $respuesta['status']) {
                 $update_p_venta->save();
@@ -1861,7 +2144,13 @@ class SaleController extends Controller
 
         } catch (\Throwable $e) {
             DB::rollback();
-            \Log::error("finalizeAjax error: " . $e->getMessage() . " line:" . $e->getLine());
+            \Log::error('POS finalizeAjax: excepción no controlada', [
+                'sale_id' => $request->input('sale_id'),
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json(['status' => false, 'message' => 'Error: ' . $e->getMessage()]);
         }
     }
@@ -2609,12 +2898,32 @@ class SaleController extends Controller
             }
 
             $lims_pos_setting_data = PosSetting::latest()->first();
-            if (Auth::user()->biller) {
-                $user = Auth::user();
-                $biller_data = Biller::select('id', 'account_id', 'warehouse_id', 'customer_id')->find($user->biller_id);
-                $lims_account_data = Account::select('id', 'name', 'account_no')->find($biller_data->account_id);
+            $user = Auth::user();
+            $sessionBillerId = session('pos_biller_id');
+
+            if ($user->role_id > 2 && $user->biller_id) {
+                // Usuarios no administrativos trabajan solo con su facturador asignado.
+                $selectedBillerId = (int) $user->biller_id;
             } else {
-                $biller_data = Biller::select('id', 'account_id', 'warehouse_id', 'customer_id')->find($lims_pos_setting_data->biller_id);
+                // Usuarios administrativos pueden continuar con el facturador elegido en apertura de caja.
+                $selectedBillerId = $sessionBillerId ?: ($user->biller_id ?: optional($lims_pos_setting_data)->biller_id);
+            }
+
+            $biller_data = Biller::select('id', 'account_id', 'warehouse_id', 'customer_id')
+                ->where('is_active', true)
+                ->find($selectedBillerId);
+
+            if (!$biller_data) {
+                $biller_data = Biller::select('id', 'account_id', 'warehouse_id', 'customer_id')
+                    ->where('is_active', true)
+                    ->first();
+            }
+
+            $lims_account_data = null;
+            if ($biller_data && $biller_data->account_id) {
+                $lims_account_data = Account::select('id', 'name', 'account_no')->find($biller_data->account_id);
+            }
+            if (!$lims_account_data) {
                 $lims_account_data = Account::select('id', 'name', 'account_no')->where('is_default', true)->first();
             }
 
@@ -2635,6 +2944,9 @@ class SaleController extends Controller
                 }
                 $lims_biller_list = Biller::select('id', 'name', 'company_name')->where('is_active', true)->get();
                 $lims_tax_list = Tax::where('is_active', true)->get();
+                $lims_customer_list = Customer::select('id', 'name', 'phone_number', 'is_credit', 'credit', 'deposit', 'expense')
+                    ->where('is_active', true)
+                    ->get();
                 $lims_methodpay_list = MethodPayment::select('id', 'name')->where('cbx', true)->get();
                 $lims_product_list = Product::select('id', 'name', 'code', 'image')->ActiveFeatured()->where('type', '!=', 'insumo')->whereNull('is_variant')->orderBy('id', 'asc')->get();
                 foreach ($lims_product_list as $key => $product) {
@@ -2690,7 +3002,12 @@ class SaleController extends Controller
                 $lista_metodo_pago = SiatParametricaVario::where('tipo_clasificador', 'tipoMetodoPago')->orderBy('codigo_clasificador', 'ASC')->get();
                 $customer_data = Customer::select("id", "name")->find($lims_pos_setting_data->customer_id);
                 $lims_sucursal_all = SiatSucursal::where('estado', 1)->get();
-                return view('sale.pos', compact('all_permission', 'lims_customer_group_all', 'lims_warehouse_list', 'lims_product_list', 'product_number', 'lims_tax_list', 'lims_biller_list', 'lims_pos_setting_data', 'lims_brand_list', 'lims_category_list', 'recent_sale', 'recent_draft', 'lims_coupon_list', 'flag', 'lims_methodpay_list', 'biller_data', 'account_data', 'lista_documentos', 'lista_metodo_pago', 'customer_data', 'lims_sucursal_all', 'lims_warehouse_selects'));
+                $siatConfigured = !empty(trim((string) ($lims_pos_setting_data->user_siat ?? '')))
+                    && !empty(trim((string) ($lims_pos_setting_data->pass_siat ?? '')))
+                    && !empty(trim((string) ($lims_pos_setting_data->url_siat ?? '')));
+                $siatAuthenticated = (bool) session('auth_siat', false) && !empty(session('token_siat'));
+                $hasSiat = $siatConfigured && $siatAuthenticated;
+                return view('sale.pos', compact('all_permission', 'lims_customer_group_all', 'lims_warehouse_list', 'lims_product_list', 'product_number', 'lims_tax_list', 'lims_biller_list', 'lims_customer_list', 'lims_pos_setting_data', 'lims_brand_list', 'lims_category_list', 'recent_sale', 'recent_draft', 'lims_coupon_list', 'flag', 'lims_methodpay_list', 'biller_data', 'account_data', 'lista_documentos', 'lista_metodo_pago', 'customer_data', 'lims_sucursal_all', 'lims_warehouse_selects', 'hasSiat'));
             } else {
                 if (Auth::user()->role_id > 2 && Auth::user()->biller) {
                     $lims_biller_list[] = Auth::user()->biller;
@@ -2707,39 +3024,40 @@ class SaleController extends Controller
     public function getProductByFilter($category_id, $brand_id)
     {
         $data = [];
-        $companyId = Auth::user()->company_id;
-
         if (($category_id != 0) && ($brand_id != 0)) {
-            $lims_product_list = Product::join('categories', 'products.category_id', '=', 'categories.id')
-                ->where('products.is_active', true)
-                ->where('products.type', '!=', 'insumo')
-                ->where(function ($q) use ($category_id) {
-                    $q->where('products.category_id', $category_id)
-                      ->orWhere('categories.parent_id', $category_id);
-                })
-                ->where('products.brand_id', $brand_id)
-                ->select('products.id', 'products.name', 'products.code', 'products.image', 'products.is_variant')
-                ->orderBy('products.name', 'asc')->get();
+            $lims_product_list = DB::table('products')
+                ->join('categories', 'products.category_id', '=', 'categories.id')
+                ->where([
+                    ['products.is_active', true],
+                    ['products.category_id', $category_id],
+                    ['brand_id', $brand_id],
+                    ['products.type', '!=', 'insumo'],
+                ])->orWhere([
+                        ['categories.parent_id', $category_id],
+                        ['products.is_active', true],
+                        ['brand_id', $brand_id],
+                    ])->select('products.name', 'products.code', 'products.image')->orderBy('products.name', 'asc')->get();
         } elseif (($category_id != 0) && ($brand_id == 0)) {
-            $lims_product_list = Product::join('categories', 'products.category_id', '=', 'categories.id')
-                ->where('products.is_active', true)
-                ->where('products.type', '!=', 'insumo')
-                ->where(function ($q) use ($category_id) {
-                    $q->where('products.category_id', $category_id)
-                      ->orWhere('categories.parent_id', $category_id);
-                })
-                ->select('products.id', 'products.name', 'products.code', 'products.image', 'products.is_variant')
-                ->orderBy('products.name', 'asc')->get();
+            $lims_product_list = DB::table('products')
+                ->join('categories', 'products.category_id', '=', 'categories.id')
+                ->where([
+                    ['products.is_active', true],
+                    ['products.category_id', $category_id],
+                    ['products.type', '!=', 'insumo'],
+                ])->orWhere([
+                        ['categories.parent_id', $category_id],
+                        ['products.is_active', true],
+                    ])->select('products.id', 'products.name', 'products.code', 'products.image', 'products.is_variant')->orderBy('products.name', 'asc')->get();
         } elseif (($category_id == 0) && ($brand_id != 0)) {
             $lims_product_list = Product::where([
                 ['brand_id', $brand_id],
                 ['is_active', true],
                 ['type', '!=', 'insumo'],
-            ])->select('id', 'name', 'code', 'image', 'is_variant')->get();
+            ])
+                ->select('products.id', 'products.name', 'products.code', 'products.image', 'products.is_variant')
+                ->get();
         } else {
-            $lims_product_list = Product::where([['is_active', true], ['type', '!=', 'insumo']])
-                ->select('id', 'name', 'code', 'image', 'is_variant')
-                ->orderBy('name', 'asc')->get();
+            $lims_product_list = Product::where([['is_active', true], ['type', '!=', 'insumo']])->orderBy('products.name', 'asc')->get();
         }
 
         $index = 0;
@@ -2801,8 +3119,12 @@ class SaleController extends Controller
     public function getCustomerGroup($id)
     {
         $lims_customer_data = Customer::find($id);
+        if (!$lims_customer_data || !$lims_customer_data->customer_group_id) {
+            return 0;
+        }
+
         $lims_customer_group_data = CustomerGroup::find($lims_customer_data->customer_group_id);
-        return $lims_customer_group_data->percentage;
+        return $lims_customer_group_data ? $lims_customer_group_data->percentage : 0;
     }
 
     public function limsProductSearch(Request $request)
@@ -3072,12 +3394,12 @@ class SaleController extends Controller
                 $unit = '';
             }
 
-            if ($product_sale_data->employee_id != null) {
-                $employee_data = Employee::find($product_sale_data->employee_id);
-                $product_sale[0][$key] = $product->name . ' [' . $product->code . '] - Realizado Por: ' . $employee_data->name;
-            } else {
-                $product_sale[0][$key] = $product->name . ' [' . $product->code . ']';
+            $details = [];
+            if (!empty($product_sale_data->description)) {
+                $details[] = $product_sale_data->description;
             }
+            $details_text = count($details) ? ' - ' . implode(' | ', $details) : '';
+            $product_sale[0][$key] = $product->name . ' [' . $product->code . ']' . $details_text;
             $product_sale[1][$key] = $product_sale_data->qty;
             $product_sale[2][$key] = $unit;
             $product_sale[3][$key] = $product_sale_data->tax;
@@ -3597,7 +3919,7 @@ class SaleController extends Controller
         $lims_customer_data = Customer::find($lims_sale_data->customer_id);
         $lims_payment_data = Payment::where('sale_id', $id)->get();
         $lims_pos_setting_data = PosSetting::latest()->first();
-        $formato_fecha = GeneralSetting::first()->date_format;
+        $formato_fecha = GeneralSetting::currentDateFormat();
         $lims_sale_data->setAttribute('formato_fecha', "$formato_fecha H:i:s");
 
         $numberToWords = new NumberToWords();
@@ -3637,6 +3959,36 @@ class SaleController extends Controller
         } else {
             return view('sale.invoice', compact('lims_sale_data', 'lims_product_sale_data', 'lims_biller_data', 'lims_warehouse_data', 'lims_customer_data', 'lims_payment_data', 'numberInWords', 'cadenaCentavos'));
         }
+    }
+
+    public function genInvoicePreview($id)
+    {
+        $lims_sale_data = Sale::findOrFail($id);
+        $lims_product_sale_data = Product_Sale::where('sale_id', $id)->get();
+        $lims_biller_data = Biller::find($lims_sale_data->biller_id);
+        $lims_warehouse_data = Warehouse::find($lims_sale_data->warehouse_id);
+        $lims_customer_data = Customer::find($lims_sale_data->customer_id);
+        $lims_payment_data = Payment::where('sale_id', $id)->get();
+        $lims_pos_setting_data = PosSetting::latest()->first();
+        $formato_fecha = GeneralSetting::currentDateFormat();
+        $lims_sale_data->setAttribute('formato_fecha', "$formato_fecha H:i:s");
+
+        $numberToWords = new NumberToWords();
+        if (\App::getLocale() == 'ar' || \App::getLocale() == 'hi' || \App::getLocale() == 'vi' || \App::getLocale() == 'en-gb') {
+            $numberTransformer = $numberToWords->getNumberTransformer('en');
+        } else {
+            $numberTransformer = $numberToWords->getNumberTransformer(\App::getLocale());
+        }
+
+        $cadenaCentavos = $this->obtenerParteDecimalLiteral($lims_sale_data->grand_total);
+        $numberInWords = $numberTransformer->toWords($lims_sale_data->grand_total);
+        $is_preview_mode = true;
+
+        if ($lims_pos_setting_data && $lims_pos_setting_data->type_print == 3) {
+            return view('sale.invoicemiddle', compact('lims_sale_data', 'lims_product_sale_data', 'lims_biller_data', 'lims_warehouse_data', 'lims_customer_data', 'lims_payment_data', 'numberInWords', 'cadenaCentavos', 'is_preview_mode'));
+        }
+
+        return view('sale.invoice', compact('lims_sale_data', 'lims_product_sale_data', 'lims_biller_data', 'lims_warehouse_data', 'lims_customer_data', 'lims_payment_data', 'numberInWords', 'cadenaCentavos', 'is_preview_mode'));
     }
 
     public function addPayment(Request $request)
@@ -4388,6 +4740,18 @@ class SaleController extends Controller
         $punto_venta_id      = $data['punto_venta_id'] ?? null;
         $sucursal_id         = $data['sucursal_id'] ?? null;
 
+        if ($motivo_anulacion_id === null || trim((string) $motivo_anulacion_id) === '') {
+            return response()->json(['estado' => false, 'mensaje' => 'Debe seleccionar un motivo de anulación.'], 422);
+        }
+
+        $motivoExiste = SiatParametricaVario::where('tipo_clasificador', 'motivoAnulacion')
+            ->where('codigo_clasificador', (string) $motivo_anulacion_id)
+            ->exists();
+
+        if (!$motivoExiste) {
+            return response()->json(['estado' => false, 'mensaje' => 'El motivo de anulación seleccionado no es válido.'], 422);
+        }
+
         $send_whatsapp  = filter_var($data['send_whatsapp'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $whatsapp_phone = $data['whatsapp_phone'] ?? null;
         $whatsapp_phone = is_string($whatsapp_phone) ? trim($whatsapp_phone) : $whatsapp_phone;
@@ -4458,7 +4822,7 @@ class SaleController extends Controller
                             'customer_phone' => $customer->phone_number ?? null,
                         ]);
                     } else {                    
-                        $general_setting = GeneralSetting::first();
+                        $general_setting = GeneralSetting::current();
                         $company_name = $general_setting->site_title ?? 'Empresa';
 
                         $motivo = $this->obtenerDescripcionMotivo($motivo_anulacion_id) ?? 'No especificado';
@@ -4665,31 +5029,28 @@ class SaleController extends Controller
             13 => 'SERV',
         ];
 
+        $pos_setting       = PosSetting::latest()->first();
+        $cufd_centralizado = !empty($pos_setting) && !empty($pos_setting->cufd_centralizado);
+
         $estado_factura = " ";
         $venta_facturada = CustomerSale::where('sale_id', $sale_id)->first();
         if (!empty($venta_facturada)) {
+            // Si la factura fue ANULADA, mostrarla exactamente como "SIN FACTURA"
+            if ($venta_facturada->estado_factura === 'ANULADO') {
+                $estado_factura .= ' <span class="badge badge-secondary" title="Sin facturar"><i class="fa fa-exclamation-circle"></i> SIN FACTURA</span>';
+                return $estado_factura;
+            }
+
             if ($venta_facturada->estado_factura != null) {
-                $tipo_factura = $tipo_factura_lookup[$venta_facturada->codigo_documento_sector] ?? 'COM-VEN';
-                
-                // Badge con color según estado
-                $badge_class = 'badge-success'; // VIGENTE / CONTINGENCIA / MASIVO
-                if ($venta_facturada->estado_factura == 'ANULADO') {
-                    $badge_class = 'badge-danger';
-                } elseif ($venta_facturada->estado_factura == 'PENDIENTE') {
-                    $badge_class = 'badge-warning';
-                }
-                
+                $tipo_factura = $tipo_factura_lookup[$venta_facturada->codigo_documento_sector];
                 if ($venta_facturada->nro_factura != null) {
-                    $texto_factura = ' <span class="badge ' . $badge_class . '" title="Factura SIAT"><i class="fa fa-file-text"></i> ' . $tipo_factura . ' #' . $venta_facturada->nro_factura . ' | ' . $venta_facturada->estado_factura . '</span>';
+                    $texto_factura = '[FACT-' . $tipo_factura . '#' . $venta_facturada->nro_factura . '|' . $venta_facturada->estado_factura . ']';
                     $estado_factura .= $texto_factura;
                 } else {
-                    $texto_factura = ' <span class="badge badge-info" title="Factura Manual"><i class="fa fa-file-o"></i> MANUAL-' . $tipo_factura . ' #' . $venta_facturada->nro_factura_manual . ' | ' . $venta_facturada->estado_factura . '</span>';
+                    $texto_factura = '[FACT-' . '<div class="badge badge-info">Manual</div>' . '-' . $tipo_factura . '#' . $venta_facturada->nro_factura_manual . ' |' . $venta_facturada->estado_factura . ']';
                     $estado_factura .= $texto_factura;
                 }
             }
-        } else {
-            // No facturada - agregar badge indicador
-            $estado_factura .= ' <span class="badge badge-secondary" title="Sin facturar"><i class="fa fa-exclamation-circle"></i> SIN FACTURA</span>';
         }
         return $estado_factura;
     }
@@ -4712,15 +5073,95 @@ class SaleController extends Controller
         return $data_p_venta->modo_contingencia;
     }
 
+    public function activarModoContingenciaPOS(Request $request, $biller_id)
+    {
+        try {
+            $data_biller = Biller::select('id', 'sucursal', 'punto_venta_siat')->where('id', $biller_id)->first();
+            if (!$data_biller) {
+                return array('estado' => false, 'mensaje' => 'No se encontró el punto de venta seleccionado.');
+            }
+
+            $data_p_venta = SiatPuntoVenta::where([
+                'sucursal' => $data_biller->sucursal,
+                'codigo_punto_venta' => $data_biller->punto_venta_siat
+            ])->first();
+
+            if (!$data_p_venta) {
+                return array('estado' => false, 'mensaje' => 'No se encontró la configuración SIAT del punto de venta.');
+            }
+
+            $control_activo = ControlContingencia::where([
+                'sucursal' => $data_biller->sucursal,
+                'codigo_punto_venta' => $data_biller->punto_venta_siat,
+                'estado' => 'EN_PROCESO',
+            ])->first();
+
+            if (!$control_activo) {
+                $codigo_documento_sector = (int) $request->input('codigo_documento_sector', 1);
+                if (!in_array($codigo_documento_sector, [1, 2, 13])) {
+                    $codigo_documento_sector = 1;
+                }
+
+                $tipo_factura_lookup = [
+                    1 => 'compra-venta',
+                    2 => 'alquiler',
+                    13 => 'servicio-basico',
+                ];
+                $tipo_factura = $tipo_factura_lookup[$codigo_documento_sector];
+
+                $codigo_evento = (int) $request->input('codigo_evento', 4);
+                $descripcion_evento = SiatParametricaVario::where('tipo_clasificador', 'eventosSignificativos')
+                    ->where('codigo_clasificador', $codigo_evento)
+                    ->value('descripcion');
+
+                if (!$descripcion_evento) {
+                    $codigo_evento = 4;
+                    $descripcion_evento = SiatParametricaVario::where('tipo_clasificador', 'eventosSignificativos')
+                        ->where('codigo_clasificador', $codigo_evento)
+                        ->value('descripcion');
+                }
+
+                $data_siat_cufd = SiatCufd::where('sucursal', $data_biller->sucursal)
+                    ->where('codigo_punto_venta', $data_biller->punto_venta_siat)
+                    ->where('estado', true)
+                    ->orderBy('fecha_registro', 'desc')
+                    ->first();
+
+                if (!$data_siat_cufd) {
+                    return array('estado' => false, 'mensaje' => 'No existe CUFD vigente para activar contingencia.');
+                }
+
+                ControlContingencia::create([
+                    'cuis' => $data_p_venta->codigo_cuis,
+                    'sucursal' => $data_biller->sucursal,
+                    'codigo_punto_venta' => $data_biller->punto_venta_siat,
+                    'tipo_factura' => $tipo_factura,
+                    'codigo_documento_sector' => $codigo_documento_sector,
+                    'codigo_evento' => $codigo_evento,
+                    'descripcion' => $codigo_evento . ' - ' . ($descripcion_evento ?: 'ACTIVACION AUTOMATICA DESDE POS'),
+                    'fecha_inicio_evento' => Carbon::now()->format('Y-m-d H:i:s'),
+                    'cufd_evento' => $data_siat_cufd->codigo_cufd,
+                    'estado' => 'EN_PROCESO',
+                    'usuario_modificacion' => Auth::id(),
+                    'cantidad_paquetes' => 0,
+                ]);
+            }
+
+            $data_p_venta->usuario_alta = Auth::id();
+            $data_p_venta->modo_contingencia = true;
+            $data_p_venta->save();
+
+            return array('estado' => true, 'mensaje' => 'Modo contingencia activado correctamente desde POS.');
+        } catch (\Throwable $th) {
+            Log::warning('Error activarModoContingenciaPOS => ' . $th->getMessage());
+            return array('estado' => false, 'mensaje' => 'No se pudo activar el modo contingencia desde POS.');
+        }
+    }
+
     // Función para imprimir la factura de una venta determinada por ID, renderizada en una vista
     public function getFactura($venta_id)
     {
         $data = $this->getImprimirFactura($venta_id); //SIAT Trait
-        
-        // Si se pide solo el contenido (para AJAX dentro del modal)
-        if (request()->ajax() || request()->get('partial') == '1') {
-            return view('sale.impresion-factura-partial', compact('data', 'venta_id'));
-        }
 
         return view('sale.impresion-factura', compact('data'));
     }
@@ -4728,23 +5169,9 @@ class SaleController extends Controller
     // retorna la venta facturada en formato de bytes
     public function getBytesFactura($venta_id)
     {
-        // Comprobar que exista un registro de facturación (CustomerSale) para esta venta
-        $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
-        if (! $data_cliente) {
-            return response()->json(['status' => false, 'message' => 'Factura no encontrada / no generada']);
-        }
-
-        // Llamar al trait que invoca al servicio SIAT para obtener los bytes de impresión
         $data = $this->getImprimirFactura($venta_id); //SIAT Trait
 
-        // Agregar información adicional de la factura para verificación
-        $data['cuf'] = $data_cliente->cuf;
-        $data['nro_factura'] = $data_cliente->nro_factura;
-        $data['estado_factura'] = $data_cliente->estado_factura;
-        $data['codigo_recepcion'] = $data_cliente->codigo_recepcion;
-        $data['sale_id'] = $venta_id;
-
-        return response()->json($data);
+        return $data;
     }
 
     /**
@@ -4943,7 +5370,16 @@ class SaleController extends Controller
     // Obtiene los puntos de ventas pertenecientes a determinada sucursal
     public function getPuntoVentaxSucursal($sucursal)
     {
-        $puntos_ventas = SiatPuntoVenta::where('sucursal', $sucursal)->get();
+        $sucursalCode = $this->resolveSucursalCode($sucursal);
+
+        if ($sucursalCode === null) {
+            return collect();
+        }
+
+        $puntos_ventas = $this->getPuntosVentaDesdeSiatApi($sucursalCode);
+        if ($puntos_ventas === null) {
+            $puntos_ventas = SiatPuntoVenta::where('sucursal', $sucursalCode)->get();
+        }
         return $puntos_ventas;
     }
 
@@ -5412,7 +5848,7 @@ class SaleController extends Controller
             }
 
             // Obtener datos de configuración general
-            $general_setting = \App\GeneralSetting::first();
+            $general_setting = \App\GeneralSetting::current();
             $company_name = $general_setting ? $general_setting->site_title : 'GISUL';
             
             // Obtener NIT de la empresa desde pos_setting

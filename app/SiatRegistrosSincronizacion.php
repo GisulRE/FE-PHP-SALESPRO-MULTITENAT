@@ -52,7 +52,7 @@ class SiatRegistrosSincronizacion extends Model
     
     public function getFecha()
     {
-        $formato_fecha = GeneralSetting::first()->date_format;
+        $formato_fecha = GeneralSetting::currentDateFormat();
         $fecha = new Carbon($this->updated_at);
         $fecha = $fecha->format("$formato_fecha H:i");
         return $fecha;

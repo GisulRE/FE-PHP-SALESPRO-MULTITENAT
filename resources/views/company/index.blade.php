@@ -28,6 +28,7 @@
                             <tr>
                                 <th>ID</th>
                                 <th>{{ trans('file.name') }}</th>
+                                <th>NIT</th>
                                 <th>Fecha de Creación</th>
                                 <th class="not-exported">{{ trans('file.action') }}</th>
                             </tr>
@@ -37,6 +38,7 @@
                             <tr>
                                 <td>{{ $company->id }}</td>
                                 <td>{{ $company->name }}</td>
+                                <td>{{ $company->nit ?? '-' }}</td>
                                 <td>{{ $company->created_at->format('Y-m-d H:i') }}</td>
                                 <td>
                                     <div class="btn-group">
@@ -77,7 +79,7 @@
             },
             'columnDefs': [{
                 "orderable": false,
-                'targets': [3]
+                'targets': [4]
             }],
             'select': {
                 style: 'multi',

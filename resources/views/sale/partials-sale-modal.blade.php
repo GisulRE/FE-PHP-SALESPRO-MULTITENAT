@@ -4,8 +4,8 @@
         <div class="input-group">
             <select name="tipo_factura" id="tipo_factura_id" class="selectpicker form-control" title="Seleccione...">
                 <option value="1" selected>FACTURA COMPRA-VENTA</option>
-                <option value="2" disabled>FACTURA ALQUILER</option>
-                <option value="13" disabled>FACTURA SERVICIO-BASICO</option>
+                <option value="2">FACTURA ALQUILER</option>
+                <option value="13">FACTURA SERVICIO-BASICO</option>
             </select>
         </div>
     </div>
@@ -102,6 +102,11 @@
     </div>
 </div>
 
+<div id="tab_basicservice" class="disabled" style="display:none;">
+    <div class="dropdown-divider"></div>
+    @include('sale.partials-sale-modal-serviciobasico')
+</div>
+
 
 <script>
 
@@ -188,6 +193,7 @@
     }
 
     $('#glosa_tipo_factura').hide();
+    $('#tab_basicservice').hide();
     $('#sales_valor_documento').hide();
     $('#sales_complemento').hide();
     $('#sales_tipo_documento_id').on('change', mostrarSalesInput);
@@ -409,17 +415,11 @@
         }
     })
 
-    // Según el valor que tenga el sistema POS SETTING 
-    // lo mostramos el toggle factura, Facturar Siempre, o Facturar Opcional
-    if ($("input[name='facturacion_id_hidden']").val() == 1) {
-        $('#toggle-event').prop('checked', true).change()
-        $("input[name='bandera_factura_hidden']").val(1);
-        $("input[name='bandera_codigo_excepcion_hidden']").val(0);
-        $("input[name='invoice_no']").val(0);
-    } else {
-        $('#toggle-event').prop('checked', false).change()
-        $("input[name='bandera_factura_hidden']").val("")
-    }
+    // Forzar Facturar siempre en POS
+    $('#toggle-event').prop('checked', true).change();
+    $("input[name='bandera_factura_hidden']").val(1);
+    $("input[name='bandera_codigo_excepcion_hidden']").val(0);
+    $("input[name='invoice_no']").val(0);
 
     // funciona para guardar los valores input hidden de TipoDocumento y CasoEspecial
     // razon a que los select no envia los datos por usar Disabled
@@ -565,6 +565,7 @@
             $("input[name='glosa_periodo_facturado']").val("");
             $('input[name=domicilio_cliente]').prop("required", false);
             $('input[name=ciudad]').prop("required", false);
+            $('#tab_basicservice').hide();
             $("#tab_basicservice").addClass("disabled");
         }
         if (estadoTipoFactura == 2) {
@@ -573,6 +574,7 @@
             $('input[name=glosa_periodo_facturado]').prop("required", true);
             $('input[name=domicilio_cliente]').prop("required", false);
             $('input[name=ciudad]').prop("required", false);
+            $('#tab_basicservice').hide();
             $("#tab_basicservice").addClass("disabled");
         }
         if (estadoTipoFactura == 13) {
@@ -586,6 +588,7 @@
                 $("input[name='domicilio_cliente']").val(temp_customer.address);
                 $("input[name='ciudad']").val(temp_customer.city);
             }
+            $('#tab_basicservice').show();
             $("#tab_basicservice").removeClass("disabled");
         }
     });

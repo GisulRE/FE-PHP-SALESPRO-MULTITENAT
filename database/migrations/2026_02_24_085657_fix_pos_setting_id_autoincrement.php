@@ -15,10 +15,18 @@ class FixPosSettingIdAutoincrement extends Migration
     {
         // Eliminar registros con id=0 que causan conflictos
         \DB::table('pos_setting')->where('id', 0)->delete();
-        
-        // Cambiar el índice UNIQUE por PRIMARY KEY
-        // La columna ya tiene AUTO_INCREMENT, solo falta la PRIMARY KEY
-        \DB::statement('ALTER TABLE pos_setting DROP INDEX pos_setting_id_unique, ADD PRIMARY KEY (id)');
+
+        $driver = \DB::getDriverName();
+        if ($driver === 'pgsql') {
+            \DB::statement('ALTER TABLE pos_setting DROP CONSTRAINT IF EXISTS pos_setting_id_unique');
+            \DB::statement('DROP INDEX IF EXISTS pos_setting_id_unique');
+            \DB::statement('ALTER TABLE pos_setting DROP CONSTRAINT IF EXISTS pos_setting_pkey');
+            \DB::statement('ALTER TABLE pos_setting ADD PRIMARY KEY (id)');
+        } else {
+            // Cambiar el índice UNIQUE por PRIMARY KEY
+            // La columna ya tiene AUTO_INCREMENT, solo falta la PRIMARY KEY
+            \DB::statement('ALTER TABLE pos_setting DROP INDEX pos_setting_id_unique, ADD PRIMARY KEY (id)');
+        }
     }
 
     /**
@@ -28,7 +36,14 @@ class FixPosSettingIdAutoincrement extends Migration
      */
     public function down()
     {
-        // Revertir el cambio
-        \DB::statement('ALTER TABLE pos_setting DROP PRIMARY KEY, ADD UNIQUE KEY pos_setting_id_unique (id)');
+        $driver = \DB::getDriverName();
+        if ($driver === 'pgsql') {
+            \DB::statement('ALTER TABLE pos_setting DROP CONSTRAINT IF EXISTS pos_setting_pkey');
+            \DB::statement('ALTER TABLE pos_setting DROP CONSTRAINT IF EXISTS pos_setting_id_unique');
+            \DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS pos_setting_id_unique ON pos_setting (id)');
+        } else {
+            // Revertir el cambio
+            \DB::statement('ALTER TABLE pos_setting DROP PRIMARY KEY, ADD UNIQUE KEY pos_setting_id_unique (id)');
+        }
     }
 }

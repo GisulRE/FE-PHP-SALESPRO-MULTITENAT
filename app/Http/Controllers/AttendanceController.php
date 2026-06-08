@@ -8,9 +8,11 @@ use App\HrmSetting;
 use App\PosSetting;
 use App\ShiftEmployee;
 use App\User;
-use Auth;
 use DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 
 class AttendanceController extends Controller
@@ -197,56 +199,108 @@ class AttendanceController extends Controller
         //return date('h:i:s a', strtotime($data['from_time']));
     }
 
-    public function checkin_out($id)
+    public function checkin_out(Request $request, $id)
     {
-        $data['date'] = date('Y-m-d');
-        $data['checkout'] = null;
-        $data['user_id'] = Auth::id();
-        $lims_hrm_setting_data = HrmSetting::latest()->first();
-        if (!$lims_hrm_setting_data) {
-            return array('status' => false, 'type' => 'no_hrm_config', 'redirect' => route('setting.hrm'));
-        }
-        $checkin = $lims_hrm_setting_data->checkin;
-        $lims_attendance_data = Attendance::whereDate('date', $data['date'])->where('employee_id', $id)->first();
-        if (!$lims_attendance_data) {
-            $data['employee_id'] = $id;
-            $data['checkin'] = date('h:ia');
-            $data['company_id'] = Auth::user()->company_id;
-            $diff = strtotime($checkin) - strtotime($data['checkin']);
-            if ($diff >= 0) {
-                $data['status'] = 1;
+        try {
+            $today = date('Y-m-d');
+            $user_id = Auth::id();
+            $lims_hrm_setting_data = HrmSetting::latest()->first();
+
+            // Evita fallo de marcaje cuando aún no existe configuración HRM.
+            if (!$lims_hrm_setting_data) {
+                $lims_hrm_setting_data = HrmSetting::create([
+                    'checkin' => '09:00',
+                    'checkout' => '18:00',
+                ]);
+            }
+            $standard_checkin = $lims_hrm_setting_data->checkin;
+
+            // --- Validar PIN si el empleado lo tiene configurado ---
+            $employee = Employee::find($id);
+            if ($employee && $employee->attendance_pin) {
+                $pin = $request->input('pin');
+                if (empty($pin)) {
+                    return response()->json([
+                        'status'       => false,
+                        'requires_pin' => true,
+                        'message'      => 'Se requiere el código PIN del empleado.',
+                    ]);
+                }
+                if (!Hash::check($pin, $employee->attendance_pin)) {
+                    return response()->json([
+                        'status'  => false,
+                        'message' => 'Código PIN incorrecto. Intente nuevamente.',
+                    ]);
+                }
+            }
+            // --- FIN validación PIN ---
+
+            // Buscamos si el empleado tiene una entrada activa hoy (sin hora de salida registrada)
+            $active_attendance = Attendance::whereDate('date', $today)
+                ->where('employee_id', $id)
+                ->whereNull('checkout')
+                ->first();
+
+            if (!$active_attendance) {
+                // --- REGISTRAR ENTRADA (Check-in) ---
+                $data = [
+                    'date'        => $today,
+                    'employee_id' => $id,
+                    'user_id'     => $user_id,
+                    'checkin'     => date('h:ia'),
+                    'checkout'    => null,
+                    'company_id'  => Auth::user()->company_id,
+                ];
+
+                $diff = strtotime($standard_checkin) - strtotime($data['checkin']);
+                $data['status'] = ($diff >= 0) ? 1 : 0;
+
+                $result = Attendance::create($data);
+
+                $data_shift = [
+                    'employee_id' => $id,
+                    'status'      => 1,
+                    'company_id'  => Auth::user()->company_id,
+                ];
+                $last = ShiftEmployee::whereDate('created_at', $today)->max('position');
+                $data_shift['position'] = $last ? $last + 1 : 1;
+                ShiftEmployee::create($data_shift);
+
+                $status = (bool) $result;
+                $type   = 'checkin';
             } else {
-                $data['status'] = 0;
+                // --- REGISTRAR SALIDA (Check-out) ---
+                $active_attendance->checkout = date('h:ia');
+                $result = $active_attendance->save();
+
+                $position = ShiftEmployee::whereDate('created_at', $today)
+                    ->where('employee_id', $id)
+                    ->first();
+                if ($position) {
+                    $position->delete();
+                }
+
+                $status = (bool) $result;
+                $type   = 'checkout';
             }
 
-            unset($data['checkout']); // no enviar checkout null al hacer checkin
-            $result = Attendance::create($data);
-            $data['status'] = 1;
-            $last = ShiftEmployee::whereDate('created_at', $data['date'])->max('position');
-            if ($last) {
-                $data['position'] = $last + 1;
-            } else {
-                $data['position'] = 1;
-            }
-            ShiftEmployee::create($data);
-            if ($result) {
-                $status = true;
-            } else {
-                $status = false;
-            }
-            $type = "checkin";
-        } else {
-            $data['checkout'] = date('h:ia');
-            $lims_attendance_data->checkout = $data['checkout'];
-            $position = ShiftEmployee::whereDate('created_at', $data['date'])->where('employee_id', $id)->first();
-            $lims_attendance_data->delete();
-            if ($position)
-                $position->delete();
+            return response()->json(['status' => $status, 'type' => $type]);
+        } catch (\Throwable $e) {
+            Log::error('Error al marcar asistencia de empleado', [
+                'employee_id' => $id,
+                'user_id' => Auth::id(),
+                'company_id' => optional(Auth::user())->company_id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
 
-            $status = true;
-            $type = "checkout";
+            return response()->json([
+                'status' => false,
+                'type' => 'exception',
+                'message' => 'Error interno al marcar asistencia. Revise logs.',
+            ]);
         }
-        return array('status' => $status, 'type' => $type);
     }
 
     public function reset()

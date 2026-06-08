@@ -64,7 +64,7 @@ class SiatPuntoVenta extends Model
 
     public function getFecha()
     {
-        $formato_fecha = GeneralSetting::first()->date_format;
+        $formato_fecha = GeneralSetting::currentDateFormat();
 
         $fecha = new Carbon($this->fecha_vigencia_cuis);
         $fecha = $fecha->format("$formato_fecha H:i");

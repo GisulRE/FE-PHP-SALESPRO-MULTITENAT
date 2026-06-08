@@ -13,10 +13,40 @@ use Illuminate\Validation\Rule;
 use Log;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Session;
 
 class SiatPuntoVentaController extends Controller
 {
     use CufdTrait;
+
+    private function resolveSucursalCode($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        $textValue = trim((string) $value);
+        if ($textValue === '') {
+            return null;
+        }
+
+        if (strpos($textValue, '|') !== false) {
+            $textValue = trim(explode('|', $textValue)[0]);
+        }
+
+        $upperValue = strtoupper($textValue);
+
+        $sucursal = SiatSucursal::whereRaw('UPPER(nombre) = ?', [$upperValue])
+            ->orWhereRaw('UPPER(descripcion_sucursal) = ?', [$upperValue])
+            ->orWhereRaw('UPPER(domicilio_tributario) = ?', [$upperValue])
+            ->first();
+
+        return $sucursal ? (int) $sucursal->sucursal : null;
+    }
 
     public function index()
     {
@@ -34,6 +64,31 @@ class SiatPuntoVentaController extends Controller
     {
         $user = Auth::user()->id;
         $data = $request->all();
+        $data['sucursal'] = $this->resolveSucursalCode($data['sucursal'] ?? null);
+
+        if ($data['sucursal'] === null) {
+            return redirect('punto_venta')->with('not_permitted', 'Sucursal invalida. Seleccione una sucursal valida.');
+        }
+
+        $pos_setting = \App\PosSetting::latest()->first();
+        if ($data['modoSIN'] == "1" && (!$pos_setting || !$pos_setting->nit_emisor)) {
+            return redirect('punto_venta')->with('not_permitted', 'El NIT del emisor no está configurado en los Ajustes POS. Configurelo antes de registrar.');
+        }
+
+        $data['codigo_punto_venta'] = (int) ($data['codigo_punto_venta'] ?? 0);
+        $data['tipo_punto_venta'] = (int) ($data['tipo_punto_venta'] ?? 0);
+
+        if ($data['tipo_punto_venta'] <= 0) {
+            return redirect('punto_venta')->with('not_permitted', 'Tipo Punto Venta invalido.');
+        }
+
+        $data['usuario_alta'] = $user;
+        $data['correlativo_factura'] = $data['correlativo_factura'] ?? 1;
+        $data['correlativo_alquiler'] = $data['correlativo_alquiler'] ?? 1;
+        $data['correlativo_servicios_basicos'] = $data['correlativo_servicios_basicos'] ?? 1;
+        $data['correlativo_nota_debcred'] = $data['correlativo_nota_debcred'] ?? 1;
+        $data['is_active'] = $data['is_active'] ?? true;
+
         if ($data['modoSIN'] == "1") {
             if ($data['modoComisionista'] == "1") {
                 $result = $this->registrarPuntoVentaComisionista($data);
@@ -41,29 +96,45 @@ class SiatPuntoVentaController extends Controller
                 $result = $this->registrarPuntoVenta($data);
             }
             if ($result['status'] == true) {
-                $data_cuis = $this->obtenerCuis($result['data']['CODIGO_PUNTO_VENTA'], $data['sucursal']);
-                if ($data_cuis['status'] == true) {
-                    $data['usuario_alta'] = $user;
-                    $data['correlativo_factura'] = 1;
-                    $data['correlativo_alquiler'] = 1;
-                    $data['correlativo_servicios_basicos'] = 1;
-                    $data['correlativo_nota_debcred'] = 1;
-                    $data['codigo_punto_venta'] = $result['data']['CODIGO_PUNTO_VENTA'];
-                    $data['codigo_cuis'] = $data_cuis['data']['CUIS'];
-                    $data['fecha_vigencia_cuis'] = $data_cuis['data']['FECHA_VIGENCIA_CUIS'];
-                    $data['is_siat'] = true;
+                $data['codigo_punto_venta'] = $result['data']['CODIGO_PUNTO_VENTA'];
+                $data['is_siat'] = true;
+                
+                // Si el usuario ingresó manualmente un CUIS, lo usamos
+                if (!empty($data['codigo_cuis'])) {
+                    $data['fecha_vigencia_cuis'] = $data['fecha_vigencia_cuis'] ?? date('Y-m-d H:i:s', strtotime('+1 year'));
                     $puntoVenta = SiatPuntoVenta::create($data);
-                    $message = "";
+                    $message = "CUIS ingresado manualmente.";
                     try {
                         $this->renovarVigenciaxPuntoVenta($puntoVenta);
-                        $message = "CUDF Obtenido.";
+                        $message .= " CUDF Obtenido.";
                     } catch (\Throwable $th) {
                         Log::error("Error: " . $th->getMessage());
-                        $message = "Error al obtener CUDF diario, por favor intente renovar en Ajustes POS.";
+                        $message .= " Error al obtener CUDF diario, intente renovar en Ajustes POS.";
                     }
                     return redirect('punto_venta')->with('message', 'Punto de Venta creada correctamente! ' . $message);
                 } else {
-                    return redirect('punto_venta')->with('not_permitted', $result['mensaje']);
+                    // Intenta obtener automáticamente
+                    $data_cuis = $this->obtenerCuis($result['data']['CODIGO_PUNTO_VENTA'], $data['sucursal']);
+                    if ($data_cuis['status'] == true) {
+                        $data['codigo_cuis'] = $data_cuis['data']['CUIS'];
+                        $data['fecha_vigencia_cuis'] = $data_cuis['data']['FECHA_VIGENCIA_CUIS'];
+                        $puntoVenta = SiatPuntoVenta::create($data);
+                        $message = "";
+                        try {
+                            $this->renovarVigenciaxPuntoVenta($puntoVenta);
+                            $message = "CUDF Obtenido.";
+                        } catch (\Throwable $th) {
+                            Log::error("Error: " . $th->getMessage());
+                            $message = "Error al obtener CUDF diario, por favor intente renovar en Ajustes POS.";
+                        }
+                        return redirect('punto_venta')->with('message', 'Punto de Venta creada correctamente! ' . $message);
+                    } else {
+                        // Fallback a guardar con CUIS pendiente para no bloquear la creación completa si falla la generación automática de CUIS
+                        $data['codigo_cuis'] = 'CUIS-PENDIENTE';
+                        $data['fecha_vigencia_cuis'] = date('Y-m-d H:i:s');
+                        $puntoVenta = SiatPuntoVenta::create($data);
+                        return redirect('punto_venta')->with('message', 'Punto de Venta registrado en SIAT, pero falló la generación automática de CUIS. Se guardó con CUIS pendiente. Intente renovarlo o ingresarlo manualmente. Error SIAT: ' . $data_cuis['mensaje']);
+                    }
                 }
             } else {
                 return redirect('punto_venta')->with('not_permitted', $result['mensaje']);
@@ -80,6 +151,11 @@ class SiatPuntoVentaController extends Controller
     public function update(Request $request, $id)
     {
         $data = $request->all();
+        $data['sucursal'] = $this->resolveSucursalCode($data['sucursal'] ?? null);
+        if ($data['sucursal'] === null) {
+            return redirect('punto_venta')->with('not_permitted', 'Sucursal invalida. Seleccione una sucursal valida.');
+        }
+
         $update_data = SiatPuntoVenta::find($data['punto_venta_id']);
         if ($data['modoSINEdit'] == "1") {
             $data['is_siat'] = true;
@@ -204,5 +280,137 @@ class SiatPuntoVentaController extends Controller
         } else {
             return array('status' => false, 'cashier' => false, 'puntoVenta' => 'No Definido', 'message' => "Sin Apertura de Caja, Inicie Sesion Con el Facturador asociado para aperturar la caja");
         }
+    }
+
+    public function sincronizarDesdeSiat()
+    {
+        $pos_setting = \App\PosSetting::latest()->first();
+        if (!$pos_setting || !$pos_setting->nit_emisor) {
+            return redirect('punto_venta')->with('not_permitted', 'El NIT del emisor no está configurado en los Ajustes POS.');
+        }
+
+        $bearer = 'Bearer ' . Session::get('token_siat');
+        if (!Session::get('token_siat')) {
+            $this->getToken();
+            $bearer = 'Bearer ' . Session::get('token_siat');
+        }
+
+        $host = $pos_setting->url_operaciones;
+        $path = '/operaciones/lista.punto.venta';
+
+        $sucursales = SiatSucursal::where('estado', true)->get();
+        $total_importados = 0;
+        $total_actualizados = 0;
+
+        foreach ($sucursales as $sucursal) {
+            // Obtenemos el CUIS directamente de la API para el punto de venta 0
+            $data_cuis = $this->obtenerCuis(0, $sucursal->sucursal);
+            if ($data_cuis['status'] == true) {
+                $cuis = $data_cuis['data']['CUIS'];
+                $punto_venta_cero = SiatPuntoVenta::where('sucursal', $sucursal->sucursal)
+                    ->where('codigo_punto_venta', 0)
+                    ->first();
+                if (!$punto_venta_cero) {
+                    SiatPuntoVenta::create([
+                        'codigo_punto_venta' => 0,
+                        'nombre_punto_venta' => 'Punto de Venta Principal',
+                        'descripcion' => 'Punto de Venta Principal Casa Matriz',
+                        'tipo_punto_venta' => 1,
+                        'codigo_cuis' => $cuis,
+                        'fecha_vigencia_cuis' => $data_cuis['data']['FECHA_VIGENCIA_CUIS'],
+                        'sucursal' => $sucursal->sucursal,
+                        'is_siat' => true,
+                        'is_active' => true,
+                        'usuario_alta' => Auth::user()->id,
+                    ]);
+                } else {
+                    $punto_venta_cero->codigo_cuis = $cuis;
+                    $punto_venta_cero->fecha_vigencia_cuis = $data_cuis['data']['FECHA_VIGENCIA_CUIS'];
+                    $punto_venta_cero->save();
+                }
+            } else {
+                Log::warning("No se pudo obtener CUIS desde la API para la sucursal {$sucursal->sucursal} al sincronizar.");
+                continue;
+            }
+
+            $query = '?nit=' . $pos_setting->nit_emisor . '&sucursal=' . $sucursal->sucursal . '&cuis=' . $cuis;
+            $url = $host . $path . $query;
+
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => $bearer,
+                ])->get($url);
+
+                if ($response->successful()) {
+                    $res_data = $response->json();
+                    $puntos_venta = [];
+                    if (isset($res_data['DATOS'])) {
+                        $puntos_venta = $res_data['DATOS'];
+                    } elseif (isset($res_data['listaPuntosVentas'])) {
+                        $puntos_venta = $res_data['listaPuntosVentas'];
+                    } elseif (is_array($res_data)) {
+                        $puntos_venta = $res_data;
+                    }
+
+                    if (is_array($puntos_venta)) {
+                        $codigos_siat = [];
+                        foreach ($puntos_venta as $pv) {
+                            $codigo = $pv['codigoPuntoVenta'] ?? $pv['codigo_punto_venta'] ?? null;
+                            if ($codigo === null) continue;
+                            $codigos_siat[] = (int) $codigo;
+
+                            $nombre = $pv['nombrePuntoVenta'] ?? $pv['nombre_punto_venta'] ?? 'Punto de Venta ' . $codigo;
+                            $tipo = $pv['codigoTipoPuntoVenta'] ?? $pv['tipo_punto_venta'] ?? 1;
+                            $descripcion = $pv['descripcionPuntoVenta'] ?? $pv['descripcion'] ?? '';
+
+                            $local_pv = SiatPuntoVenta::where('sucursal', $sucursal->sucursal)
+                                ->where('codigo_punto_venta', $codigo)
+                                ->first();
+
+                            if ($local_pv) {
+                                $local_pv->nombre_punto_venta = $nombre;
+                                $local_pv->tipo_punto_venta = $tipo;
+                                $local_pv->descripcion = $descripcion;
+                                $local_pv->is_active = true;
+                                $local_pv->is_siat = true;
+                                $local_pv->save();
+                                $total_actualizados++;
+                            } else {
+                                SiatPuntoVenta::create([
+                                    'codigo_punto_venta' => $codigo,
+                                    'nombre_punto_venta' => $nombre,
+                                    'descripcion' => $descripcion,
+                                    'tipo_punto_venta' => $tipo,
+                                    'sucursal' => $sucursal->sucursal,
+                                    'codigo_cuis' => 'CUIS-PENDIENTE',
+                                    'fecha_vigencia_cuis' => date('Y-m-d H:i:s'),
+                                    'is_siat' => true,
+                                    'is_active' => true,
+                                    'usuario_alta' => Auth::user()->id,
+                                ]);
+                                $total_importados++;
+                            }
+                        }
+
+                        // Desactivar localmente los puntos de venta con is_siat = true que ya no estén registrados en SIAT
+                        $locales_a_desactivar = SiatPuntoVenta::where('sucursal', $sucursal->sucursal)
+                            ->where('is_siat', true)
+                            ->whereNotIn('codigo_punto_venta', $codigos_siat)
+                            ->get();
+
+                        foreach ($locales_a_desactivar as $pv_des) {
+                            $pv_des->is_active = false;
+                            $pv_des->save();
+                        }
+                    }
+                } else {
+                    Log::error("Error al obtener puntos de venta de SIAT sucursal {$sucursal->sucursal}. Status: " . $response->status() . " Body: " . $response->body());
+                }
+            } catch (\Throwable $e) {
+                Log::error("Excepción al sincronizar puntos de venta de SIAT sucursal {$sucursal->sucursal}: " . $e->getMessage());
+            }
+        }
+
+        return redirect('punto_venta')->with('message', "Sincronización de puntos de venta SIAT completada con éxito. Importados: {$total_importados}, Actualizados: {$total_actualizados}.");
     }
 }

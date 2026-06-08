@@ -18,6 +18,27 @@
             color: black !important;
             font-weight: bold !important;
         }
+
+        .pos-section {
+            width: 100%;
+        }
+
+        .pos-section .container-fluid {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+
+        .pos-section .row {
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+        .pos-section .row > [class*='col-'] {
+            padding-left: 8px;
+            padding-right: 8px;
+        }
     </style>
     <section class="forms pos-section">
         <div class="container-fluid">
@@ -53,6 +74,8 @@
                                             <input type="text" class="form-control" name="employee_name"
                                                 placeholder="Empleado de Servicio..." readonly>
                                             <input type="hidden" class="form-control" name="employee_id">
+                                            <input type="hidden" class="form-control" name="attentionshift_id"
+                                                value="0">
                                             <input id="biller_id" type="hidden" name="biller_id"
                                                 value="{{ $lims_pos_setting_data->biller_id }}">
                                             <input id="warehouse_id" type="hidden" name="warehouse_id"
@@ -196,7 +219,10 @@
                         </div>
                         <div class="payment-options">
                             <div class="column-5"></div>
-                            <div class="column-5"></div>
+                            <div class="column-5">
+                                <button style="background-color: #8c7ae6" type="button" class="btn btn-custom"
+                                    id="load-turno-btn"><i class="fa fa-address-book"></i> Cargar turno</button>
+                            </div>
                             <div class="column-5">
                                 <button style="background-color: #2bf710" type="button" class="btn btn-custom"
                                     id="presale-btn"><i class="fa fa-save"></i> Generar Pre-Venta</button>
@@ -217,23 +243,8 @@
                                     Salir</button>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <!-- modal: HRM no configurado -->
-                <div id="hrm-config-modal" tabindex="-1" role="dialog" aria-hidden="true" class="modal fade text-left">
-                    <div role="document" class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-header bg-warning">
-                                <h5 class="modal-title"><i class="dripicons-warning"></i> Configuración requerida</h5>
-                                <button type="button" data-dismiss="modal" aria-label="Cerrar" class="close"><span aria-hidden="true">&times;</span></button>
-                            </div>
-                            <div class="modal-body">
-                                <p>Para registrar asistencia debes configurar primero los horarios de entrada y salida en <strong>Configuración HRM</strong>.</p>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                                <a id="hrm-config-link" href="{{ route('setting.hrm') }}" class="btn btn-primary"><i class="dripicons-gear"></i> Ir a Configuración HRM</a>
-                            </div>
+                        <div class="text-center mt-1 mb-2">
+                            <small id="selected-turno-label">Sin turno cargado</small>
                         </div>
                     </div>
                 </div>
@@ -321,6 +332,32 @@
                                 </div>
                                 <button type="button" name="tip_btn" class="btn btn-primary"
                                     data-dismiss="modal">{{ trans('file.submit') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="selecturno-modal" tabindex="-1" role="dialog" aria-labelledby="selectTurnoLabel"
+                    aria-hidden="true" class="modal fade text-left bd-example-modal-sm">
+                    <div role="document" class="modal-dialog modal-dialog-centered" style="max-width: 520px;">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 id="selectTurnoLabel" class="modal-title">Cargar turno asignado</h5>
+                                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
+                                        aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="col-md-12 form-group">
+                                    <label>Buscar por nro. turno o cliente</label>
+                                    <select id="turno_id_prepos" class="form-control selectpicker" name="turno_id_prepos"
+                                        required data-live-search="true" data-live-search-style="contains"
+                                        title="Seleccione turno asignado...">
+                                    </select>
+                                </div>
+                                <div class="col-md-12 form-group">
+                                    <button id="btn_updturno_prepos" class="btn btn-success"><i
+                                            class="dripicons-checkmark"></i>Cargar turno</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -425,6 +462,12 @@
                                 <button class="btn btn-block btn-info" id="brand-filter">{{ trans('file.Brand') }}</button>
                             </div>
                         @endif
+                        <div class="col-md-12 mt-1">
+                            <input type="text" id="product-search-input" class="form-control" placeholder="Buscar producto...">
+                        </div>
+
+                        <span>{{ json_encode($lims_product_list) }}</span>
+
                         <div class="col-md-12 mt-1 table-container">
                             <table id="product-table" class="table no-shadow product-list">
                                 <thead class="d-none">
@@ -443,8 +486,8 @@
                                                 data-product="{{ $lims_product_list[0 + $i * 5]->code . ' (' . $lims_product_list[0 + $i * 5]->name . ')' }}">
                                                 <img src="{{ url('./public/images/product', $lims_product_list[0 + $i * 5]->base_image) }}"
                                                     width="100%" />
-                                                <p style="color: black;font-weight: bold;">
-                                                    {{ $lims_product_list[0 + $i * 5]->name }}
+                                                <p style="color: black;font-weight: bold;">                                                
+                                                    {{ $lims_product_list[0 + $i * 5]->name }} - {{ $lims_product_list[0 + $i * 5]->price }}
                                                 </p>
                                                 <span>{{ $lims_product_list[0 + $i * 5]->code }}</span>
                                             </td>
@@ -454,7 +497,7 @@
                                                     <img src="{{ url('public/images/product', $lims_product_list[1 + $i * 5]->base_image) }}"
                                                         width="100%" />
                                                     <p style="color: black;font-weight: bold;">
-                                                        {{ $lims_product_list[1 + $i * 5]->name }}
+                                                        {{ $lims_product_list[1 + $i * 5]->name }} - {{ $lims_product_list[1 + $i * 5]->price }}
                                                     </p>
                                                     <span>{{ $lims_product_list[1 + $i * 5]->code }}</span>
                                                 </td>
@@ -467,7 +510,7 @@
                                                     <img src="{{ url('public/images/product', $lims_product_list[2 + $i * 5]->base_image) }}"
                                                         width="100%" />
                                                     <p style="color: black;font-weight: bold;">
-                                                        {{ $lims_product_list[2 + $i * 5]->name }}
+                                                        {{ $lims_product_list[2 + $i * 5]->name }} - {{ $lims_product_list[2 + $i * 5]->price }}
                                                     </p>
                                                     <span>{{ $lims_product_list[2 + $i * 5]->code }}</span>
                                                 </td>
@@ -480,7 +523,7 @@
                                                     <img src="{{ url('public/images/product', $lims_product_list[3 + $i * 5]->base_image) }}"
                                                         width="100%" />
                                                     <p style="color: black;font-weight: bold;">
-                                                        {{ $lims_product_list[3 + $i * 5]->name }}
+                                                        {{ $lims_product_list[3 + $i * 5]->name }} - {{$lims_product_list[3 + $i * 5]->price}}
                                                     </p>
                                                     <span>{{ $lims_product_list[3 + $i * 5]->code }}</span>
                                                 </td>
@@ -493,7 +536,7 @@
                                                     <img src="{{ url('public/images/product', $lims_product_list[4 + $i * 5]->base_image) }}"
                                                         width="100%" />
                                                     <p style="color: black;font-weight: bold;">
-                                                        {{ $lims_product_list[4 + $i * 5]->name }}
+                                                        {{ $lims_product_list[4 + $i * 5]->name }} - {{ $lims_product_list[4 + $i * 5]->price }}
                                                     </p>
                                                     <span>{{ $lims_product_list[4 + $i * 5]->code }}</span>
                                                 </td>
@@ -564,7 +607,7 @@
                     class="modal fade text-left">
                     <div role="document" class="modal-dialog">
                         <div class="modal-content">
-                            {!! Form::open(['route' => 'customer.store', 'method' => 'post', 'files' => true]) !!}
+                            {!! Form::open(['route' => 'customer.store', 'method' => 'post', 'files' => true, 'id' => 'frmAddCustomer']) !!}
                             <div class="modal-header">
                                 <h5 id="exampleModalLabel" class="modal-title">{{ trans('file.Add Customer') }}</h5>
                                 <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
@@ -588,16 +631,20 @@
                                     <input type="text" name="name" required class="form-control">
                                 </div>
                                 <div class="form-group">
-                                    <label>{{ trans('file.Email') }}</label>
-                                    <input type="text" name="email" placeholder="example@example.com" class="form-control">
-                                </div>
-                                <div class="form-group">
                                     <label>{{ trans('file.Phone Number') }}</label>
                                     <input type="text" name="phone_number" class="form-control">
                                 </div>
                                 <div class="form-group">
+                                    <label>Fecha Nacimiento (Opcional)</label>
+                                    <input type="date" name="date_birh" class="form-control">
+                                </div>
+                                <div class="form-group">
                                     <label>{{ trans('file.Address') }}</label>
                                     <input type="text" name="address" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label>{{ trans('file.Email') }}</label>
+                                    <input type="text" name="email" placeholder="example@example.com" class="form-control">
                                 </div>
                                 <div class="form-group">
                                     <label>{{ trans('file.City') }}</label>
@@ -1009,6 +1056,8 @@
             $('input[name="warehouse_id"]').val(warehouse_id);
             $('input[name="employee_id"]').val(employee_id);
             $('input[name="employee_name"]').val(newEmployeeName);
+            $('input[name="attentionshift_id"]').val(0);
+            $('#selected-turno-label').text('Sin turno cargado');
 
             // Assign the new employee id to all existing items in the cart
             $('table.order-list tbody tr').each(function () {
@@ -1024,6 +1073,63 @@
             calculateTotal();
         });
 
+        function loadAssignedTurnos() {
+            var selectedEmployee = employee_id || $('input[name="employee_id"]').val();
+            if (!selectedEmployee) {
+                msg = new swal("Información", "Primero seleccione empleado de servicio", "info");
+                return;
+            }
+
+            $('#turno_id_prepos').empty();
+            $.get('attention/listsimple', {
+                employee_id: selectedEmployee
+            }, function (data) {
+                if (data && data.length > 0) {
+                    $('#turno_id_prepos').append('<option value="">Seleccione turno asignado...</option>');
+                    data.forEach(function (turno) {
+                        var customerName = turno.customer_name ? turno.customer_name : 'Sin cliente';
+                        var optionText = turno.reference_nro + ' - ' + customerName;
+                        var option = '<option value="' + turno.id + '" data-customer="' + (turno.customer_id || 0) +
+                            '">' + optionText + '</option>';
+                        $('#turno_id_prepos').append(option);
+                    });
+                    $('#turno_id_prepos').selectpicker('refresh');
+                    $('#selecturno-modal').modal('show');
+                } else {
+                    msg = new swal("Asignación", "No hay turnos activos asignados al empleado seleccionado", "error");
+                }
+            }).fail(function () {
+                msg = new swal("Error", "No se pudo cargar la lista de turnos", "error");
+            });
+        }
+
+        $('#load-turno-btn').on('click', function () {
+            loadAssignedTurnos();
+        });
+
+        $('#btn_updturno_prepos').on('click', function () {
+            var turnoId = $('#turno_id_prepos').val();
+            if (!turnoId) {
+                msg = new swal("Mensaje", "Seleccione un turno asignado", "error");
+                return;
+            }
+
+            var selectedOption = $('#turno_id_prepos option:selected');
+            var selectedText = selectedOption.text();
+            var customerId = selectedOption.data('customer');
+
+            $('input[name="attentionshift_id"]').val(turnoId);
+            $('#selected-turno-label').text('Turno cargado: ' + selectedText);
+
+            if (customerId && $('#customer_id option[value="' + customerId + '"]').length > 0) {
+                $('#customer_id').val(customerId);
+                $('.selectpicker').selectpicker('refresh');
+                $('#customer_id').trigger('change');
+            }
+
+            $('#selecturno-modal').modal('hide');
+        });
+
         $('.category-img').on('click', function () {
             var category_id = $(this).data('category');
             var brand_id = 0;
@@ -1037,11 +1143,6 @@
         $('.attendance-img').on('click', function () {
             var id = $(this).data('employee');
             $.get('attendance/checked/' + id, function (data) {
-                if (data.type === 'no_hrm_config') {
-                    $('#hrm-config-link').attr('href', data.redirect);
-                    $('#hrm-config-modal').modal('show');
-                    return;
-                }
                 if (data.status) {
                     if (data.type == 'checkin') {
                         $(`#emp_tab_${id}`).attr("style",
@@ -1053,11 +1154,18 @@
                         msg = new swal('Marcaje', "Empleado registro salida con éxito", "success");
                     }
                 } else {
-                    msg = new swal('Marcaje', "Empleado fallo al marcar, intente de nuevo!", "error");
+                    var detail = data && data.message ? data.message : "Empleado fallo al marcar, intente de nuevo!";
+                    msg = new swal('Marcaje', detail, "error");
                 }
                 /*$('#attendance-modal').modal('hide')
                 $('body').removeClass('modal-open');
                 $('.modal-backdrop').remove();*/
+            }).fail(function (xhr) {
+                var detail = "Error en servidor al marcar asistencia";
+                if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                    detail = xhr.responseJSON.message;
+                }
+                msg = new swal('Marcaje', detail, "error");
             });
         });
 
@@ -1395,7 +1503,7 @@
             $('.qc').data('initial', 1);
         });
 
-        $("#presale-btn").on("click", function () {
+        function submitPreSaleWithValidation() {
             blockAmounts()
             var audio = $("#mysoundclip2")[0];
             audio.play();
@@ -1415,7 +1523,7 @@
                         if (res.enabled)
                             $('.payment-form').submit();
                         else
-                            msg = new swal("Mensaje", "Error no tiene un turno asignado, intente mas tarde", "error");
+                            msg = new swal("Mensaje", "No tiene un turno asignado, intente más tarde", "error");
                     }).catch((error) => {
                         msg = new swal("Error de servicio!",
                             "Error: " + error + " contacte con soporte", "error");
@@ -1429,6 +1537,19 @@
                 $("#submit-btn").addClass("disabled noselect");
                 msg = new swal("Advertencia de Servicio", "Complete el empleado de servicio del item", "warning");
             }
+        }
+
+        $("#presale-btn").on("click", function () {
+            new swal({
+                title: "Confirmar Pre-Venta",
+                text: "Se generará la preventa y se abrirá la impresión.",
+                icon: "info",
+                buttons: true,
+            }).then((ok) => {
+                if (ok) {
+                    submitPreSaleWithValidation();
+                }
+            });
         });
 
         $("#submit-btn").on("click", function () {
@@ -2200,7 +2321,7 @@
 
             msg = new swal({
                 title: "Esta seguro de querer salir?",
-                text: "Esta accion cerrara el panel de Pre-Vena!",
+                text: "Esta accion cerrara el panel de Pre-Venta!",
                 icon: "warning",
                 buttons: true,
                 dangerMode: true,
@@ -2213,6 +2334,59 @@
                     }
                 });
         }
+
+        $(document).on('submit', '#frmAddCustomer', function (e) {
+            e.preventDefault();
+
+            var form_data = $(this).serialize();
+            $.ajax({
+                url: '{{ route('customer.store') }}',
+                type: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                data: form_data,
+                success: function (data) {
+                    if (data.status) {
+                        document.getElementById('frmAddCustomer').reset();
+
+                        if ($('#customer_id option[value="' + data.customer.id + '"]').length === 0) {
+                            $('#customer_id').append(
+                                $('<option>', {
+                                    value: data.customer.id,
+                                    text: data.customer.name + ' (' + (data.customer.phone_number || 'S/T') + ')'
+                                })
+                            );
+                        }
+
+                        $('#customer_id').val(data.customer.id);
+                        $('.selectpicker').selectpicker('refresh');
+                        $('#customer_id').trigger('change');
+
+                        msg = new swal('Mensaje', data.message, 'success');
+                        $('#addCustomer').modal('hide');
+                    } else {
+                        msg = new swal('Mensaje', data.message, 'error');
+                    }
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    if (XMLHttpRequest.status === 422) {
+                        var errors = $.parseJSON(XMLHttpRequest.responseText);
+                        $.each(errors, function (key, value) {
+                            if ($.isPlainObject(value)) {
+                                $.each(value, function (key, value) {
+                                    msg = new swal('Error Validacion', value, 'error');
+                                });
+                            } else {
+                                msg = new swal('Error Validacion', value, 'error');
+                            }
+                        });
+                    } else {
+                        msg = new swal('Error', 'Estado: ' + textStatus + ' Error: ' + errorThrown, 'error');
+                    }
+                }
+            });
+        });
 
         $(document).on('submit', '.payment-form', function (e) {
             var rownumber = $('table.order-list tbody tr:last').index();
@@ -2230,6 +2404,14 @@
             $('input[name="order_tax_rate"]').val($('select[name="order_tax_rate_select"]').val());
 
         });
+
+        @if (session()->has('message'))
+            swal("Éxito", {!! json_encode(session()->get('message')) !!}, "success");
+        @endif
+
+        @if (session()->has('not_permitted'))
+            swal("Error", {!! json_encode(session()->get('not_permitted')) !!}, "error");
+        @endif
 
         $('#product-table').DataTable({
             "order": [],
@@ -2346,6 +2528,24 @@
                 ]
             });
         }
+    </script>
+    <script>
+        let productSearchTimeout;
+        $('#product-search-input').on('keyup', function() {
+            clearTimeout(productSearchTimeout);
+            var searchTerm = $(this).val().toLowerCase();
+            productSearchTimeout = setTimeout(function() {
+                $('#product-table tbody .product-img').each(function() {
+                    var productName = $(this).find('p').text().toLowerCase();
+                    var productCode = $(this).find('span').text().toLowerCase();
+                    if (productName.includes(searchTerm) || productCode.includes(searchTerm)) {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                });
+            }, 300);
+        });
     </script>
 @endsection
 @section('scripts')

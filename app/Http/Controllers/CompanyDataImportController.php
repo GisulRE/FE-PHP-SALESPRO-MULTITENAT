@@ -121,10 +121,33 @@ class CompanyDataImportController extends Controller
     {
         $this->ensurePermission();
 
-        $this->validate($request, [
+        // 1. Verificar si el tamaño de la petición excede post_max_size
+        $contentLength = $_SERVER['CONTENT_LENGTH'] ?? 0;
+        $maxPostSize = $this->parseBytes(ini_get('post_max_size'));
+        if (($maxPostSize > 0 && $contentLength > $maxPostSize) || ($request->isMethod('post') && empty($_POST) && empty($_FILES) && $contentLength > 0)) {
+            return redirect()->back()->with('not_permitted', 'El tamaño total de la petición excede el límite post_max_size de php.ini (' . ini_get('post_max_size') . ').');
+        }
+
+        // 2. Si el archivo falló a nivel PHP, detectar el código de error antes de la validación
+        $restoreFile = $request->file('restore_file');
+        if ($restoreFile && !$restoreFile->isValid()) {
+            $errCode = $restoreFile->getError();
+            return redirect()->back()->with('not_permitted', 'Error de subida de PHP (código ' . $errCode . '): ' . $this->getUploadErrorString($errCode));
+        }
+
+        $validator = \Validator::make($request->all(), [
             'company_id' => 'required|exists:companies,id',
             'restore_file' => 'required|file|mimes:sql,txt|max:204800',
         ]);
+
+        if ($validator->fails()) {
+            $restoreFile = $request->file('restore_file');
+            if ($restoreFile && !$restoreFile->isValid()) {
+                $errCode = $restoreFile->getError();
+                return redirect()->back()->withErrors($validator)->with('not_permitted', 'Error al subir archivo (código ' . $errCode . '): ' . $this->getUploadErrorString($errCode));
+            }
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
 
         // Solo sube el límite; no lo restaura para evitar excepciones cuando el uso actual ya lo supera.
         ini_set('memory_limit', '1024M');
@@ -215,24 +238,48 @@ class CompanyDataImportController extends Controller
         $sourceName = null;
         $sourcePath = null;
 
-            if ($request->hasFile('restore_file')) {
-                $this->validate($request, [
-                    'restore_file' => 'required|file|mimes:sql,txt|max:204800',
-                ]);
-                $sourceName = $request->file('restore_file')->getClientOriginalName();
-                $sourcePath = $request->file('restore_file')->store('imports/pending', 'local');
-            } elseif ($request->filled('temp_file')) {
-                $tempPath = $request->input('temp_file');
-                if (!preg_match('/^restore_preview\/[a-zA-Z0-9_\-\.\/]+$/', $tempPath) || !Storage::disk('local')->exists($tempPath)) {
-                    return redirect()->route('setting.restoreCompanyData')->with('not_permitted', 'El archivo temporal ya no existe. Analiza el SQL nuevamente.');
-                }
-
-                $sourceName = basename($tempPath);
-                $sourcePath = 'imports/pending/' . date('YmdHis') . '_' . basename($tempPath);
-                Storage::disk('local')->copy($tempPath, $sourcePath);
-            } else {
-                return redirect()->route('setting.restoreCompanyData')->with('not_permitted', 'Debes subir un archivo SQL o venir desde el análisis previo.');
+        if ($request->hasFile('restore_file') || isset($_FILES['restore_file'])) {
+            // 1. Verificar si el tamaño de la petición excede post_max_size
+            $contentLength = $_SERVER['CONTENT_LENGTH'] ?? 0;
+            $maxPostSize = $this->parseBytes(ini_get('post_max_size'));
+            if (($maxPostSize > 0 && $contentLength > $maxPostSize) || ($request->isMethod('post') && empty($_POST) && empty($_FILES) && $contentLength > 0)) {
+                return redirect()->back()->with('not_permitted', 'El tamaño total de la petición excede el límite post_max_size de php.ini (' . ini_get('post_max_size') . ').');
             }
+
+            // 2. Si el archivo falló a nivel PHP
+            $restoreFile = $request->file('restore_file');
+            if ($restoreFile && !$restoreFile->isValid()) {
+                $errCode = $restoreFile->getError();
+                return redirect()->back()->with('not_permitted', 'Error de subida de PHP (código ' . $errCode . '): ' . $this->getUploadErrorString($errCode));
+            }
+
+            $validator = \Validator::make($request->all(), [
+                'restore_file' => 'required|file|mimes:sql,txt|max:204800',
+            ]);
+
+            if ($validator->fails()) {
+                $restoreFile = $request->file('restore_file');
+                if ($restoreFile && !$restoreFile->isValid()) {
+                    $errCode = $restoreFile->getError();
+                    return redirect()->back()->withErrors($validator)->with('not_permitted', 'Error al subir archivo (código ' . $errCode . '): ' . $this->getUploadErrorString($errCode));
+                }
+                return redirect()->back()->withErrors($validator)->withInput();
+            }
+
+            $sourceName = $request->file('restore_file')->getClientOriginalName();
+            $sourcePath = $request->file('restore_file')->store('imports/pending', 'local');
+        } elseif ($request->filled('temp_file')) {
+            $tempPath = $request->input('temp_file');
+            if (!preg_match('/^restore_preview\/[a-zA-Z0-9_\-\.\/]+$/', $tempPath) || !Storage::disk('local')->exists($tempPath)) {
+                return redirect()->route('setting.restoreCompanyData')->with('not_permitted', 'El archivo temporal ya no existe. Analiza el SQL nuevamente.');
+            }
+
+            $sourceName = basename($tempPath);
+            $sourcePath = 'imports/pending/' . date('YmdHis') . '_' . basename($tempPath);
+            Storage::disk('local')->copy($tempPath, $sourcePath);
+        } else {
+            return redirect()->route('setting.restoreCompanyData')->with('not_permitted', 'Debes subir un archivo SQL o venir desde el análisis previo.');
+        }
 
         $parsed = $parserService->parseFileSummary(storage_path('app/' . $sourcePath));
         list($filteredTables) = $this->filterImportableTables($parsed['tables'], $schemaService);
@@ -242,31 +289,99 @@ class CompanyDataImportController extends Controller
         $roots = $schemaService->getRootTables($tableNames);
 
         $job = ImportJob::create([
-            'company_id' => $companyId,
-            'user_id' => Auth::id(),
-            'source_name' => $sourceName,
-            'source_path' => $sourcePath,
-            'status' => 'queued',
-            'root_tables' => $roots,
+            'company_id'      => $companyId,
+            'user_id'         => Auth::id(),
+            'source_name'     => $sourceName,
+            'source_path'     => $sourcePath,
+            'status'          => 'queued',
+            'root_tables'     => $roots,
             'migration_order' => $order,
-            'options' => [
-                'queue_driver' => config('queue.default'),
-                'parser_issues' => $parsed['issues'],
+            'options'         => [
+                'queue_driver'       => config('queue.default'),
+                'parser_issues'      => $parsed['issues'],
                 'split_before_import' => true,
             ],
         ]);
 
         $progressService->initializeJob($job, $order, $filteredTables);
+
+        // Modo de ejecución: 'sync' = ejecutar ahora mismo en esta request (sin worker)
+        //                    'queue' = encolar para worker externo
+        $executionMode = $request->input('execution_mode', 'queue');
+
+        if ($executionMode === 'sync') {
+            // Ejecutar directamente — no requiere worker corriendo
+            try {
+                set_time_limit(0);
+                app(\App\Services\Import\CompanySqlImportService::class)->run($job);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("Excepción durante la importación directa (Job #{$job->id}): " . $e->getMessage(), [
+                    'exception' => get_class($e),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                $progressService->failJob($job->fresh(), $e->getMessage());
+            }
+
+            return redirect()->route('setting.restoreCompanyData', ['job_id' => $job->id])
+                ->with('message', 'Importación completada (modo síncrono). Job #' . $job->id . '.');
+        }
+
+        // Modo cola — encolar para worker externo
         ProcessCompanyImportJob::dispatch($job->id)->onQueue('imports');
 
-        $message = 'Importación encolada. Job #' . $job->id . '. '; 
+        $message = 'Importación encolada. Job #' . $job->id . '. ';
         if (config('queue.default') === 'sync') {
-            $message .= 'El proyecto sigue usando QUEUE_DRIVER=sync; cambia a database para ver progreso en tiempo real.';
+            $message .= 'QUEUE_DRIVER=sync: la importación se ejecutó automáticamente.';
         } else {
-            $message .= 'Puedes seguir el progreso y logs en esta misma pantalla.';
+            $message .= 'Recuerda que necesitas un worker corriendo: php artisan queue:work --queue=imports';
         }
 
         return redirect()->route('setting.restoreCompanyData', ['job_id' => $job->id])->with('message', $message);
+    }
+
+    /**
+     * Ejecuta inmediatamente un job que está atascado en estado 'queued'.
+     * Útil cuando no hay un queue worker corriendo.
+     */
+    public function runNow(ImportJob $importJob, ImportProgressService $progressService)
+    {
+        $this->ensurePermission();
+
+        if (!in_array($importJob->status, ['queued', 'failed', 'partial', 'cancelled'], true)) {
+            return redirect()->route('setting.restoreCompanyData', ['job_id' => $importJob->id])
+                ->with('not_permitted', 'El job #' . $importJob->id . ' no se puede ejecutar (estado: ' . $importJob->status . ').');
+        }
+
+        if (!Storage::disk('local')->exists($importJob->source_path)) {
+            return redirect()->route('setting.restoreCompanyData')
+                ->with('not_permitted', 'El archivo fuente del job ya no está disponible.');
+        }
+
+        ini_set('memory_limit', '1024M');
+        set_time_limit(0);
+
+        // Si viene de un estado terminal, resetear para permitir re-ejecución
+        if (in_array($importJob->status, ['failed', 'partial', 'cancelled'], true)) {
+            $importJob->details()->update(['status' => 'queued', 'processed_rows' => 0, 'failed_rows' => 0, 'deferred_rows' => 0, 'retries' => 0]);
+            $importJob->update(['status' => 'queued', 'processed_rows' => 0, 'failed_rows' => 0, 'processed_tables' => 0, 'started_at' => null, 'finished_at' => null, 'last_error' => null]);
+        }
+
+        try {
+            app(\App\Services\Import\CompanySqlImportService::class)->run($importJob);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Excepción durante la ejecución directa runNow (Job #{$importJob->id}): " . $e->getMessage(), [
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $progressService->failJob($importJob->fresh(), $e->getMessage());
+        }
+
+        return redirect()->route('setting.restoreCompanyData', ['job_id' => $importJob->id])
+            ->with('message', 'Ejecución directa del Job #' . $importJob->id . ' completada.');
     }
 
     public function status(ImportJob $importJob)
@@ -436,5 +551,46 @@ class CompanyDataImportController extends Controller
         ProcessCompanyImportJob::dispatch($retryJob->id)->onQueue('imports');
 
         return redirect()->route('setting.restoreCompanyData', ['job_id' => $retryJob->id])->with('message', 'Reintento encolado. Job #' . $retryJob->id . '.');
+    }
+
+    protected function parseBytes($val)
+    {
+        $val = trim($val);
+        if (empty($val)) {
+            return 0;
+        }
+        $last = strtolower($val[strlen($val) - 1]);
+        $val = (int) $val;
+        switch ($last) {
+            case 'g':
+                $val *= 1024;
+            case 'm':
+                $val *= 1024;
+            case 'k':
+                $val *= 1024;
+        }
+        return $val;
+    }
+
+    protected function getUploadErrorString($errorCode)
+    {
+        switch ($errorCode) {
+            case UPLOAD_ERR_INI_SIZE:
+                return 'El archivo excede el límite de tamaño permitido por la directiva upload_max_filesize en php.ini (' . ini_get('upload_max_filesize') . ').';
+            case UPLOAD_ERR_FORM_SIZE:
+                return 'El archivo excede el límite de tamaño especificado en el formulario HTML (MAX_FILE_SIZE).';
+            case UPLOAD_ERR_PARTIAL:
+                return 'El archivo fue subido solo parcialmente.';
+            case UPLOAD_ERR_NO_FILE:
+                return 'No se subió ningún archivo.';
+            case UPLOAD_ERR_NO_TMP_DIR:
+                return 'No se encuentra la carpeta temporal en el servidor para almacenar la subida.';
+            case UPLOAD_ERR_CANT_WRITE:
+                return 'Error al escribir el archivo en el disco del servidor. Revisa los permisos de escritura o el espacio en disco.';
+            case UPLOAD_ERR_EXTENSION:
+                return 'Una extensión de PHP detuvo la subida del archivo.';
+            default:
+                return 'Error desconocido en la subida del archivo.';
+        }
     }
 }

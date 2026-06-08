@@ -11,7 +11,7 @@ class Employee extends Model
     protected $fillable = [
         "name", "image", "department_id", "email", "phone_number", "user_id", "address",
         "city", "country", "is_active", "contract_type", "percentage", "pay_commission",
-        "pre_sale", "warehouse_id", "company_id"
+        "pre_sale", "warehouse_id", "company_id", "is_public", "attendance_pin"
     ];
 
     public function payroll()

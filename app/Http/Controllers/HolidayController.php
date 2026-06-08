@@ -88,8 +88,8 @@ class HolidayController extends Controller
                     ['user_id', Auth::id()]
                 ])->first();
             if ($holiday_found) {
-                $general_setting = \App\GeneralSetting::select('date_format')->latest()->first();
-                $holidays[$start] = date($general_setting->date_format, strtotime($holiday_found->from_date)) . ' ' . trans("file.To") . ' ' . date($general_setting->date_format, strtotime($holiday_found->to_date));
+                $dateFormat = \App\GeneralSetting::currentDateFormat();
+                $holidays[$start] = date($dateFormat, strtotime($holiday_found->from_date)) . ' ' . trans("file.To") . ' ' . date($dateFormat, strtotime($holiday_found->to_date));
             } else {
                 $holidays[$start] = false;
             }

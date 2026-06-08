@@ -211,7 +211,7 @@ class AccountsController extends Controller
 
     public function balanceSheetAccount(Request $request)
     {
-        $start_date = $request->start_date;
+        $start_date = $request->start_date ?: date('Y-m-d');
         $end_date = date("Y-m-d");
         $end_date_temp = $start_date;
         $end_date = $start_date . " 23:59:59";
@@ -1066,30 +1066,69 @@ class AccountsController extends Controller
                 $credit = 0;
                 $debit = 0;
 
-                $payment_recieved = Payment::whereNotNull('sale_id')->whereIn('account_id', $lims_account_list)
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                $payment_sent = Payment::whereNotNull('purchase_id')->whereIn('account_id', $lims_account_list)
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                $returns = Returns::whereIn('account_id', $lims_account_list)->where('biller_id', $biller->id)
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-                $return_purchase = DB::table('return_purchases')->whereIn('account_id', $lims_account_list)
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-                $expenses = DB::table('expenses')->whereIn('account_id', $lims_account_list)
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                $payrolls = DB::table('payrolls')->whereIn('account_id', $lims_account_list)
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                $sent_money_via_transfer = MoneyTransfer::whereIn('from_account_id', $lims_account_list)
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                $recieved_money_via_transfer = MoneyTransfer::whereIn('to_account_id', $lims_account_list)
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                $adjustment_account_ing = AdjustmentAccount::whereIn('account_id', $lims_account_list)->where([['is_active', true], ['type_adjustment', 'ING']])
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                $adjustment_account_egr = AdjustmentAccount::whereIn('account_id', $lims_account_list)->where([['is_active', true], ['type_adjustment', 'EGR']])
-                    ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
+                // El saldo anterior del arqueo debe representar solo caja en efectivo.
+                // Por eso se calcula únicamente con la cuenta principal de efectivo del facturador.
+                $cash_account_id = $biller->account_id;
 
-                $credit = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + $lims_account_data->initial_balance;
-                $debit = $payment_sent + $returns + $expenses + $payrolls + $sent_money_via_transfer + $adjustment_account_egr;
-                $saldoant = $credit - $debit;
+                // Prioridad 1: usar el último cierre real de caja previo a la fecha seleccionada.
+                $active_cashier = Cashier::where('account_id', $cash_account_id)
+                    ->where('is_active', true)
+                    ->whereNull('end_date')
+                    ->orderByDesc('start_date')
+                    ->first();
+
+                // Si la caja está abierta en la fecha consultada, el saldo anterior (A)
+                // del arqueo corresponde al monto de apertura de esa caja.
+                if (
+                    $active_cashier &&
+                    !empty($active_cashier->amount_start) &&
+                    date('Y-m-d', strtotime($active_cashier->start_date)) == $start_date
+                ) {
+                    $saldoant = (float) $active_cashier->amount_start;
+                } else {
+
+                $cashier_cutoff_datetime = $start_date . ' 00:00:00';
+                if ($active_cashier && !empty($active_cashier->start_date)) {
+                    $cashier_cutoff_datetime = $active_cashier->start_date;
+                }
+
+                $cashier_close_before_date = Cashier::where('account_id', $cash_account_id)
+                    ->whereNotNull('amount_end')
+                    ->whereNotNull('end_date')
+                    ->where('end_date', '<', $cashier_cutoff_datetime)
+                    ->orderByDesc('end_date')
+                    ->first();
+
+                if ($cashier_close_before_date) {
+                    $saldoant = (float) $cashier_close_before_date->amount_end;
+                } else {
+
+                    $payment_recieved = Payment::whereNotNull('sale_id')->where('account_id', $cash_account_id)->where('paying_method', 'Efectivo')
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
+                    $payment_sent = Payment::whereNotNull('purchase_id')->where('account_id', $cash_account_id)
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
+                    $returns = Returns::where('account_id', $cash_account_id)->where('biller_id', $biller->id)
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
+                    $return_purchase = DB::table('return_purchases')->where('account_id', $cash_account_id)
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
+                    $expenses = DB::table('expenses')->where('account_id', $cash_account_id)
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
+                    $payrolls = DB::table('payrolls')->where('account_id', $cash_account_id)
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
+                    $sent_money_via_transfer = MoneyTransfer::where('from_account_id', $cash_account_id)
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
+                    $recieved_money_via_transfer = MoneyTransfer::where('to_account_id', $cash_account_id)
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
+                    $adjustment_account_ing = AdjustmentAccount::where('account_id', $cash_account_id)->where([['is_active', true], ['type_adjustment', 'ING']])
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
+                    $adjustment_account_egr = AdjustmentAccount::where('account_id', $cash_account_id)->where([['is_active', true], ['type_adjustment', 'EGR']])
+                        ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
+
+                    $credit = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + $lims_account_data->initial_balance;
+                    $debit = $payment_sent + $returns + $expenses + $payrolls + $sent_money_via_transfer + $adjustment_account_egr;
+                    $saldoant = $credit - $debit;
+                }
+                }
 
                 /*** Totales Egresos Actual */
 

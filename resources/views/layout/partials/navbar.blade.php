@@ -1,6 +1,11 @@
 @php
     $permissions = session('permissions');
     $role = DB::table('roles')->find(Auth::user()->role_id);
+    $alert_product = (int) ($alert_product ?? 0);
+    $alert_lote = (int) ($alert_lote ?? 0);
+    $alert_cuis = (int) ($alert_cuis ?? 0);
+    $pendingTransfers = isset($pendingTransfers) ? collect($pendingTransfers) : collect();
+    $pendingTransfersCount = isset($pendingTransfersCount) ? (int) $pendingTransfersCount : $pendingTransfers->count();
 
     // Si hay datos de prueba en sesión, sobrescribir las variables usadas por el dropdown/modal
     if (session()->has('test_notifications')) {
@@ -296,7 +301,7 @@
     </div>
 </div>
 
-@if(session()->has('show_notifications_modal'))
+@if(session()->has('show_notifications_modal') && ($alert_product + $alert_lote + $alert_cuis + $pendingTransfersCount) > 0)
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             try {

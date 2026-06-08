@@ -67,7 +67,7 @@ class PreSaleController extends Controller
             $lims_warehouse_list = Warehouse::select('id', 'name')->where('is_active', true)->get();
             $lims_biller_list = Biller::select('id', 'name', 'company_name')->where('is_active', true)->get();
             $lims_tax_list = Tax::where('is_active', true)->get();
-            $lims_product_list = Product::select('id', 'name', 'code', 'image')->ActiveFeatured()->where('type', '!=', 'insumo')->whereNull('is_variant')->get();
+            $lims_product_list = Product::select('id', 'name', 'code', 'image', 'price')->ActiveFeatured()->where('type', '!=', 'insumo')->whereNull('is_variant')->get();
             foreach ($lims_product_list as $key => $product) {
                 $images = explode(",", $product->image);
                 $product->base_image = $images[0];
@@ -75,7 +75,7 @@ class PreSaleController extends Controller
                     unset($lims_product_list[$key]);
                 }
             }
-            $lims_product_list_with_variant = Product::select('id', 'name', 'code', 'image')->ActiveFeatured()->whereNotNull('is_variant')->get();
+            $lims_product_list_with_variant = Product::select('id', 'name', 'code', 'image', 'price')->ActiveFeatured()->whereNotNull('is_variant')->get();
 
             foreach ($lims_product_list_with_variant as $product) {
                 $images = explode(",", $product->image);
@@ -119,7 +119,7 @@ class PreSaleController extends Controller
                     if ($role->hasPermissionTo('attentionshift')) {
                         if ($presale->attentionshift_id) {
                             $nestedData['attentionshift'] = $presale->attentionshift->reference_nro;
-                            $nestedData['customer'] = $presale->attentionshift->customer_name;
+                            $nestedData['customer'] = optional($presale->customer)->name ?? $presale->attentionshift->customer_name;
                             if ($presale->attentionshift->employee_id) {
                                 $nestedData['employee'] = $presale->attentionshift->employee->name;
                             } else {
@@ -188,11 +188,15 @@ class PreSaleController extends Controller
         Log::info('Registrando pre-venta...');
         $data = $request->all();
         $data['user_id'] = Auth::id();
+        $data['order_discount'] = (isset($data['order_discount']) && $data['order_discount'] !== '') ? (float) $data['order_discount'] : 0.00;
+        $data['shipping_cost'] = (isset($data['shipping_cost']) && $data['shipping_cost'] !== '') ? (float) $data['shipping_cost'] : 0.00;
+        $data['tips'] = (isset($data['tips']) && $data['tips'] !== '') ? (float) $data['tips'] : 0.00;
         $datenow = date('Y-m-d');
         $last_ref = PreSale::get()->last();
+        $turno_data = null;
         if (isset($data['sale_status'])) {
             $turno_data = AttentionShift::find($data['attentionshift_id']);
-            Log::info('Turno id: ' . $turno_data->id);
+            Log::info('Turno id: ' . ($turno_data ? $turno_data->id : 'null'));
             if ($turno_data) {
                 $presale_data = PreSale::where('attentionshift_id', $turno_data->id)->first();
                 if ($presale_data) {
@@ -203,7 +207,12 @@ class PreSaleController extends Controller
                 }
             }
         } else {
-            $turno_data = AttentionShift::where([['employee_id', $data['employee_id']], ['status', 1]])->whereDate('created_at', $datenow)->first();
+            if (!empty($data['attentionshift_id'])) {
+                $turno_data = AttentionShift::where([['id', $data['attentionshift_id']], ['status', 1]])->whereDate('created_at', $datenow)->first();
+            }
+            if (!$turno_data) {
+                $turno_data = AttentionShift::where([['employee_id', $data['employee_id']], ['status', 1]])->whereDate('created_at', $datenow)->first();
+            }
             if ($turno_data) {
                 $presale_data = PreSale::where('attentionshift_id', $turno_data->id)->first();
                 if ($presale_data) {
@@ -230,6 +239,9 @@ class PreSaleController extends Controller
 
         if ($turno_data) {
             $data['attentionshift_id'] = $turno_data->id;
+            if ($turno_data->employee_id) {
+                $data['employee_id'] = $turno_data->employee_id;
+            }
         }
         $employeeid = $data['employee_id'];
         if (is_array($employeeid)) {
@@ -288,6 +300,7 @@ class PreSaleController extends Controller
             $employee[] = $data['employee'];
         }
         $product_sale = [];
+        $fallback_category_id = Category::where('is_active', true)->value('id') ?: Category::value('id') ?: 1;
 
         foreach ($product_id as $i => $id) {
             $lims_product_data = Product::where('id', $id)->first();
@@ -305,7 +318,13 @@ class PreSaleController extends Controller
 
             $product_sale['presale_id'] = $lims_sale_data->id;
             $product_sale['product_id'] = $id;
-            $product_sale['category_id'] = $lims_product_data->category_id;
+            $product_sale['category_id'] = ($lims_product_data && $lims_product_data->category_id) ? $lims_product_data->category_id : $fallback_category_id;
+            if (!$lims_product_data || !$lims_product_data->category_id) {
+                Log::warning('[PreSaleController@store] Producto sin categoria, se aplica fallback', [
+                    'product_id' => $id,
+                    'fallback_category_id' => $fallback_category_id,
+                ]);
+            }
             $product_sale['qty'] = $mail_data['qty'][$i] = $qty[$i];
             $product_sale['sale_unit_id'] = $sale_unit_id;
             $product_sale['net_unit_price'] = $net_unit_price[$i];
@@ -351,22 +370,10 @@ class PreSaleController extends Controller
             $message = 'Pre-Venta creada con éxito' . $error;
         }
         if ($lims_sale_data->status == '1' && isset($data['sale_status'])) {
-            $data['prepos'] = $lims_pos_setting_data->print_presale;
-            if ($data['prepos']) {
-                //return redirect('presales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
-                return array('message' => $message, 'status' => true, 'message_code' => 'success', 'print' => true, 'id' => $presale_data->id);
-            } else {
-                //return redirect('prepos')->with('message', $message);
-                return array('message' => $message, 'status' => true, 'message_code' => 'success', 'print' => false);
-            }
+            return array('message' => $message, 'status' => true, 'message_code' => 'success', 'print' => true, 'id' => $lims_sale_data->id);
 
         } elseif ($lims_sale_data->status == '1') {
-            $data['prepos'] = $lims_pos_setting_data->print_presale;
-            if ($data['prepos']) {
-                return redirect('presales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
-            } else {
-                return redirect('prepos')->with('message', $message);
-            }
+            return redirect('presales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
         }
 
     }
@@ -402,6 +409,27 @@ class PreSaleController extends Controller
         $lims_sale_data = PreSale::find($id);
         $lims_product_sale_data = Product_Presale::select('product_pre_sale.*', 'products.code')
             ->join('products', 'product_pre_sale.product_id', '=', 'products.id')->where('product_pre_sale.presale_id', $id)->get();
+
+        Log::info('[PreSaleController@edit] Loading presale for POS', [
+            'presale_id' => $id,
+            'head_grand_total' => $lims_sale_data ? $lims_sale_data->grand_total : null,
+            'items_count' => $lims_product_sale_data->count(),
+        ]);
+
+        foreach ($lims_product_sale_data as $item) {
+            Log::info('[PreSaleController@edit] Item values', [
+                'presale_id' => $id,
+                'product_id' => $item->product_id,
+                'code' => $item->code,
+                'qty' => $item->qty,
+                'net_unit_price' => $item->net_unit_price,
+                'discount' => $item->discount,
+                'tax_rate' => $item->tax_rate,
+                'tax' => $item->tax,
+                'total' => $item->total,
+            ]);
+        }
+
         return array('head' => $lims_sale_data, 'body' => $lims_product_sale_data);
     }
 
@@ -416,11 +444,17 @@ class PreSaleController extends Controller
     {
         $data = $request->all();
         $data['user_id'] = Auth::id();
+        $data['order_discount'] = (isset($data['order_discount']) && $data['order_discount'] !== '') ? (float) $data['order_discount'] : 0.00;
+        $data['shipping_cost'] = (isset($data['shipping_cost']) && $data['shipping_cost'] !== '') ? (float) $data['shipping_cost'] : 0.00;
+        $data['tips'] = (isset($data['tips']) && $data['tips'] !== '') ? (float) $data['tips'] : 0.00;
         $datenow = date('Y-m-d');
         $presale_data = PreSale::find($data['presale_id']);
         $presale_data->grand_total = $data['grand_total'];
         $presale_data->item = $data['item'];
         $presale_data->total_qty = $data['total_qty'];
+        $presale_data->order_discount = $data['order_discount'];
+        $presale_data->shipping_cost = $data['shipping_cost'];
+        $presale_data->tips = $data['tips'];
         $presale_data->customer_id = $data['customer_id'];
         $presale_data->warehouse_id = $data['warehouse_id'];
         $presale_data->user_id = $data['user_id'];
@@ -486,6 +520,7 @@ class PreSaleController extends Controller
         }
         $product_presale = [];
         $total_grand = 0;
+        $fallback_category_id = Category::where('is_active', true)->value('id') ?: Category::value('id') ?: 1;
         foreach ($product_id as $i => $id) {
             /** if found data save than update $product_presale_data*/
             $product_presale_data = Product_Presale::where([['presale_id', $presale_data->id], ['product_id', $id]])->first();
@@ -507,7 +542,13 @@ class PreSaleController extends Controller
                 $sale_unit_id = 0;
             }
             if ($product_presale_data) {
-                $product_presale_data->category_id = $lims_product_data->category_id;
+                $product_presale_data->category_id = ($lims_product_data && $lims_product_data->category_id) ? $lims_product_data->category_id : $fallback_category_id;
+                if (!$lims_product_data || !$lims_product_data->category_id) {
+                    Log::warning('[PreSaleController@update] Producto sin categoria, se aplica fallback', [
+                        'product_id' => $id,
+                        'fallback_category_id' => $fallback_category_id,
+                    ]);
+                }
                 $product_presale_data->qty = $qty[$i];
                 $product_presale_data->sale_unit_id = $sale_unit_id;
                 $product_presale_data->net_unit_price = $net_unit_price[$i];
@@ -524,7 +565,13 @@ class PreSaleController extends Controller
             } else {
                 $product_presale['presale_id'] = $presale_data->id;
                 $product_presale['product_id'] = $id;
-                $product_presale['category_id'] = $lims_product_data->category_id;
+                $product_presale['category_id'] = ($lims_product_data && $lims_product_data->category_id) ? $lims_product_data->category_id : $fallback_category_id;
+                if (!$lims_product_data || !$lims_product_data->category_id) {
+                    Log::warning('[PreSaleController@update] Producto sin categoria, se aplica fallback', [
+                        'product_id' => $id,
+                        'fallback_category_id' => $fallback_category_id,
+                    ]);
+                }
                 $product_presale['qty'] = $mail_data['qty'][$i] = $qty[$i];
                 $product_presale['sale_unit_id'] = $sale_unit_id;
                 $product_presale['net_unit_price'] = $net_unit_price[$i];
@@ -548,22 +595,10 @@ class PreSaleController extends Controller
             $message = 'Pre-Venta actualizado con éxito';
         }
         if ($presale_data->status == '1' && isset($data['sale_status'])) {
-            $data['prepos'] = $lims_pos_setting_data->print_presale;
-            if ($data['prepos']) {
-                //return redirect('presales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
-                return array('message' => $message, 'status' => true, 'message_code' => 'success', 'print' => true, 'id' => $presale_data->id);
-            } else {
-                //return redirect('prepos')->with('message', $message);
-                return array('message' => $message, 'status' => true, 'message_code' => 'success', 'print' => false);
-            }
+            return array('message' => $message, 'status' => true, 'message_code' => 'success', 'print' => true, 'id' => $presale_data->id);
 
         } elseif ($presale_data->status == '1') {
-            $data['prepos'] = $lims_pos_setting_data->print_presale;
-            if ($data['prepos']) {
-                return redirect('presales/gen_invoice/' . $presale_data->id)->with('message', $message);
-            } else {
-                return redirect('prepos')->with('message', $message);
-            }
+            return redirect('presales/gen_invoice/' . $presale_data->id)->with('message', $message);
         }
     }
 

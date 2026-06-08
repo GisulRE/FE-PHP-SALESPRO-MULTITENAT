@@ -94,7 +94,7 @@ class AutorizacionFacturacion extends Model
 
     public function getFechaVencimientoToken()
     {
-        $formato_fecha = GeneralSetting::first()->date_format;
+        $formato_fecha = GeneralSetting::currentDateFormat();
 
         $fecha = new Carbon($this->fecha_vencimiento_token);
         $fecha = $fecha->format("$formato_fecha H:i");
@@ -109,7 +109,7 @@ class AutorizacionFacturacion extends Model
 
     public function getFechaModalidad()
     {
-        $formato_fecha = GeneralSetting::first()->date_format;
+        $formato_fecha = GeneralSetting::currentDateFormat();
 
         $fecha = new Carbon($this->fecha_solicitud);
         $fecha = $fecha->format($formato_fecha);

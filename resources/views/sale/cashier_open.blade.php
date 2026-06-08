@@ -98,7 +98,10 @@
 <script type="text/javascript">
 var btn = document.getElementById("btn_save");
 btn.disabled = false;
-$('select[name=biller_id]').val($("input[name='biller_id_hidden']").val());
+var _hid_biller = $("input[name='biller_id_hidden']").val();
+if (_hid_biller && _hid_biller !== '') {
+    $('select[name=biller_id]').val(_hid_biller);
+}
 $('.selectpicker').selectpicker('refresh');
 oldMonto();
 $.ajaxSetup({
@@ -135,13 +138,30 @@ $(document).ready(function() {
 
 function oldMonto(){ 
     var id = $('select[name=biller_id]').val();
+
+    if(!id){
+        $('input[name="amount_old"]').val(0);
+        $('input[name="amount_start"]').val(0);
+        return;
+    }
+
     $.ajax({
         type:'GET',
         url:'cashier/amountold/' + id,
         success:function(data){
-            console.log(data);
-            $('input[name="amount_old"]').val(data.amount_end);
-            $('input[name="amount_start"]').val(data.amount_end);
+            var amountOld = 0;
+            if(data && data.amount_end !== undefined && data.amount_end !== null){
+                amountOld = parseFloat(data.amount_end);
+                if(isNaN(amountOld)){
+                    amountOld = 0;
+                }
+            }
+            $('input[name="amount_old"]').val(amountOld);
+            $('input[name="amount_start"]').val(amountOld);
+        },
+        error:function(){
+            $('input[name="amount_old"]').val(0);
+            $('input[name="amount_start"]').val(0);
         }
     });
 }

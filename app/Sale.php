@@ -13,7 +13,8 @@ class Sale extends Model
         "total_qty", "total_discount", "total_tax", "total_price", "order_tax_rate", 
         "order_tax", "order_discount","coupon_id", "coupon_discount", "shipping_cost", 
         "grand_total", "sale_status", "payment_status", "paid_amount", "document", 
-        "sale_note", "staff_note", "date_sell", "total_tips", "invoice_no", "company_id"
+        "sale_note", "staff_note", "date_sell", "total_tips", "invoice_no", "company_id",
+        "quotation_id"
     ];
 
     public function biller()
@@ -29,6 +30,11 @@ class Sale extends Model
     public function warehouse()
     {
     	return $this->belongsTo('App\Warehouse');
+    }
+
+    public function quotation()
+    {
+        return $this->belongsTo('App\Quotation');
     }
 
     public function user()

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Unit;
 use App\Company;
+use Illuminate\Support\Facades\DB;
 
 class UnitsSeeder extends Seeder
 {
@@ -16,6 +17,11 @@ class UnitsSeeder extends Seeder
     public function run()
     {
         $this->command->info('Creando unidades para cada compañía...');
+
+        if (DB::getDriverName() === 'pgsql') {
+            // Evita colisiones de PK cuando la secuencia quedó desfasada por inserts previos.
+            DB::statement("SELECT setval(pg_get_serial_sequence('units','id'), COALESCE((SELECT MAX(id) FROM units), 1), true)");
+        }
 
         // Obtener todas las compañías
         $companies = Company::all();

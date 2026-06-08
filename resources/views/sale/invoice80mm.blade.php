@@ -59,6 +59,18 @@
 </head>
 
 <body>
+    @php
+        $service_employee_name = null;
+        foreach ($lims_product_sale_data as $service_product_sale_data) {
+            if ($service_product_sale_data->employee_id) {
+                $service_employee_data = \App\Employee::find($service_product_sale_data->employee_id);
+                if ($service_employee_data) {
+                    $service_employee_name = $service_employee_data->name;
+                    break;
+                }
+            }
+        }
+    @endphp
 
     <div class="invoice-ticket-container">
         <div class="centered">
@@ -98,14 +110,16 @@
                         <span>{{ $lims_sale_data->reference_no }}</span>
                     </td>
                 </tr>
-                <tr>
-                    <td>
-                        <strong>{{ __('file.Biller') }}:</strong>
-                    </td>
-                    <td>
-                        <span>{{ $lims_biller_data->name }}</span>
-                    </td>
-                </tr>
+                @if ($service_employee_name)
+                    <tr>
+                        <td>
+                            <strong>Servicio por:</strong>
+                        </td>
+                        <td>
+                            <span>{{ $service_employee_name }}</span>
+                        </td>
+                    </tr>
+                @endif
                 <tr>
                     <td>
                         <strong>{{ __('file.customer') }}:</strong>
@@ -135,6 +149,9 @@
                             $product_name = $lims_product_data->name . ' [' . $variant_data->name . ']';
                         } else {
                             $product_name = $lims_product_data->name;
+                        }
+                        if (!empty($product_sale_data->description)) {
+                            $product_name .= ' - ' . $product_sale_data->description;
                         }
                     @endphp
                     <tr>
@@ -234,6 +251,10 @@
                             {{ number_format((float) $lims_sale_data->grand_total, 2, '.', ',') }}</td>
                     </tr>
                     <tr>
+                        <td style="padding: 5px;width:40%">Facturador:</td>
+                        <td style="padding: 5px;width:60%">{{ $lims_biller_data->name }}</td>
+                    </tr>
+                    <tr>
                         <td class="centered" colspan="3">
                             {{ __('file.Thank you for shopping with us. Please come again') }}</td>
                     </tr>
@@ -246,6 +267,11 @@
                                 {{ number_format((float) $payment_data->amount, 2, '.', ',') }}</td>
                             <td style="padding: 5px;width:30%">{{ __('file.Change') }}:
                                 {{ number_format((float) $payment_data->change, 2, '.', ',') }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px;width:30%">Facturador:</td>
+                            <td style="padding: 5px;width:40%">{{ $lims_biller_data->name }}</td>
+                            <td style="padding: 5px;width:30%"></td>
                         </tr>
                         <tr>
                             <td class="centered" colspan="3">

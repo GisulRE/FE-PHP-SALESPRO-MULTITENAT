@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\AttentionShift;
 use App\Customer;
+use App\CustomerGroup;
 use App\Employee;
 use App\PreSale;
 use App\ShiftEmployee;
 use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 use Pusher\Pusher;
 
@@ -26,7 +28,9 @@ class AttentionShiftController extends Controller
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('attentionshift')) {
             $this->date = date('Y-m-d');
-            return view('shift.index');
+            $lims_customer_list = Customer::select('id', 'name', 'phone_number')->where('is_active', true)->orderBy('name', 'asc')->get();
+            $lims_customer_group_all = CustomerGroup::where('is_active', true)->orderBy('name', 'asc')->get();
+            return view('shift.index', compact('lims_customer_list', 'lims_customer_group_all'));
         } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
@@ -68,14 +72,17 @@ class AttentionShiftController extends Controller
                 }
                 $presale_data = PreSale::where('attentionshift_id', $turno->id)->whereDate('created_at', $this->date)->first();
                 if ($turno->status == 2 || $turno->status == 1) {
+                    $employeeId   = $turno->employee_id ?? 0;
+                    $employeeName = $turno->employee_id ? $turno->employee->name : 'Sin Asignar';
                     $nestedData['options'] = '<div class="btn-group">';
                     if ($presale_data) {
-                        $nestedData['options'] .= \Form::open(["route" => ["attentionshift.destroy", $turno->id], "method" => "DELETE"]) . '
-                              <button type="submit" class="btn btn-sm btn-danger" onclick="return confirmDelete()" disabled><i class="dripicons-trash"></i> ' . trans("file.delete") . '</button>' . \Form::close() . '</div>';
+                        $nestedData['options'] .= '<button type="button" class="btn btn-sm btn-danger" disabled><i class="dripicons-trash"></i> ' . trans("file.delete") . '</button>';
                     } else {
-                        $nestedData['options'] .= \Form::open(["route" => ["attentionshift.destroy", $turno->id], "method" => "DELETE"]) . '
-                              <button type="submit" class="btn btn-sm btn-danger" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' . trans("file.delete") . '</button>' . \Form::close() . '</div>';
+                        $nestedData['options'] .= '<button type="button" class="btn btn-sm btn-danger"
+                            onclick="openDeleteWithPin(' . $turno->id . ', ' . $employeeId . ', `' . addslashes($employeeName) . '`)">
+                            <i class="dripicons-trash"></i> ' . trans("file.delete") . '</button>';
                     }
+                    $nestedData['options'] .= '</div>';
 
                 } else {
                     $nestedData['options'] = '';
@@ -97,11 +104,22 @@ class AttentionShiftController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function list_cbx()
+    public function list_cbx(Request $request)
     {
         $this->date = date('Y-m-d');
-        $lims_turno_all = AttentionShift::select('id', 'reference_nro', 'customer_name')
-            ->where([['status', '<', 3]])->whereDate('created_at', $this->date)->orderBy('created_at', 'desc')->get();
+        $query = AttentionShift::select('id', 'reference_nro', 'customer_name', 'customer_id', 'employee_id', 'status')
+            ->whereDate('created_at', $this->date)
+            ->orderBy('created_at', 'desc');
+
+        if ($request->filled('employee_id')) {
+            $query->where('status', 1)
+                ->whereNotNull('employee_id')
+                ->where('employee_id', $request->employee_id);
+        } else {
+            $query->where('status', '<', 3);
+        }
+
+        $lims_turno_all = $query->get();
         return $lims_turno_all;
     }
 
@@ -138,12 +156,17 @@ class AttentionShiftController extends Controller
         $statusEmployee = $this->findEmpShift($data['employee_id']);
         if ($statusEmployee['enabled'] == false) {
             $data['reference_nro'] = 'TRA-' . $nro;
-            if ($data['customer_name']) {
+            if (!empty($data['customer_id'])) {
+                $customer = Customer::find($data['customer_id']);
+                if ($customer) {
+                    $data['customer_name'] = $customer->name;
+                }
+            } elseif (!empty($data['customer_name'])) {
                 $customer = Customer::where('name', $data['customer_name'])->first();
                 if ($customer) {
                     $data['customer_id'] = $customer->id;
+                    $data['customer_name'] = $customer->name;
                 }
-
             }
             if ($data['employee_id'] == null) {
                 $data['status'] = 2;
@@ -248,6 +271,61 @@ class AttentionShiftController extends Controller
         }
         $turno_data->delete();
         return Redirect::to($url)->with('not_permitted', "Turno Eliminado con éxito, Empleado liberado");
+    }
+
+    /**
+     * Eliminar un turno verificando el código PIN del empleado asociado.
+     * Si el empleado no tiene PIN configurado, se permite la eliminación directamente.
+     *
+     * DELETE /attentionshift/{id}/secure
+     */
+    public function destroyWithPin(Request $request, $id)
+    {
+        $this->date = date('Y-m-d');
+        $turno_data = AttentionShift::find($id);
+
+        if (!$turno_data) {
+            return response()->json(['success' => false, 'message' => 'Turno no encontrado'], 404);
+        }
+
+        // Verificar PIN si el empleado tiene uno configurado
+        if ($turno_data->employee_id) {
+            $employee = Employee::find($turno_data->employee_id);
+
+            if ($employee && $employee->attendance_pin) {
+                $pin = $request->input('pin');
+
+                if (empty($pin)) {
+                    return response()->json([
+                        'success'      => false,
+                        'message'      => 'Se requiere el código PIN del empleado para esta acción.',
+                        'requires_pin' => true,
+                    ], 422);
+                }
+
+                if (!Hash::check($pin, $employee->attendance_pin)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Código PIN incorrecto. Intente nuevamente.',
+                    ], 403);
+                }
+            }
+
+            // PIN válido (o sin PIN): liberar posición del empleado
+            $employee_position = ShiftEmployee::where([['status', 0], ['employee_id', $turno_data->employee_id]])
+                ->whereDate('created_at', $this->date)->first();
+            if ($employee_position) {
+                $employee_position->status = 1;
+                $employee_position->save();
+            }
+        }
+
+        $turno_data->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Turno eliminado con éxito, empleado liberado.',
+        ]);
     }
 
     /**

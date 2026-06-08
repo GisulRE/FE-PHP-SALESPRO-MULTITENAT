@@ -12,75 +12,80 @@ class CreateCompanyAndPruebaSeeder extends Seeder
     public function run()
     {
         try {
-            $createdCompanies = [];
+            $defaultCompanyId = null;
             if (Schema::hasTable('companies')) {
-                $companyNames = ['Empresa Prueba 1', 'Empresa Prueba 2'];
-                foreach ($companyNames as $cname) {
-                    $company = DB::table('companies')->where('name', $cname)->first();
-                    if (!$company) {
-                        $id = DB::table('companies')->insertGetId([
-                            'name' => $cname,
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
-                        $createdCompanies[] = $id;
-                    } else {
-                        $createdCompanies[] = $company->id;
+                $company = DB::table('companies')->orderBy('id')->first();
+                if (!$company) {
+                    $companyData = [
+                        'name' => 'Empresa Principal',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                    if (Schema::hasColumn('companies', 'nit')) {
+                        $companyData['nit'] = '0';
                     }
+
+                    $defaultCompanyId = DB::table('companies')->insertGetId($companyData);
+                } else {
+                    $defaultCompanyId = $company->id;
                 }
             }
 
             $userRoleId = null;
             if (Schema::hasTable('roles')) {
-                $userRole = DB::table('roles')->where('name', 'Administrador')->first();
+                $userRole = DB::table('roles')->where('name', 'User')->first();
                 if (!$userRole) {
-                    $userRoleId = DB::table('roles')->insertGetId([
+                    $roleData = [
                         'name' => 'User',
                         'guard_name' => 'web',
                         'created_at' => now(),
                         'updated_at' => now(),
-                    ]);
+                    ];
+
+                    if (Schema::hasColumn('roles', 'description')) {
+                        $roleData['description'] = 'Rol base para usuarios de prueba';
+                    }
+                    if (Schema::hasColumn('roles', 'is_active')) {
+                        $roleData['is_active'] = true;
+                    }
+                    if (Schema::hasColumn('roles', 'blocked_modules')) {
+                        $roleData['blocked_modules'] = null;
+                    }
+
+                    $userRoleId = DB::table('roles')->insertGetId($roleData);
                 } else {
                     $userRoleId = $userRole->id;
                 }
             }
 
             if (Schema::hasTable('users')) {
-                $users = [
-                    ['name' => 'prueba1', 'email' => 'prueba1@local.test', 'company_index' => 0],
-                    ['name' => 'prueba2', 'email' => 'prueba2@local.test', 'company_index' => 1],
-                ];
+                $email = 'prueba@local.test';
+                $user = DB::table('users')->where('email', $email)->first();
 
-                foreach ($users as $u) {
-                    $email = $u['email'];
-                    $user = DB::table('users')->where('email', $email)->first();
-                    $companyId = $createdCompanies[$u['company_index']] ?? null;
-
-                    if (!$user) {
-                        DB::table('users')->insert([
-                            'name' => $u['name'],
-                            'email' => $email,
-                            'password' => Hash::make('Llave123.#'),
-                            'phone' => null,
-                            'company_name' => null,
-                            'company_id' => $companyId,
-                            'role_id' => $userRoleId,
-                            'biller_id' => null,
-                            'is_active' => true,
-                            'is_deleted' => false,
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
-                    } else {
-                        DB::table('users')->where('id', $user->id)->update([
-                            'company_id' => $companyId,
-                            'role_id' => $userRoleId,
-                            'is_active' => true,
-                            'is_deleted' => false,
-                            'password' => Hash::make('Llave123.#'),
-                            'updated_at' => now(),
-                        ]);
-                    }
+                if (!$user) {
+                    DB::table('users')->insert([
+                        'name' => 'prueba',
+                        'email' => $email,
+                        'password' => Hash::make('Llave123.#'),
+                        'phone' => null,
+                        'company_name' => null,
+                        'company_id' => $defaultCompanyId,
+                        'role_id' => $userRoleId,
+                        'biller_id' => null,
+                        'is_active' => true,
+                        'is_deleted' => false,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    DB::table('users')->where('id', $user->id)->update([
+                        'company_id' => $defaultCompanyId,
+                        'role_id' => $userRoleId,
+                        'is_active' => true,
+                        'is_deleted' => false,
+                        'password' => Hash::make('Llave123.#'),
+                        'updated_at' => now(),
+                    ]);
                 }
             }
         } catch (\Exception $e) {

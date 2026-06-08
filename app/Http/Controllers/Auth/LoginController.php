@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\CufdTrait;
 use App\Http\Traits\SiatTrait;
+use App\Company;
 use App\PosSetting;
 use App\SiatCufd;
-use Log;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 
 
@@ -37,6 +38,14 @@ class LoginController extends Controller
 
     public function credentials(Request $request)
     {
+        $request->validate([
+            'nit_login' => ['required', 'string', 'max:30'],
+        ]);
+        Session::put('login_nit', $request->input('nit_login'));
+
+        $companyId = Company::where('nit', trim((string) $request->input('nit_login')))->value('id');
+        Session::put('login_company_id', $companyId);
+
         $this->getToken();
         $auth_siat = Session::get('auth_siat');
         Log::info('Login: auth_siat=' . ($auth_siat ? 'true' : 'false'));
@@ -98,6 +107,7 @@ class LoginController extends Controller
 
         $credentials = $request->only($this->username(), 'password');
         $credentials = array_add($credentials, 'is_deleted', '0');
+        $credentials = array_add($credentials, 'company_id', $companyId ?: -1);
         return $credentials;
     }
 

@@ -55,7 +55,13 @@ class ReportController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('product-qty-alert')) {
-            $lims_product_data = Product::select('name', 'code', 'image', 'qty', 'alert_quantity')->where('is_active', true)->whereColumn('alert_quantity', '>', 'qty')->get();
+            // Excluir productos cuya cantidad de alerta sea NULL para no generar alertas cuando no está definida
+            $lims_product_data = Product::select('name', 'code', 'image', 'qty', 'alert_quantity')
+                ->where('is_active', true)
+                ->whereIn('type', ['standard', 'insumo', 'producto_terminado'])
+                ->whereNotNull('alert_quantity')
+                ->whereColumn('alert_quantity', '>', 'qty')
+                ->get();
             return view('report.qty_alert_report', compact('lims_product_data'));
         } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
@@ -74,8 +80,8 @@ class ReportController extends Controller
                 ])->count();
 
             $total_qty = Product::where('is_active', true)->sum('qty');
-            $total_price = DB::table('products')->where('is_active', true)->sum(DB::raw('price * qty'));
-            $total_cost = DB::table('products')->where('is_active', true)->sum(DB::raw('cost * qty'));
+            $total_price = DB::table('products')->where('is_active', true)->sum(DB::raw('CAST(price AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
+            $total_cost = DB::table('products')->where('is_active', true)->sum(DB::raw('CAST(cost AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
             if (Auth::user()->role_id > 2 && Auth::user()->biller_id) {
                 $lims_warehouse_list = app(BillerController::class)::warehouseAuthorizate(Auth::user()->biller_id);
             } else {
@@ -113,13 +119,13 @@ class ReportController extends Controller
             ->where([
                 ['products.is_active', true],
                 ['product_warehouse.warehouse_id', $data['warehouse_id']],
-            ])->sum(DB::raw('products.price * product_warehouse.qty'));
+            ])->sum(DB::raw('CAST(products.price AS DECIMAL(20,4)) * CAST(product_warehouse.qty AS DECIMAL(20,4))'));
         $total_cost = DB::table('product_warehouse')
             ->join('products', 'product_warehouse.product_id', '=', 'products.id')
             ->where([
                 ['products.is_active', true],
                 ['product_warehouse.warehouse_id', $data['warehouse_id']],
-            ])->sum(DB::raw('products.cost * product_warehouse.qty'));
+            ])->sum(DB::raw('CAST(products.cost AS DECIMAL(20,4)) * CAST(product_warehouse.qty AS DECIMAL(20,4))'));
         if (Auth::user()->role_id > 2 && Auth::user()->biller_id) {
             $lims_warehouse_list = app(BillerController::class)::warehouseAuthorizate(Auth::user()->biller_id);
         } else {
@@ -1152,7 +1158,7 @@ class ReportController extends Controller
 
     public function paymentReportByDate(Request $request)
     {
-        $setting = $general_setting = GeneralSetting::latest()->first();
+        $setting = $general_setting = GeneralSetting::current();
         $data = $request->all();
         $start_date = $data['start_date'];
         $end_date = $data['end_date'];
@@ -1467,6 +1473,98 @@ class ReportController extends Controller
         $end_date_temp = $end_date;
         $end_date = $end_date . " 23:59:59";
         $employee_id = $request->employee_id;
+        $mode = ((isset($request->guess) && ($request->guess == 'true')) ? true : false);
+
+        $lims_employees_list = Employee::select('id', 'name')->where([['is_active', true], ['contract_type', 'COMISION_UNICA']])->get();
+
+        if ($mode) {
+            $total_grand = 0;
+            $total_com = 0;
+            $data = [];
+            $start = $request->input('start');
+            if ($employee_id == 0) {
+                $comisiones = Product_Sale::select('product_sales.id', 'sales.date_sell', 'product_sales.net_unit_price as total', 'product_sales.employee_id', 'sales.reference_no', 'products.name', 'product_sales.employee_id as emp_id')
+                    ->whereNotNull('employee_id')->join('employees', 'product_sales.employee_id', '=', 'employees.id')
+                    ->join('sales', 'product_sales.sale_id', '=', 'sales.id')->join('products', 'product_sales.product_id', '=', 'products.id')
+                    ->whereDate('sales.date_sell', ">=", $start_date)
+                    ->whereDate('sales.date_sell', "<=", $end_date)
+                    ->where('employees.contract_type', 'COMISION_UNICA')
+                    ->get();
+                $totalData = Product_Sale::whereNotNull('employee_id')
+                    ->join('employees', 'product_sales.employee_id', '=', 'employees.id')
+                    ->join('sales', 'product_sales.sale_id', '=', 'sales.id')
+                    ->whereDate('sales.date_sell', ">=", $start_date)
+                    ->whereDate('sales.date_sell', "<=", $end_date)
+                    ->where('employees.contract_type', 'COMISION_UNICA')
+                    ->count();
+            } else {
+                $comisiones = Product_Sale::select('product_sales.id', 'sales.date_sell', 'product_sales.net_unit_price as total', 'product_sales.employee_id', 'sales.reference_no', 'products.name', 'product_sales.employee_id as emp_id')
+                    ->where('employee_id', $employee_id)
+                    ->join('sales', 'product_sales.sale_id', '=', 'sales.id')->join('products', 'product_sales.product_id', '=', 'products.id')
+                    ->whereDate('sales.date_sell', ">=", $start_date)
+                    ->whereDate('sales.date_sell', "<=", $end_date)
+                    ->get();
+                $totalData = Product_Sale::where('employee_id', $employee_id)
+                    ->join('sales', 'product_sales.sale_id', '=', 'sales.id')
+                    ->whereDate('sales.date_sell', ">=", $start_date)
+                    ->whereDate('sales.date_sell', "<=", $end_date)
+                    ->count();
+            }
+            $totalFiltered = $totalData;
+            if ($request->input('length') != -1) {
+                $limit = $request->input('length');
+            } else {
+                $limit = $totalData;
+            }
+            $comisionshow = Product_Sale::select('product_sales.id', 'sales.date_sell', 'product_sales.net_unit_price as total', 'product_sales.employee_id', 'sales.reference_no', 'products.name', 'product_sales.employee_id as emp_id')
+                ->where('employee_id', $employee_id)
+                ->join('sales', 'product_sales.sale_id', '=', 'sales.id')->join('products', 'product_sales.product_id', '=', 'products.id')
+                ->whereDate('sales.date_sell', ">=", $start_date)
+                ->whereDate('sales.date_sell', "<=", $end_date)
+                ->offset($start)->limit($limit)->get();
+
+            if (!empty($comisiones)) {
+                foreach ($comisiones as $comision) {
+                    $total_grand = $total_grand + $comision->total;
+                    $employee = Employee::find($comision->emp_id);
+                    $percentage = $employee ? (float) $employee->percentage : 0;
+                    if ($percentage == 0) {
+                        $totalper = (float) $comision->total;
+                    } else {
+                        $totalper = ($percentage * (float) $comision->total) / 100;
+                    }
+                    $total_com = $total_com + $totalper;
+                }
+                foreach ($comisionshow as $key => $comision) {
+                    $employee = Employee::find($comision->emp_id);
+                    $nestedData['id'] = $comision->id;
+                    $nestedData['key'] = $key + 1;
+                    $nestedData['reference_no'] = $comision->reference_no;
+                    $nestedData['service'] = $comision->name;
+                    $nestedData['employee'] = $employee ? $employee->name : '';
+                    $nestedData['date'] = date(config('date_format'), strtotime($comision->date_sell));
+                    $nestedData['total'] = number_format($comision->total, 2);
+                    $percentage = $employee ? (float) $employee->percentage : 0;
+                    if ($percentage == 0) {
+                        $totalwithcom = (float) $comision->total;
+                    } else {
+                        $totalwithcom = ($percentage * (float) $comision->total) / 100;
+                    }
+                    $nestedData['comision'] = number_format($totalwithcom, 2);
+                    $data[] = $nestedData;
+                }
+            }
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+                "total" => $total_grand,
+                "total_com" => $total_com
+            );
+            return response()->json($json_data);
+        }
+
         if ($employee_id == 0) {
             $comisiones = Product_Sale::select('product_sales.id', 'sales.date_sell', 'product_sales.net_unit_price as total', 'product_sales.employee_id', 'sales.reference_no', 'products.name')
                 ->whereNotNull('employee_id')->join('employees', 'product_sales.employee_id', '=', 'employees.id')
@@ -1484,15 +1582,14 @@ class ReportController extends Controller
                 ->get();
         }
 
-        $lims_employees_list = Employee::select('id', 'name')->where([['is_active', true], ['contract_type', 'COMISION_UNICA']])->get();
         $end_date = $end_date_temp;
         return view('report.employee_service_up', compact('comisiones', 'start_date', 'end_date', 'employee_id', 'lims_employees_list'));
     }
 
     public function saleServiceComissionReport(Request $request)
     {
-        $start_date = $request->start_date;
-        $end_date = $request->end_date;
+        $start_date = $request->start_date ?: $request->end_date;
+        $end_date = $start_date;
         $start_date_temp = $start_date;
         $end_date_temp = $end_date;
         $start_date = $start_date . " 00:00:00";
@@ -1536,7 +1633,8 @@ class ReportController extends Controller
             $total_grand = 0;
             $total_qr = 0;
             $total_com = 0;
-            $lims_pos_setting_data = PosSetting::select('qr_commission')->latest()->first();
+            $lims_pos_setting_data = PosSetting::latest()->first();
+            $qrCommission = (float) ($lims_pos_setting_data->qr_commission ?? 0);
             $data = [];
             $start = $request->input('start');
             $totalFiltered = $totalData;
@@ -1563,8 +1661,8 @@ class ReportController extends Controller
                     }
                     $payments = Payment::where([['sale_id', $comision->sale_id], ['paying_method', 'Qr_simple']])->get();
                     foreach ($payments as $payment) {
-                        $totalper = $totalper - $lims_pos_setting_data->qr_commission;
-                        $total_qr = $total_qr + $lims_pos_setting_data->qr_commission;
+                        $totalper = $totalper - $qrCommission;
+                        $total_qr = $total_qr + $qrCommission;
                     }
                     $total_com = $total_com + $totalper;
                 }
@@ -1585,10 +1683,10 @@ class ReportController extends Controller
                     }
                     $payments = Payment::where([['sale_id', $comision->sale_id], ['paying_method', 'Qr_simple']])->get();
                     foreach ($payments as $payment) {
-                        $totalwithcom = $totalwithcom - $lims_pos_setting_data->qr_commission;
+                        $totalwithcom = $totalwithcom - $qrCommission;
                     }
                     if (sizeof($payments) > 0) {
-                        $nestedData['comision_qr'] = number_format($lims_pos_setting_data->qr_commission, 2);
+                        $nestedData['comision_qr'] = number_format($qrCommission, 2);
                     } else
                         $nestedData['comision_qr'] = number_format(0, 2);
 
@@ -1611,7 +1709,8 @@ class ReportController extends Controller
             $total_grand = 0;
             $total_qr = 0;
             $total_com = 0;
-            $lims_pos_setting_data = PosSetting::select('qr_commission')->latest()->first();
+            $lims_pos_setting_data = PosSetting::latest()->first();
+            $qrCommission = (float) ($lims_pos_setting_data->qr_commission ?? 0);
             if (!empty($comisiones)) {
                 foreach ($comisiones as $comision) {
                     $total_grand += (float) $comision->total;
@@ -1624,10 +1723,8 @@ class ReportController extends Controller
                     // Deduct per QR payment and accumulate QR commission
                     $payments = Payment::where([['sale_id', $comision->sale_id], ['paying_method', 'Qr_simple']])->get();
                     foreach ($payments as $payment) {
-                        if ($lims_pos_setting_data) {
-                            $totalper -= (float) $lims_pos_setting_data->qr_commission;
-                            $total_qr += (float) $lims_pos_setting_data->qr_commission;
-                        }
+                        $totalper -= $qrCommission;
+                        $total_qr += $qrCommission;
                     }
                     $total_com += $totalper;
                 }
@@ -2385,9 +2482,11 @@ class ReportController extends Controller
         $result = [];
         $result_util = [];
         $total_ingreso = 0;
+        $total_ingreso_efectivo = 0;
         $total_costo = 0;
         $total_egreso = 0;
         $total_general = 0;
+        $total_efectivo = 0;
         /* Ingreso */
 
         if ($category_id == 0) {
@@ -2408,6 +2507,16 @@ class ReportController extends Controller
             $ingresosList[] = $result[0]['saleresume'];
             $total_ingreso = $result[0]['total'];
         }
+
+        // Extrae solo el ingreso por ventas en efectivo desde el resumen de ingresos.
+        foreach ($ingresosList as $ingreso_group) {
+            foreach ($ingreso_group as $ingreso_item) {
+                if (isset($ingreso_item['paying_method']) && $ingreso_item['paying_method'] == 'Efectivo') {
+                    $total_ingreso_efectivo += (float) $ingreso_item['total'];
+                }
+            }
+        }
+
         /* Egresos */
         if ($biller_id != 0) {
             $result = [];
@@ -2420,12 +2529,15 @@ class ReportController extends Controller
             $egresosList[] = $result['egresoresume'][0];
             $total_egreso = $result['total'];
         }
+
+        // Similar al arqueo: efectivo neto del periodo = efectivo de ventas - egresos.
+        $total_efectivo = $total_ingreso_efectivo - $total_egreso;
         $total_general = $total_ingreso - $total_egreso;
 
         $lims_biller_list = Biller::where('is_active', true)->get();
         $lims_categorie_list = Category::where('is_active', true)->get();
         $end_date = $end_date_temp;
-        return view('report.generallUtil_report', compact('start_date', 'end_date', 'ingresosList', 'costosList', 'egresosList', 'total_ingreso', 'total_egreso', 'total_general', 'total_costo', 'lims_biller_list', 'lims_categorie_list', 'biller_id', 'category_id'));
+        return view('report.generallUtil_report', compact('start_date', 'end_date', 'ingresosList', 'costosList', 'egresosList', 'total_ingreso', 'total_egreso', 'total_general', 'total_costo', 'total_ingreso_efectivo', 'total_efectivo', 'lims_biller_list', 'lims_categorie_list', 'biller_id', 'category_id'));
     }
 
     public function salesUtil($start_date, $end_date, $category_id = 0)
@@ -2587,7 +2699,7 @@ class ReportController extends Controller
         }
 
         if ($days == null) {
-            $setting = $general_setting = GeneralSetting::latest()->first();
+            $setting = $general_setting = GeneralSetting::current();
             $days = $setting->alert_expiration;
         }
         $lotes_list = [];
@@ -2618,7 +2730,7 @@ class ReportController extends Controller
         $end_date = date('Y-m-d');
         $warehouse_id = 0;
         $biller_id = 0;
-        $setting = $general_setting = GeneralSetting::latest()->first();
+        $setting = $general_setting = GeneralSetting::current();
         $data = $request->all();
         if (!is_null($request->start_date) && !empty($request->start_date) && !is_null($request->end_date) || !empty($request->end_date)) {
             $start_date = $data['start_date'];
@@ -2719,7 +2831,7 @@ class ReportController extends Controller
         $end_date = date('Y-m-d');
         $warehouse_id = 0;
         $biller_id = 0;
-        $setting = $general_setting = GeneralSetting::latest()->first();
+        $setting = $general_setting = GeneralSetting::current();
         $data = $request->all();
 
         if (!is_null($request->start_date) && !empty($request->start_date) && !is_null($request->end_date) || !empty($request->end_date)) {
