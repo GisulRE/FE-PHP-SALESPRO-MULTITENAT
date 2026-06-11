@@ -15,9 +15,9 @@ use App\SiatProductoServicio;
 use App\Http\Traits\CufdTrait;
 use App\Http\Traits\SiatTrait;
 use App\SiatActividadEconomica;
-use Illuminate\Support\Facades\DB;
 use App\SiatRegistrosSincronizacion;
 use Illuminate\Support\Facades\Session;
+use Log;
 use Auth;
 
 
@@ -44,6 +44,16 @@ class SiatPanelController extends Controller
         $actividades = SiatActividadEconomica::where('codigo_punto_venta', $punto_venta)
             ->where('sucursal', $sucursal)->get();
 
+        Log::info("SIAT PANEL BUSQUEDA", [
+            'funcion' => 'getActividadById',
+            'params' => [
+                'biller_id' => $id->id,
+                'punto_venta' => $punto_venta,
+                'sucursal' => $sucursal,
+            ],
+            'total_resultados' => $actividades->count(),
+        ]);
+
         return view('siat-panel.index', ['billers' => $billers, 'actividades' => $actividades]);
     }
 
@@ -64,6 +74,16 @@ class SiatPanelController extends Controller
         $sucursal = $id->almacen->sucursal->sucursal;
         $documentos = SiatDocumentoSector::where('codigo_punto_venta', $punto_venta)
             ->where('sucursal', $sucursal)->get();
+
+        Log::info("SIAT PANEL BUSQUEDA", [
+            'funcion' => 'getDocumentoSectorById',
+            'params' => [
+                'biller_id' => $id->id,
+                'punto_venta' => $punto_venta,
+                'sucursal' => $sucursal,
+            ],
+            'total_resultados' => $documentos->count(),
+        ]);
 
         return view('siat-panel.documento_sector', ['billers' => $billers, 'documentos' => $documentos]);
     }
@@ -86,6 +106,16 @@ class SiatPanelController extends Controller
         $sucursal = $id->almacen->sucursal->sucursal;
         $parametricas = SiatParametricaVario::where('codigo_punto_venta', $punto_venta)
             ->where('sucursal', $sucursal)->get();
+
+        Log::info("SIAT PANEL BUSQUEDA", [
+            'funcion' => 'getParametroById',
+            'params' => [
+                'biller_id' => $id->id,
+                'punto_venta' => $punto_venta,
+                'sucursal' => $sucursal,
+            ],
+            'total_resultados' => $parametricas->count(),
+        ]);
 
         return view('siat-panel.parametrica', ['billers' => $billers, 'parametricas' => $parametricas]);
     }
@@ -110,6 +140,16 @@ class SiatPanelController extends Controller
         $productos = SiatProductoServicio::where('codigo_punto_venta', $punto_venta)
             ->where('sucursal', $sucursal)->get();
 
+        Log::info("SIAT PANEL BUSQUEDA", [
+            'funcion' => 'getProductoServicioById',
+            'params' => [
+                'biller_id' => $id->id,
+                'punto_venta' => $punto_venta,
+                'sucursal' => $sucursal,
+            ],
+            'total_resultados' => $productos->count(),
+        ]);
+
         return view('siat-panel.productoservicio', ['billers' => $billers, 'productos' => $productos]);
     }
 
@@ -130,6 +170,16 @@ class SiatPanelController extends Controller
         $sucursal = $id->almacen->sucursal->sucursal;
         $leyendas = SiatLeyendaFactura::where('codigo_punto_venta', $punto_venta)
             ->where('sucursal', $sucursal)->get();
+
+        Log::info("SIAT PANEL BUSQUEDA", [
+            'funcion' => 'getLeyendaById',
+            'params' => [
+                'biller_id' => $id->id,
+                'punto_venta' => $punto_venta,
+                'sucursal' => $sucursal,
+            ],
+            'total_resultados' => $leyendas->count(),
+        ]);
 
         return view('siat-panel.leyenda', ['billers' => $billers, 'leyendas' => $leyendas]);
     }
@@ -219,27 +269,112 @@ class SiatPanelController extends Controller
     //Funcion para consultar en la tabla RegistrosSincronizacionSiat
     public function consultaRegistros($sucursal, $punto_venta)
     {
-        $tablas = $this->listaOperaciones();
+        $sucursales = SiatSucursal::where('estado', true)->get();
+        $nitCollection = PosSetting::latest()->first()->pluck('nit_emisor');
+        $nitValue = $nitCollection->first();
+        $datos_sucursal = SiatSucursal::where('sucursal', $sucursal)->first();
 
-        foreach ($tablas as $tabla) {
+        Log::info("SIAT PANEL CONSULTA", [
+            'funcion' => 'consultaRegistros',
+            'sucursal' => $sucursal,
+            'punto_venta' => $punto_venta,
+            'nit' => $nitValue,
+        ]);
 
-            $rss = SiatRegistrosSincronizacion::where('sucursal', $sucursal)
-                ->where('codigo_punto_venta', $punto_venta)
-                ->where('operacion', $tabla['operacion'])->get();
-            if ($rss->isNotEmpty()) {
-                //No está vacía, no hacer nada    
-            } else {
-                //Está vacío, llenar de null
-                $this->rellenarDatosVacios($tabla['descripcion'], $tabla['operacion'], $sucursal, $punto_venta, $tabla['id']);
+        $registros = [];
+
+        if (Session::get('token_siat') != null) {
+            Log::info("SIAT PANEL CONSULTA - SINCRONIZANDO DESDE API", [
+                'funcion' => 'consultaRegistros',
+                'nit' => $nitValue,
+                'sucursal' => $sucursal,
+                'punto_venta' => $punto_venta,
+            ]);
+            try {
+                $response = $this->getResponse($nitValue, $sucursal, $punto_venta);
+                if ($response && isset($response['ENTITIES'])) {
+                    $registros = $response['ENTITIES'];
+
+                    $siatIdEmpresa = $registros[0]['empresa']['idEmpresa'] ?? null;
+                    if ($siatIdEmpresa) {
+                        Session::put('siat_id_empresa', $siatIdEmpresa);
+                    }
+
+                    Log::info("SIAT PANEL CONSULTA - SINCRONIZACION COMPLETADA", [
+                        'funcion' => 'consultaRegistros',
+                        'total_entidades' => count($registros),
+                        'sucursal' => $sucursal,
+                        'punto_venta' => $punto_venta,
+                    ]);
+                } else {
+                    Log::warning("SIAT PANEL CONSULTA - RESPUESTA SIN ENTITIES", [
+                        'funcion' => 'consultaRegistros',
+                        'response_keys' => $response ? array_keys($response) : [],
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error("SIAT PANEL CONSULTA ERROR", [
+                    'funcion' => 'consultaRegistros',
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } else {
+            Log::warning("SIAT PANEL CONSULTA - SIN TOKEN", [
+                'funcion' => 'consultaRegistros',
+                'sucursal' => $sucursal,
+                'punto_venta' => $punto_venta,
+            ]);
+        }
+
+        return view('siat-panel.log_siat_consulta', [
+            'sucursales' => $sucursales,
+            'registros' => $registros,
+            'nit' => $nitCollection,
+            'datos_sucursal' => $datos_sucursal,
+            'sucursal' => $sucursal,
+        ]);
+    }
+
+    public function listarSincronizados()
+    {
+        $sucursales = SiatSucursal::where('estado', true)->get();
+        $nitCollection = PosSetting::latest()->first()->pluck('nit_emisor');
+        $operaciones = $this->listaOperaciones();
+
+        return view('siat-panel.datos_sincronizados', [
+            'sucursales' => $sucursales,
+            'operaciones' => $operaciones,
+            'nit' => $nitCollection,
+        ]);
+    }
+
+    public function getListarNitData(Request $request)
+    {
+        $nitCollection = PosSetting::latest()->first()->pluck('nit_emisor');
+        $nitValue = $nitCollection->first();
+        $entidades = [];
+
+        if (Session::get('token_siat') != null) {
+            $body = [
+                'nit' => $nitValue,
+                'parametro' => $request->input('parametro', ''),
+                'sucursal' => (int)$request->input('sucursal', 0),
+                'codigoPuntoVenta' => (int)$request->input('codigo_punto_venta', 0),
+            ];
+
+            try {
+                $response = $this->postListarNit($body);
+                if ($response && isset($response['ENTITIES'])) {
+                    $entidades = $response['ENTITIES'];
+                }
+            } catch (\Exception $e) {
+                Log::error("SIAT GET LISTAR NIT DATA ERROR", [
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 
-        $sucursales = SiatSucursal::where('estado', true)->get();
-        $nit = PosSetting::latest()->first()->pluck('nit_emisor');
-        $registros = SiatRegistrosSincronizacion::where('sucursal', $sucursal)->where('codigo_punto_venta', $punto_venta)->orderBy('orden', 'asc')->get();
-        $datos_sucursal = SiatSucursal::where('sucursal', $sucursal)->first();
-        $datos_p_venta = SiatPuntoVenta::where("codigo_punto_venta", $punto_venta)->first();
-        return view('siat-panel.log_siat_consulta', ['sucursales' => $sucursales, 'registros' => $registros, 'nit' => $nit, 'datos_sucursal' => $datos_sucursal, 'datos_p_venta' => $datos_p_venta]);
+        return response()->json(['entidades' => $entidades]);
     }
 
     public function getRegistrosSiat($sucursal, $punto_venta)
@@ -264,6 +399,16 @@ class SiatPanelController extends Controller
         $registros = SiatRegistrosSincronizacion::where('sucursal', $sucursal)->where('codigo_punto_venta', $punto_venta)->orderBy('orden', 'asc')->get();
         $datos_sucursal = SiatSucursal::where('sucursal', $sucursal)->first();
         $datos_p_venta = SiatPuntoVenta::where("codigo_punto_venta", $punto_venta)->first();
+
+        Log::info("SIAT PANEL BUSQUEDA", [
+            'funcion' => 'getRegistrosSiat',
+            'params' => [
+                'sucursal' => $sucursal,
+                'punto_venta' => $punto_venta,
+            ],
+            'total_registros' => $registros->count(),
+        ]);
+
         $respuesta = array(
             "sucursal" => $sucursal,
             "punto_venta" => $punto_venta,
@@ -283,6 +428,16 @@ class SiatPanelController extends Controller
         $registros = SiatRegistrosSincronizacion::where('sucursal', $sucursal)->where('codigo_punto_venta', $punto_venta)->orderBy('orden', 'asc')->get();
         $datos_sucursal = SiatSucursal::where('sucursal', $sucursal)->first();
         $datos_p_venta = SiatPuntoVenta::where("codigo_punto_venta", $punto_venta)->first();
+
+        Log::info("SIAT PANEL BUSQUEDA", [
+            'funcion' => 'mostrarDatosdeSucursalPuntoVenta',
+            'params' => [
+                'sucursal' => $sucursal,
+                'punto_venta' => $punto_venta,
+            ],
+            'total_registros' => $registros->count(),
+        ]);
+
         return view('siat-panel.log_siat_consulta', ['sucursales' => $sucursales, 'registros' => $registros, 'nit' => $nit, 'datos_sucursal' => $datos_sucursal, 'datos_p_venta' => $datos_p_venta]);
     }
 
@@ -306,44 +461,70 @@ class SiatPanelController extends Controller
     {
         if (Session::get('token_siat') != null) {
             $registro = $request->registro_id;
+            $descripcion = $request->descripcion;
             $operacion = $request->operacion;
+            $orden = $request->orden;
             $sucursal = $request->sucursal;
             $p_venta = $request->codigo_punto_venta;
+            $idEmpresa = $request->id_empresa;
+            $nit = $request->nit;
             $is_auth = false;
             if (isset($request->auth))
                 $is_auth = true;
 
-            $nit = $request->nit;
+            $body = [
+                'id' => (int)$registro,
+                'descripcion' => $descripcion,
+                'operacion' => $operacion,
+                'estado' => 'S',
+                'orden' => (int)$orden,
+                'sucursal' => (int)$sucursal,
+                'codigo_punto_venta' => (int)$p_venta,
+                'empresa' => [
+                    'idEmpresa' => (int)$idEmpresa,
+                    'nit' => $nit,
+                ],
+            ];
+
+            Log::info("SIAT PANEL SINCRONIZACION", [
+                'funcion' => 'update',
+                'body' => $body,
+            ]);
+
             try {
-                $response = $this->getResponse($nit, $sucursal, $p_venta);
-                $this->llenarTablaxOperacion($operacion, $response, $sucursal, $p_venta);
-            } catch (\Excepcion $e) {
+                $response = $this->postSincronizar($body);
+                if (!$response) {
+                    return redirect()->back()->with('warning', 'Error al sincronizar con SIAT');
+                }
+            } catch (\Exception $e) {
+                Log::error("SIAT PANEL SINCRONIZACION ERROR", [
+                    'funcion' => 'update',
+                    'error' => $e->getMessage(),
+                ]);
                 return redirect()->back()->with('warning', 'Credenciales SIAT no válidas');
             }
 
-            //Actualizar y/o modificar la info de tabla Registros de Sincronizacion según la operacion ACTIVIDADES
-            $user = Auth::user()->id;
-            $datos = SiatRegistrosSincronizacion::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta)->where('operacion', $operacion)->first();
-            $data = new SiatRegistrosSincronizacion;
-            $data->descripcion = $datos['descripcion'];
-            $data->operacion = $datos['operacion'];
-            $data->estado = true;
-            $data->usuario_alta = $user;
-            $data->usuario_modificacion = $user;
-            $data->orden = $datos['orden'];
-            $data->sucursal = $sucursal;
-            $data->codigo_punto_venta = $p_venta;
-            SiatRegistrosSincronizacion::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta)->where('operacion', $operacion)->delete();
-            $data->save();
+            $msj = $descripcion . '\n Sincronización Siat completada con éxito.';
 
-            $msj = $datos['descripcion'] . '\n Sincronización Siat completada con éxito.';
+            Log::info("SIAT PANEL SINCRONIZACION COMPLETADA", [
+                'funcion' => 'update',
+                'operacion' => $operacion,
+                'sucursal' => $sucursal,
+                'punto_venta' => $p_venta,
+                'estado' => 'completada',
+            ]);
+
             if ($is_auth) {
                 return array('mensaje' => $msj, 'status' => true);
             } else {
                 Session::flash('success', $msj);
-                return $this->mostrarDatosdeSucursalPuntoVenta($sucursal, $p_venta);
+                return redirect()->back();
             }
         } else {
+            Log::warning("SIAT PANEL SINCRONIZACION", [
+                'funcion' => 'update',
+                'error' => 'sin conexion al servicio Gisul',
+            ]);
             return array('mensaje' => "sin conexion al servicio Gisul", 'status' => false);
         }
     }

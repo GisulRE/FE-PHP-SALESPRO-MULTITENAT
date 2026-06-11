@@ -332,7 +332,7 @@ class ReportController extends Controller
             $end = strtotime($year . '-12-31');
             while ($start <= $end) {
                 $start_date = $year . '-' . date('m', $start) . '-' . '01';
-                $end_date = $year . '-' . date('m', $start) . '-' . '31';
+                $end_date = $year . '-' . date('m', $start) . '-' . date('t', $start);
 
                 $temp_total_discount = Sale::whereDate('date_sell', '>=', $start_date)->whereDate('date_sell', '<=', $end_date)->sum('total_discount');
                 $total_discount[] = number_format((float) $temp_total_discount, 2, '.', '');
@@ -376,7 +376,7 @@ class ReportController extends Controller
         $end = strtotime($year . '-12-31');
         while ($start <= $end) {
             $start_date = $year . '-' . date('m', $start) . '-' . '01';
-            $end_date = $year . '-' . date('m', $start) . '-' . '31';
+            $end_date = $year . '-' . date('m', $start) . '-' . date('t', $start);
 
             $temp_total_discount = Sale::where('warehouse_id', $data['warehouse_id'])->whereDate('date_sell', '>=', $start_date)->whereDate('date_sell', '<=', $end_date)->sum('total_discount');
             $total_discount[] = number_format((float) $temp_total_discount, 2, '.', '');
@@ -414,7 +414,7 @@ class ReportController extends Controller
             $end = strtotime($year . '-12-31');
             while ($start <= $end) {
                 $start_date = $year . '-' . date('m', $start) . '-' . '01';
-                $end_date = $year . '-' . date('m', $start) . '-' . '31';
+                $end_date = $year . '-' . date('m', $start) . '-' . date('t', $start);
 
                 $query1 = array(
                     'SUM(total_discount) AS total_discount',
@@ -457,7 +457,7 @@ class ReportController extends Controller
         $end = strtotime($year . '-12-31');
         while ($start <= $end) {
             $start_date = $year . '-' . date('m', $start) . '-' . '01';
-            $end_date = $year . '-' . date('m', $start) . '-' . '31';
+            $end_date = $year . '-' . date('m', $start) . '-' . date('t', $start);
 
             $query1 = array(
                 'SUM(total_discount) AS total_discount',

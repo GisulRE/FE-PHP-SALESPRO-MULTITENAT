@@ -519,6 +519,8 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('siat_panel/leyenda', 'SiatPanelController@leyenda')->name('siat_panel.leyenda');
 	Route::get('siat_panel/leyenda/{id}', 'SiatPanelController@getLeyendaById')->name('siat_panel.leyenda_buscar');
 	Route::get('siat_panel/registros-siat', 'SiatPanelController@logSiat')->name('siat_panel.log_siat');
+	Route::get('siat_panel/datos-sincronizados', 'SiatPanelController@listarSincronizados')->name('siat_panel.datos_sincronizados');
+	Route::post('siat_panel/listar-nit-data', 'SiatPanelController@getListarNitData');
 	Route::get('siat_panel/p_venta/{id}', 'SiatPanelController@getPuntoVenta'); //operaciones
 	Route::get('siat_panel/cuis/{sucursal}/{codigo_punto_venta}', 'SiatPanelController@getCuis'); //operaciones
 

@@ -27,14 +27,8 @@
             <div class="input-group col-3">
                 <label>Punto de Venta</label>
                 <select disabled id="punto_venta" name="punto_venta" class="form-control selectpicker" title="Punto Venta...">
-                    @if ($datos_p_venta)
-                        <option value="{{$datos_p_venta->codigo_punto_venta}}" selected>{{$datos_p_venta->nombre_punto_venta}}</option>
-                    @endif
+                    <option value="{{ $sucursal }}" selected>{{ $sucursal }}</option>
                 </select>
-            </div>
-            <div class="form-group col-2">
-                <label >CUIS </label>
-                <input type="text" name="cuis" class="form-control" disabled value="{{$datos_p_venta->codigo_cuis}}">
             </div>
             <div class="form-group col-2">
                 <label >NIT </label>
@@ -52,45 +46,49 @@
                         <th class="not-exported"></th>
                         <th>Descripción</th>
                         <th>Estado</th>
-                        <th class="not-exported">{{__('file.action')}}</th>
+                        <th>Empresa</th>
+                        <th>NIT</th>
+                        <th>Fecha Alta</th>
+                        <th>Usuario Alta</th>
                         <th>Fecha Modificación</th>
-                        <th>Usuario</th>
+                        <th>Usuario Modificación</th>
+                        <th class="not-exported">{{__('file.action')}}</th>
                     </tr>
                 </thead>
                 <tbody id="tblInsumos">
-                    @foreach($registros as $key=>$dato)
-                    <tr data-id="{{$dato->id}}">
-                        <td>{{$key}}</td>
-                        <td>{{ $dato->descripcion}}</td>
+                    @foreach($registros as $key=>$entity)
+                    <tr>
+                        <td>{{$key + 1}}</td>
+                        <td>{{ $entity['descripcion'] }}</td>
                         <td>
-                            @if ( $dato->estado == 1 )
+                            @if ($entity['estado'] === 'S')
                                 <div class="badge badge-success">Sincronizado</div>                            
                             @else
                                 <div class="badge badge-warning text-white">No Sincronizado</div>
                             @endif
                         </td>
+                        <td>{{ $entity['empresa']['nombre'] ?? '' }}</td>
+                        <td>{{ $entity['empresa']['nit'] ?? '' }}</td>
+                        <td>{{ $entity['fechaAlta'] ?? '' }}</td>
+                        <td>{{ $entity['usuarioAlta'] ?? '' }}</td>
+                        <td>{{ $entity['fechaModificacion'] ?? '' }}</td>
+                        <td>{{ $entity['usuarioModificacion'] ?? '' }}</td>
                         <td>
                             <button type="button" 
-                                data-id="{{$dato->id}}"
-                                data-operacion="{{$dato->operacion}}" 
-                                data-sucursal="{{$dato->sucursal}}" 
-                                data-codigo_punto_venta="{{$dato->codigo_punto_venta}}" 
+                                data-id="{{ $entity['id'] }}"
+                                data-descripcion="{{ $entity['descripcion'] }}"
+                                data-operacion="{{ $entity['operacion'] }}"
+                                data-orden="{{ $entity['orden'] }}"
+                                data-sucursal="{{ $entity['sucursal'] }}"
+                                data-codigo_punto_venta="{{ $entity['codigo_punto_venta'] }}"
+                                data-id-empresa="{{ $entity['empresa']['idEmpresa'] ?? '' }}"
+                                data-nit="{{ $entity['empresa']['nit'] ?? '' }}"
                                 class="edit-btn btn btn-link"
                                 data-toggle="modal" data-target="#siatModal">
                                 <i class="dripicons-document-edit"></i> 
                                 Sincronizar
                             </button>
                         </td>
-                        <td>
-                            @if ($dato->updated_at)
-                                {{ $dato->getFecha() }}
-                            @endif
-                        </td>
-                        <td>
-                            @if ($dato->usuario_modificacion)
-                                {{ $dato->getUsuario() }}
-                            @endif
-                        </td>  
                     </tr>
                     @endforeach
                 </tbody>
@@ -119,9 +117,12 @@
                     </small>
                 </p>
                 <input type="hidden" name="registro_id">
+                <input type="hidden" name="descripcion">
                 <input type="hidden" name="operacion">
+                <input type="hidden" name="orden">
                 <input type="hidden" name="sucursal">
                 <input type="hidden" name="codigo_punto_venta">
+                <input type="hidden" name="id_empresa">
                 <input type="hidden" name="nit">
                 <div class="modal-footer">
                     <div>
@@ -148,11 +149,13 @@
         //llenar de valores el modal, cuando se dé click en editar
         $('.edit-btn').on('click', function(){
             $("#siatModal input[name='registro_id']").val($(this).data('id'));
+            $("#siatModal input[name='descripcion']").val($(this).data('descripcion'));
             $("#siatModal input[name='operacion']").val($(this).data('operacion'));
+            $("#siatModal input[name='orden']").val($(this).data('orden'));
             $("#siatModal input[name='sucursal']").val($(this).data('sucursal'));
-            $("#siatModal input[name='codigo_punto_venta']").val($(this).data('codigo_punto_venta'));
-            
-            $("#siatModal input[name='nit']").val($("input[name='nit']").val());
+            $("#siatModal input[name='codigo_punto_venta']").val($(this).data('codigo-punto-venta'));
+            $("#siatModal input[name='id_empresa']").val($(this).data('id-empresa'));
+            $("#siatModal input[name='nit']").val($(this).data('nit'));
         });
 
         $('#product-table').DataTable( {
@@ -236,70 +239,6 @@
             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
             }
         });
-
-        $('#sucursales_id').on('change', function() {
-            sucursal_ID = $(this).val();
-            console.log(sucursal_ID);
-            if(sucursal_ID){
-                getPuntoVenta(sucursal_ID)
-            }else{    
-                $('select[name="punto_venta"]').empty()
-            }
-        });
-        function getPuntoVenta(sucursal_ID){
-            $.ajax({
-                url: 'p_venta/'+sucursal_ID,
-                type: "GET",
-                dataType: "json",
-                success:function(data) {
-                    $('select[name="punto_venta"]').empty()
-                    $('input[name="cuis"]').val('');
-                    $.each(data, function(key, value) {
-                        $('select[name="punto_venta"]').append('<option value="'+ key +'">'+ value +'</option>');
-                    });
-                    $('.selectpicker').selectpicker('refresh');
-                },
-            });
-        }
-        //obtener CUIS y NIT
-        $('select[name="punto_venta"]').on('change', function() {
-            p_ventaID = $(this).val();
-            if(p_ventaID){
-                getCuis(p_ventaID);
-                onSiatSincronizacion(); 
-            }else{    
-                $('select[name="punto_venta"]').empty()
-            }
-        });
-        function getCuis(p_ventaID){
-            var sucursal = $('#sucursales_id').val();
-            $.ajax({
-                url: 'cuis/'+sucursal+'/'+p_ventaID,
-                type: "GET",
-                dataType: "json",
-                success:function(data) {
-                    $('input[name="cuis"]').val('');
-                    $.each(data, function(key, value) {
-                        $('input[name="cuis"]').val(value);
-                    });
-                    $('.selectpicker').selectpicker('refresh');
-                },
-            });
-        }
-
-
-        
-
-        //funciona para llamar vista con los parámetros Sucursal-PuntoVenta
-        function onSiatSincronizacion() {
-            var sucursal_id = $("select[name='sucursal']").val();
-            var p_venta_id  = $("select[name='punto_venta']").val();
-            var cuis        = $("input[name='cuis']").val();
-            var nit         = $("input[name='nit']").val();
-            //Petición AJAX
-            $('#btnBuscar').prop('href','{{ url("siat_panel/registros-siat")}}' + '/suc/' + sucursal_id+ '/pv/' + p_venta_id );
-            console.log("funcionando botón")
-        }
 
         
     </script>

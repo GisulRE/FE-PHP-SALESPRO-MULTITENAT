@@ -25,10 +25,6 @@
                 </select>
             </div>
             <div class="form-group col-2">
-                <label >CUIS </label>
-                <input type="text" name="cuis" class="form-control" disabled>
-            </div>
-            <div class="form-group col-2">
                 <label >NIT </label>
                 <input type="text" name="nit" class="form-control" disabled value="{{ $nit[0]}}">
             </div>
@@ -237,46 +233,26 @@
                 success:function(data) {
                     console.log(data);
                     $('select[name="punto_venta"]').empty()
-                    $('input[name="cuis"]').val('');
                     $('select[name="punto_venta"]').append('<option value="'+ data.codigo_punto_venta +'">'+ data.nombre_punto_venta +'</option>');
                     $('.selectpicker').selectpicker('refresh');
                 },
             });
         }
-        //obtener CUIS y NIT
+        //obtener NIT
         $('select[name="punto_venta"]').on('change', function() {
             p_ventaID = $(this).val();
             if(p_ventaID){
-                getCuis(p_ventaID);
                 onSiatSincronizacion(); 
             }else{    
                 $('select[name="punto_venta"]').empty()
             }
         });
-        function getCuis(p_ventaID){
-            var sucursal = $('#sucursales_id').val();
-            $.ajax({
-                url: 'cuis/'+sucursal+'/'+p_ventaID,
-                type: "GET",
-                dataType: "json",
-                success:function(data) {
-                    $('input[name="cuis"]').val('');
-                    $.each(data, function(key, value) {
-                        $('input[name="cuis"]').val(value);
-                    });
-                    $('.selectpicker').selectpicker('refresh');
-                },
-            });
-        }
-
-
         
 
         //funciona para llamar vista con los parámetros Sucursal-PuntoVenta
         function onSiatSincronizacion() {
             var sucursal_id = $("select[name='sucursal']").val();
             var p_venta_id  = $("select[name='punto_venta']").val();
-            var cuis        = $("input[name='cuis']").val();
             var nit         = $("input[name='nit']").val();
             //Petición AJAX
             $('#btnBuscar').prop('href','{{ url("siat_panel/registros-siat")}}' + '/suc/' + sucursal_id+ '/pv/' + p_venta_id );

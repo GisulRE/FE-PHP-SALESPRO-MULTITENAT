@@ -6,23 +6,8 @@
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" id="act" href="{{ route('siat_panel.index') }}">
-                Actividad Económica
-            </a>
-        </li>
-        <li class="nav-item" >
-            <a class="nav-link" id="doc" href="{{ route('siat_panel.documento_sector') }}">
-                Documento Sector
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" id="prod" href="{{ route('siat_panel.productoservicio') }}">
-                Productos Servicios
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" id="ley" href="{{ route('siat_panel.leyenda') }}">
-                Leyendas Facturas
+            <a class="nav-link" id="datos" href="{{ route('siat_panel.datos_sincronizados') }}">
+                Datos Sincronizados
             </a>
         </li>
         <li class="nav-item">
@@ -35,6 +20,5 @@
                 Método de Pago
             </a>
         </li>
-        
     </ul>
 </div>

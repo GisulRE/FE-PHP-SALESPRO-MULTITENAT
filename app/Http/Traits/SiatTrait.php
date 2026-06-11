@@ -116,34 +116,163 @@ trait SiatTrait
         try {
             $response = Http::withHeaders([
                 'Authorization' => $bearer,
-            ])->post($host . $path . $query);
+            ])->get($url);
             
             $http_status = $response->status();
             
             //entre 200 y 299
             if ($response->successful()) {
                 $status = $response->json();
-                Log::info("Response => " . json_encode($status, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                Log::info("SIAT SYNC RESPONSE", [
+                    'status' => $http_status,
+                    'response' => $status,
+                ]);
                 return $status;
             }
             //error >500
             if ($response->serverError()) {
-                Log::error("HTTP Status: " . $http_status . " - ERROR DEL SERVIDOR (5xx)");
-                Log::error("Response => " . $response->body());
+                Log::error("SIAT SYNC ERROR", [
+                    'status' => $http_status,
+                    'type' => 'ERROR_DEL_SERVIDOR_5xx',
+                    'response' => $response->body(),
+                ]);
                 $msj = 'Problemas de conexión Siat';
                 Session::flash('warning', $msj);
                 return;
             }
             //error >400
             if ($response->clientError()) {
-                Log::error("HTTP Status: " . $http_status . " - ERROR DEL CLIENTE (4xx)");
-                Log::error("Response => " . $response->body());
+                Log::error("SIAT SYNC ERROR", [
+                    'status' => $http_status,
+                    'type' => 'ERROR_DEL_CLIENTE_4xx',
+                    'response' => $response->body(),
+                ]);
                 $msj = 'Error | Credenciales inválidas';
                 Session::flash('warning', $msj);
                 return;
             }
         } catch (Exception $e) {
-            Log::error("ERROR EN SINCRONIZACIÓN: " . $e->getMessage());
+            Log::error("SIAT SYNC EXCEPTION", [
+                'error' => $e->getMessage(),
+            ]);
+            Session::flash('warning', $e->getMessage());
+            return;
+        }
+    }
+
+    //Envia un registro individual de sincronización via POST
+    public function postSincronizar($data)
+    {
+        $pos_setting = PosSetting::latest()->first();
+        $bearer = 'Bearer ' . Session::get('token_siat');
+        $host = $pos_setting->url_optimo;
+        $url = $host . '/sincronizacion/v1';
+
+        Log::info("SIAT POST SINCRONIZAR REQUEST", [
+            'url' => $url,
+            'method' => 'POST',
+            'body' => $data,
+        ]);
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $bearer,
+                'Content-Type' => 'application/json',
+            ])->post($url, $data);
+
+            $http_status = $response->status();
+
+            if ($response->successful()) {
+                $status = $response->json();
+                Log::info("SIAT POST SINCRONIZAR RESPONSE", [
+                    'status' => $http_status,
+                    'response' => $status,
+                ]);
+                return $status;
+            }
+
+            if ($response->serverError()) {
+                Log::error("SIAT POST SINCRONIZAR ERROR", [
+                    'status' => $http_status,
+                    'type' => 'ERROR_DEL_SERVIDOR_5xx',
+                    'response' => $response->body(),
+                ]);
+                Session::flash('warning', 'Problemas de conexión Siat');
+                return;
+            }
+
+            if ($response->clientError()) {
+                Log::error("SIAT POST SINCRONIZAR ERROR", [
+                    'status' => $http_status,
+                    'type' => 'ERROR_DEL_CLIENTE_4xx',
+                    'response' => $response->body(),
+                ]);
+                Session::flash('warning', 'Error | Credenciales inválidas');
+                return;
+            }
+        } catch (Exception $e) {
+            Log::error("SIAT POST SINCRONIZAR EXCEPTION", [
+                'error' => $e->getMessage(),
+            ]);
+            Session::flash('warning', $e->getMessage());
+            return;
+        }
+    }
+
+    //Obtiene lista de datos sincronizados desde /datosincronizado/v1/listar-nit via POST
+    public function postListarNit($body)
+    {
+        $pos_setting = PosSetting::latest()->first();
+        $bearer = 'Bearer ' . Session::get('token_siat');
+        $host = $pos_setting->url_optimo;
+        $url = $host . '/datosincronizado/v1/listar-nit';
+
+        Log::info("SIAT POST LISTAR NIT REQUEST", [
+            'url' => $url,
+            'method' => 'POST',
+            'body' => $body,
+        ]);
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $bearer,
+                'Content-Type' => 'application/json',
+            ])->post($url, $body);
+
+            $http_status = $response->status();
+
+            if ($response->successful()) {
+                $data = $response->json();
+                Log::info("SIAT POST LISTAR NIT RESPONSE", [
+                    'status' => $http_status,
+                    'total_entities' => isset($data['ENTITIES']) ? count($data['ENTITIES']) : 0,
+                ]);
+                return $data;
+            }
+
+            if ($response->serverError()) {
+                Log::error("SIAT POST LISTAR NIT ERROR", [
+                    'status' => $http_status,
+                    'type' => 'ERROR_DEL_SERVIDOR_5xx',
+                    'response' => $response->body(),
+                ]);
+                Session::flash('warning', 'Problemas de conexión Siat');
+                return;
+            }
+
+            if ($response->clientError()) {
+                Log::error("SIAT POST LISTAR NIT ERROR", [
+                    'status' => $http_status,
+                    'type' => 'ERROR_DEL_CLIENTE_4xx',
+                    'response' => $response->body(),
+                ]);
+                Session::flash('warning', 'Error | Credenciales inválidas');
+                return;
+            }
+        } catch (Exception $e) {
+            Log::error("SIAT POST LISTAR NIT EXCEPTION", [
+                'error' => $e->getMessage(),
+            ]);
             Session::flash('warning', $e->getMessage());
             return;
         }
