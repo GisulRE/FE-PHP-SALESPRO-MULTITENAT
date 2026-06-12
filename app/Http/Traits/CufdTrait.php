@@ -293,7 +293,7 @@ trait CufdTrait
             'codigo_punto_venta' => $p_venta,
         ]);
         try {
-            $response = Http::withHeaders([
+            $response = Http::timeout(3)->withHeaders([
                 'Authorization' => $bearer,
             ])->post($url);
         } catch (\Throwable $th) {
@@ -360,7 +360,7 @@ trait CufdTrait
 
             $response = null;
             try {
-                $response = Http::post($url_siat . '/TokenRest/v1/token', [
+                $response = Http::timeout(3)->post($url_siat . '/TokenRest/v1/token', [
                     'dataPassword' => $pass_siat,
                     'dataUser' => $user_siat,
                 ]);

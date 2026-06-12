@@ -92,37 +92,18 @@ class SetCompanySettings
             }
 
             if (Schema::hasTable('product_lot')) {
-                $alert_lotes = ProductLote::select('expiration')
-                    ->where('status', '!=', 0)
+                $alert_lote = ProductLote::where('status', '!=', 0)
                     ->whereNull('low_date')
-                    ->get();
-
-                foreach ($alert_lotes as $lote) {
-                    if (empty($lote->expiration)) {
-                        continue;
-                    }
-                    $days = (int) floor((strtotime(date('Y-m-d', strtotime($lote->expiration))) - strtotime(date('Y-m-d'))) / 86400);
-                    if ($days <= $alert_expiration) {
-                        $alert_lote++;
-                    }
-                }
+                    ->whereNotNull('expiration')
+                    ->whereRaw('expiration <= DATE_ADD(CURDATE(), INTERVAL ? DAY)', [$alert_expiration])
+                    ->count();
             }
 
             if (class_exists(SiatPuntoVenta::class) && Schema::hasTable((new SiatPuntoVenta)->getTable())) {
-                $list_puntosVentas = SiatPuntoVenta::select('fecha_vigencia_cuis')
-                    ->where('is_active', true)
-                    ->get();
-
-                foreach ($list_puntosVentas as $punto_venta) {
-                    $fechaCuis = date('Y-m-d', strtotime($punto_venta->fecha_vigencia_cuis));
-                    $diff = abs(strtotime($fechaCuis) - strtotime(date('Y-m-d')));
-                    $years = floor($diff / (365 * 60 * 60 * 24));
-                    $months = floor(($diff - $years * 365 * 60 * 60 * 24) / (30 * 60 * 60 * 24));
-                    $days = floor(($diff - $years * 365 * 60 * 60 * 24 - $months * 30 * 60 * 60 * 24) / (60 * 60 * 24));
-                    if ($years == 0 && $months == 0 && $days < 6) {
-                        $alert_cuis++;
-                    }
-                }
+                $alert_cuis = SiatPuntoVenta::where('is_active', true)
+                    ->whereNotNull('fecha_vigencia_cuis')
+                    ->whereRaw('ABS(DATEDIFF(fecha_vigencia_cuis, CURDATE())) < 6')
+                    ->count();
             }
         }
 

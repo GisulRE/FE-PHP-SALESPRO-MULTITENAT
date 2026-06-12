@@ -744,6 +744,24 @@
             });
         });
     </script>
+
+    @if(session('perform_cufd_renewal_ajax'))
+    <script type="text/javascript">
+        $(document).ready(function() {
+            console.log("Iniciando renovación asíncrona de CUFD...");
+            $.ajax({
+                url: "{{ route('siat_panel.renovar_cufd') }}",
+                method: "GET",
+                success: function(response) {
+                    console.log("Renovación de CUFD asíncrona completada:", response);
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error al renovar CUFD de forma asíncrona:", error);
+                }
+            });
+        });
+    </script>
+    @endif
 </body>
 
 </html>
