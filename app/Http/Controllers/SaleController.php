@@ -847,6 +847,8 @@ class SaleController extends Controller
             // Limpiar campo auxiliar que no existe en la tabla sales
             unset($data['quotation_id_loaded']);
 
+            $data['item'] = isset($data['product_id']) ? count($data['product_id']) : 0;
+
             $lims_sale_data = Sale::create($data);
 
 
@@ -1933,7 +1935,7 @@ class SaleController extends Controller
             $obj_cliente->codigofijo   = !empty($data['codigo_fijo']) ? $data['codigo_fijo'] : ($data['customer_id'] ?? 1);
 
             $obj_cliente->tipo_documento          = $tipo_documento_val;
-            $obj_cliente->valor_documento         = $data['sales_valor_documento'] ?? '0';
+            $obj_cliente->valor_documento         = $data['sales_valor_documento'] ?? '';
             $obj_cliente->complemento_documento   = $text_complemento_documento;
             $obj_cliente->codigo_excepcion        = $excepcion_val;
             $obj_cliente->codigo_documento_sector = $sector_val;

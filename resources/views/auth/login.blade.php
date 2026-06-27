@@ -67,6 +67,14 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                                     aria-hidden="true">&times;</span></button>{{ session()->get('delete_message') }}
                         </div>
                     @endif
+                    @if ($errors->has('nit_login') && str_contains($errors->first('nit_login'), 'suspendido'))
+                        <div class="alert alert-danger alert-dismissible text-center">
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                            <strong>Acceso bloqueado:</strong> {{ $errors->first('nit_login') }}
+                        </div>
+                    @endif
                     <form method="POST" action="{{ route('login') }}" id="login-form">
                         @csrf
                         <div class="form-group-material">

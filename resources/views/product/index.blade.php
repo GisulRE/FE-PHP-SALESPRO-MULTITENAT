@@ -897,7 +897,7 @@
                     result = JSON.parse(response);
                     if (result.status) {
                         swal("Mensaje", "" + result.message, "success").then((value) => {
-                            location.reload();
+                            setPage("{{ route('products.index') }}");
                         });
                     } else {
                         swal("Error Verificar archivo", "Lista de Errores: " + result.message, "error");
@@ -913,5 +913,22 @@
             var url = '<?php echo url('/'); ?>' + '/products/export-excel/' + cat;
             $("#urlexcel").attr("href", url)
         }
+
+        $(document).on('submit', '#product-data-table form', function(e) {
+            e.preventDefault();
+            var form = $(this);
+            var url = form.attr('action');
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: form.serialize(),
+                success: function() {
+                    $('#product-data-table').DataTable().ajax.reload();
+                },
+                error: function() {
+                    alert('Error al eliminar el producto');
+                }
+            });
+        });
     </script>
 @endsection

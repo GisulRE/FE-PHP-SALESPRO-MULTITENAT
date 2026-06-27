@@ -371,10 +371,20 @@ trait CufdTrait
             if ($response == null) {
                 return;
             }
-            Session::put('auth_siat', true);
             //entre 200 y 299
             if ($response->successful()) {
                 $token_siat = $response->json();
+                if (empty($token_siat['token'])) {
+                    log::error('[getTokenTask] Respuesta 200 pero sin campo "token"', ['body' => $token_siat]);
+                    Session::put('auth_siat', false);
+                    return;
+                }
+                Session::put('token_siat', $token_siat['token']);
+                Session::put('auth_siat', true);
+                $this->writeCufdDebug('TOKEN_TASK_GENERATED', [
+                    'url' => $url_siat,
+                    'has_token' => true,
+                ]);
                 return $token_siat['token'];
             }
 
@@ -382,6 +392,7 @@ trait CufdTrait
             if ($response->serverError()) {
                 log::warning('Error: serverError, archivo CufdTrait, operación_getTokenTask => ');
                 log::warning(json_encode($response->json()));
+                Session::put('auth_siat', false);
                 return;
             }
 
@@ -389,6 +400,7 @@ trait CufdTrait
             if ($response->clientError()) {
                 log::warning('Error: clientError, archivo CufdTrait, operación_getTokenTask => ');
                 log::warning(json_encode($response->json()));
+                Session::put('auth_siat', false);
                 return;
             }
         } else {
@@ -508,53 +520,99 @@ trait CufdTrait
     public function obtenerCuis(int $puntoVenta, int $sucursalId = null)
     {
         $pos_setting = PosSetting::latest()->first();
-        $bearer = 'Bearer ' . Session::get('token_siat');
+        $token = Session::get('token_siat');
+        $bearer = 'Bearer ' . $token;
         $host = $pos_setting->url_operaciones;
         $path = '/obtencion.codigos/cuis';
+
+        Log::info('[obtenerCuis] Inicio', [
+            'puntoVenta'  => $puntoVenta,
+            'sucursalId'  => $sucursalId,
+            'host'        => $host,
+            'token_siat'  => $token ? 'presente (' . strlen($token) . ' chars)' : 'AUSENTE',
+            'nit_emisor'  => $pos_setting->nit_emisor ?? 'no configurado',
+        ]);
+
+        if (!$token) {
+            Log::warning('[obtenerCuis] No hay token SIAT en sesión — se intentará re-autenticar.');
+            $this->getTokenTask();
+            $token = Session::get('token_siat');
+            $bearer = 'Bearer ' . $token;
+            if (!$token) {
+                Log::error('[obtenerCuis] Re-autenticación fallida, no se puede obtener CUIS.');
+                return array('mensaje' => 'Sin token SIAT: no se pudo obtener el CUIS.', 'status' => false);
+            }
+        }
+
         try {
             $codigoPuntoVenta = '?codigoPuntoVenta=' . $puntoVenta;
             $nit = '&nit=' . $pos_setting->nit_emisor;
             $sucursal = '&sucursal=' . $sucursalId;
             $query = $codigoPuntoVenta . $nit . $sucursal;
+            $url_completa = $host . $path . $query;
+
+            Log::info('[obtenerCuis] Llamando API SIAT', ['url' => $url_completa]);
 
             $response = Http::withHeaders([
                 'Authorization' => $bearer,
-            ])->post($host . $path . $query);
-            log::info("url => " . $host . $path . $query);
+            ])->post($url_completa);
+
+            $http_status = $response->status();
+            Log::info('[obtenerCuis] HTTP status: ' . $http_status);
+
             //entre 200 y 299
             if ($response->successful()) {
                 $data = $response->json();
+                Log::info('[obtenerCuis] OK — CUIS obtenido', [
+                    'cuis'              => $data['CUIS'] ?? '?',
+                    'fecha_vigencia'    => $data['FECHA_VIGENCIA_CUIS'] ?? '?',
+                    'mensajes_siat'     => $data['MENSAJES'] ?? [],
+                ]);
                 $respuesta = array('data' => $data, 'status' => true);
-                log::info("respuesta => " . json_encode($data));
             } else {
                 $error = $response->json();
-                log::info("respuesta => " . json_encode($error));
-                $titulo_error = $error['status'];
+                Log::warning('[obtenerCuis] Respuesta con error', [
+                    'http_status'   => $http_status,
+                    'body'          => $error,
+                ]);
+
+                $titulo_error = is_array($error) && isset($error['status']) ? $error['status'] : $http_status;
+
                 if ($titulo_error == 500) {
-                    $respuesta = array('mensaje' => 'Error interno del servidor. ', 'status' => false);
+                    Log::error('[obtenerCuis] Error 500 del servidor SIAT');
+                    $respuesta = array('mensaje' => 'Error interno del servidor SIAT.', 'status' => false);
+                } elseif ($titulo_error == 401 || $titulo_error == 403) {
+                    Log::error('[obtenerCuis] Error ' . $titulo_error . ' — token inválido o expirado');
+                    $respuesta = array('mensaje' => 'Token SIAT inválido o expirado. Vuelva a iniciar sesión.', 'status' => false);
                 } elseif ($titulo_error == 400) {
-                    if (isset($error['mensajes'])) {
+                    if (is_array($error) && isset($error['mensajes'])) {
                         $mensajes_error = $error['mensajes'];
-                        log::warning("mensajes de Error => " . json_encode($mensajes_error));
+                        Log::warning('[obtenerCuis] Mensajes de error SIAT', ['mensajes' => $mensajes_error]);
                         $descripcion = "";
                         foreach ($mensajes_error as $mensaje) {
                             $descripcion .= " Código: " . $mensaje['codigo'] . " - Descripción: " . $mensaje['descripcion'];
-                            log::info($descripcion);
                         }
-                        $msj = 'Nose pudo obtener el CUIS. Error: ' . $descripcion;
+                        $msj = 'No se pudo obtener el CUIS. Error: ' . $descripcion;
+                    } elseif (is_array($error) && isset($error['title'])) {
+                        Log::warning('[obtenerCuis] Título error SIAT: ' . $error['title']);
+                        $msj = 'No se pudo obtener el CUIS. Error: ' . $titulo_error . ' - ' . $error['title'];
                     } else {
-                        $mensajes_error = $error['title'];
-                        log::warning("mensajes de Error => " . json_encode($mensajes_error));
-                        $msj = 'Nose pudo obtener el CUIS. Error: ' . $titulo_error . " - " . $mensajes_error;
+                        $msj = 'No se pudo obtener el CUIS. Error 400 sin detalle.';
                     }
                     $respuesta = array('mensaje' => $msj, 'status' => false);
+                } else {
+                    Log::error('[obtenerCuis] Error HTTP no manejado: ' . $titulo_error, ['body' => $error]);
+                    $respuesta = array('mensaje' => 'Error HTTP ' . $titulo_error . ' al obtener CUIS.', 'status' => false);
                 }
             }
         } catch (\Throwable $th) {
-            $msj = 'Problemas de conexión Siat o Error: ' . $th->getMessage();
-            $respuesta = array('mensaje' => $msj, 'status' => false);
-            return $respuesta;
+            Log::error('[obtenerCuis] Excepción: ' . $th->getMessage(), [
+                'file' => $th->getFile(),
+                'line' => $th->getLine(),
+            ]);
+            $respuesta = array('mensaje' => 'Problemas de conexión Siat o Error: ' . $th->getMessage(), 'status' => false);
         }
+
         return $respuesta;
     }
 

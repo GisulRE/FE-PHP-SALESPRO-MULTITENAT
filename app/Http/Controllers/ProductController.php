@@ -29,8 +29,37 @@ class ProductController extends Controller
 {
     public function index()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('products-index')) {
+        $user    = Auth::user();
+        $role_id = $user ? $user->role_id : null;
+
+        Log::info('[ProductController@index] Intentando acceder', [
+            'user_id'   => $user ? $user->id    : null,
+            'user_name' => $user ? $user->name  : null,
+            'role_id'   => $role_id,
+            'is_active' => $user ? $user->is_active : null,
+        ]);
+
+        $role = Role::find($role_id);
+
+        if (!$role) {
+            Log::error('[ProductController@index] Rol NO encontrado en BD, se bloquea acceso', [
+                'user_id' => $user ? $user->id : null,
+                'role_id' => $role_id,
+            ]);
+            return redirect()->route('home')->with('not_permitted', 'Error: rol de usuario no encontrado. Contacte al administrador.');
+        }
+
+        $hasPermission = $role->hasPermissionTo('products-index');
+
+        Log::info('[ProductController@index] Resultado de verificación de permiso', [
+            'user_id'           => $user->id,
+            'role_id'           => $role_id,
+            'role_name'         => $role->name,
+            'permiso_requerido' => 'products-index',
+            'tiene_permiso'     => $hasPermission,
+        ]);
+
+        if ($hasPermission) {
             $lims_category_list = Category::select('id', 'name')->where('is_active', true)->get();
             $permissions = Role::findByName($role->name)->permissions;
             foreach ($permissions as $permission)
@@ -38,8 +67,15 @@ class ProductController extends Controller
             if (empty($all_permission))
                 $all_permission[] = 'dummy text';
             return view('product.index', compact('all_permission', 'lims_category_list'));
-        } else
+        } else {
+            Log::warning('[ProductController@index] Acceso DENEGADO por falta de permiso, redirigiendo a back()', [
+                'user_id'   => $user->id,
+                'role_id'   => $role_id,
+                'role_name' => $role->name,
+                'referer'   => request()->headers->get('referer', 'sin_referer'),
+            ]);
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function productData(Request $request)
@@ -218,8 +254,28 @@ class ProductController extends Controller
 
     public function create()
     {
-        $role = Role::firstOrCreate(['id' => Auth::user()->role_id]);
-        if ($role->hasPermissionTo('products-add')) {
+        $user    = Auth::user();
+        $role_id = $user ? $user->role_id : null;
+
+        Log::info('[ProductController@create] Intentando acceder', [
+            'user_id'   => $user ? $user->id   : null,
+            'user_name' => $user ? $user->name  : null,
+            'role_id'   => $role_id,
+        ]);
+
+        $role = Role::firstOrCreate(['id' => $role_id]);
+
+        $hasPermission = $role->hasPermissionTo('products-add');
+
+        Log::info('[ProductController@create] Resultado de verificación de permiso', [
+            'user_id'           => $user ? $user->id : null,
+            'role_id'           => $role_id,
+            'role_name'         => $role->name,
+            'permiso_requerido' => 'products-add',
+            'tiene_permiso'     => $hasPermission,
+        ]);
+
+        if ($hasPermission) {
             $lims_product_list = [];
             $lims_product_list_std = Product::where([['is_active', true], ['type', 'standard']])->get();
             $lims_product_list_dig = Product::where([['is_active', true], ['type', 'digital']])->get();
@@ -238,8 +294,15 @@ class ProductController extends Controller
             $actividades = SiatActividadEconomica::get()->sortBy('descripcion');
             $lims_account_list = Account::select('id', 'name', 'account_no')->where('is_active', true)->get();
             return view('product.create', compact('lims_product_list', 'lims_brand_list', 'lims_category_list', 'lims_unit_list', 'lims_tax_list', 'lims_product_list_all', 'lims_product_list_ins', 'actividades', 'lims_account_list'));
-        } else
+        } else {
+            Log::warning('[ProductController@create] Acceso DENEGADO por falta de permiso, redirigiendo a back()', [
+                'user_id'   => $user ? $user->id : null,
+                'role_id'   => $role_id,
+                'role_name' => $role->name,
+                'referer'   => request()->headers->get('referer', 'sin_referer'),
+            ]);
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function store(Request $request)
@@ -387,8 +450,30 @@ class ProductController extends Controller
 
     public function edit($id)
     {
-        $role = Role::firstOrCreate(['id' => Auth::user()->role_id]);
-        if ($role->hasPermissionTo('products-edit')) {
+        $user    = Auth::user();
+        $role_id = $user ? $user->role_id : null;
+
+        Log::info('[ProductController@edit] Intentando acceder', [
+            'user_id'    => $user ? $user->id  : null,
+            'user_name'  => $user ? $user->name : null,
+            'role_id'    => $role_id,
+            'product_id' => $id,
+        ]);
+
+        $role = Role::firstOrCreate(['id' => $role_id]);
+
+        $hasPermission = $role->hasPermissionTo('products-edit');
+
+        Log::info('[ProductController@edit] Resultado de verificación de permiso', [
+            'user_id'           => $user ? $user->id : null,
+            'role_id'           => $role_id,
+            'role_name'         => $role->name,
+            'permiso_requerido' => 'products-edit',
+            'tiene_permiso'     => $hasPermission,
+            'product_id'        => $id,
+        ]);
+
+        if ($hasPermission) {
             $lims_product_list_std = Product::where([['is_active', true], ['type', 'standard']])->get();
             $lims_product_list_dig = Product::where([['is_active', true], ['type', 'digital']])->get();
             ///$lims_product_list = array_merge($lims_product_list_std, $lims_product_list_dig);
@@ -415,8 +500,16 @@ class ProductController extends Controller
             $actividades = SiatActividadEconomica::get()->sortBy('descripcion');
             $lims_account_list = Account::select('id', 'name', 'account_no')->where('is_active', true)->get();
             return view('product.edit', compact('lims_product_list', 'lims_brand_list', 'lims_category_list', 'lims_unit_list', 'lims_tax_list', 'lims_product_data', 'lims_product_variant_data', 'lims_product_list_all', 'lims_product_asocciated', 'lims_product_list_ins', 'actividades', 'lims_account_list'));
-        } else
+        } else {
+            Log::warning('[ProductController@edit] Acceso DENEGADO por falta de permiso, redirigiendo a back()', [
+                'user_id'    => $user ? $user->id : null,
+                'role_id'    => $role_id,
+                'role_name'  => $role->name,
+                'product_id' => $id,
+                'referer'    => request()->headers->get('referer', 'sin_referer'),
+            ]);
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function updateProduct(Request $request)
@@ -951,6 +1044,9 @@ class ProductController extends Controller
             }
         }
         $lims_product_data->save();
+        if (request()->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Producto eliminado con éxito']);
+        }
         return redirect('products')->with('message', 'Producto eliminado con éxito');
     }
 

@@ -5,9 +5,6 @@
         <label>Actividad Económica</label>
         <select name="actividad_id" id="edit_actividad_id" class="form-control selectpicker">
             <option value="">Seleccionar</option>
-            @foreach ($actividades as $item)
-                <option value="{{ $item->codigo_caeb }}">{{ $item->descripcion }}</option>
-            @endforeach
         </select>
     </div>
     <div class="form-group col-md-12" id="edit_codigos">
@@ -65,17 +62,40 @@
             var id = $(this).data('id').toString();
             url = url.concat(id).concat("/edit");
 
-            $.get(url, function(data) {
-                $("#editModal input[name='name']").val(data['name']);
-                $("#editModal select[name='parent_id']").val(data['parent_id']);
-                $("#editModal input[name='category_id']").val(data['id']);
-                $("#editModal select[name='actividad_id']").val(data['codigo_actividad']);
-                onSelectRefresh();
-                $("#editModal select[name='codigo_pro_ser']").val(data[
-                    'codigo_producto_servicio']);
-                $('.selectpicker').selectpicker('refresh');
-            });
+            $.ajax({
+                url: '{{ url("category/get-actividades") }}',
+                type: "POST",
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content'),
+                },
+                dataType: "json",
+                success: function(res) {
+                    console.log('ACTIVIDADES EDIT response:', res);
+                    var select = $("#editModal select[name='actividad_id']");
+                    select.empty().append('<option value="">Seleccionar</option>');
+                    if (res.actividades && res.actividades.length > 0) {
+                        console.log('ACTIVIDADES EDIT primer item:', res.actividades[0]);
+                        $.each(res.actividades, function(i, item) {
+                            console.log('ACTIVIDADES EDIT item ' + i + ':', item);
+                            select.append('<option value="' + (item.valor || '') + '">' + (item.descripcion || '') + '</option>');
+                        });
+                    } else {
+                        console.warn('ACTIVIDADES EDIT: no hay actividades en la respuesta');
+                    }
+                    $('.selectpicker').selectpicker('refresh');
 
+                    $.get(url, function(data) {
+                        $("#editModal input[name='name']").val(data['name']);
+                        $("#editModal select[name='parent_id']").val(data['parent_id']);
+                        $("#editModal input[name='category_id']").val(data['id']);
+                        $("#editModal select[name='actividad_id']").val(data['codigo_actividad']);
+                        onSelectRefresh();
+                        $("#editModal select[name='codigo_pro_ser']").val(data[
+                            'codigo_producto_servicio']);
+                        $('.selectpicker').selectpicker('refresh');
+                    });
+                }
+            });
         });
 
         function onSelectRefresh() {

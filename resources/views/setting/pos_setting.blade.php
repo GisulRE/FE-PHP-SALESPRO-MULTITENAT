@@ -76,17 +76,15 @@
                                     </div>
                                     <div class="form-group">
                                         @if ($lims_pos_setting_data)
-                                            <input class="mt-2" type="checkbox" name="customer_sucursal"
-                                                value="{{ $lims_pos_setting_data->customer_sucursal }}"
-                                                @if ($lims_pos_setting_data->customer_sucursal == 1) checked @endif>
+                                            <input class="mt-2" type="checkbox" name="customer_sucursal" value="1"
+                                                @if ($lims_pos_setting_data->customer_sucursal) checked @endif>
                                         @endif
                                         <label class="mt-2"><strong>Filtrar Clientes por Sucursal?</strong></label>
                                     </div>
                                     <div class="form-group">
                                         @if ($lims_pos_setting_data)
-                                            <input class="mt-2" type="checkbox" name="user_category"
-                                                value="{{ $lims_pos_setting_data->user_category }}"
-                                                @if ($lims_pos_setting_data->user_category == 1) checked @endif>
+                                            <input class="mt-2" type="checkbox" name="user_category" value="1"
+                                                @if ($lims_pos_setting_data->user_category) checked @endif>
                                         @endif
                                         <label class="mt-2"><strong>Filtrar Categorias por Usuario?</strong></label>
                                     </div>
@@ -131,54 +129,46 @@
                                             max="5" value="{{ $lims_pos_setting_data->cant_decimal }}" required />
                                     </div>
                                     <div class="form-group">
-                                        @if ($lims_pos_setting_data && $lims_pos_setting_data->keybord_active)
+                                        @if ($lims_pos_setting_data)
                                             <input class="mt-2" type="checkbox" name="keybord_active" value="1"
-                                                checked>
-                                        @else
-                                            <input class="mt-2" type="checkbox" name="keybord_active" value="1">
+                                                @if ($lims_pos_setting_data->keybord_active) checked @endif>
                                         @endif
                                         <label class="mt-2"><strong>{{ trans('file.Touchscreen keybord') }}
                                                 Venta</label>
                                         &nbsp;&nbsp;
-                                        @if ($lims_pos_setting_data && $lims_pos_setting_data->keybord_presale)
+                                        @if ($lims_pos_setting_data)
                                             <input class="mt-2" type="checkbox" name="keybord_presale" value="1"
-                                                checked>
-                                        @else
-                                            <input class="mt-2" type="checkbox" name="keybord_presale" value="1">
+                                                @if ($lims_pos_setting_data->keybord_presale) checked @endif>
                                         @endif
                                         <label class="mt-2"><strong>{{ trans('file.Touchscreen keybord') }}
                                                 Pre-Venta</label>
                                     </div>
                                     <div class="form-group">
                                         @if ($lims_pos_setting_data)
-                                            <input class="mt-2" type="checkbox" name="print"
-                                                value="{{ $lims_pos_setting_data->print }}"
-                                                @if ($lims_pos_setting_data->print == 1) checked @endif>
+                                            <input class="mt-2" type="checkbox" name="print" value="1"
+                                                @if ($lims_pos_setting_data->print) checked @endif>
                                         @endif
                                         <label class="mt-2"><strong>{{ trans('file.Print Function') }}?</label>
                                         &nbsp;&nbsp;
                                         @if ($lims_pos_setting_data)
-                                            <input class="mt-2" type="checkbox" name="print_presale"
-                                                value="{{ $lims_pos_setting_data->print_presale }}"
-                                                @if ($lims_pos_setting_data->print_presale == 1) checked @endif>
+                                            <input class="mt-2" type="checkbox" name="print_presale" value="1"
+                                                @if ($lims_pos_setting_data->print_presale) checked @endif>
                                         @endif
                                         <label class="mt-2"><strong>{{ trans('file.Print PreSale') }}?</label>
                                     </div>
 
                                     <div class="form-group">
                                         @if ($lims_pos_setting_data)
-                                            <input class="mt-2" type="checkbox" name="date_sell"
-                                                value="{{ $lims_pos_setting_data->date_sell }}"
-                                                @if ($lims_pos_setting_data->date_sell == 1) checked @endif>
+                                            <input class="mt-2" type="checkbox" name="date_sell" value="1"
+                                                @if ($lims_pos_setting_data->date_sell) checked @endif>
                                         @endif
                                         <label class="mt-2"><strong>Mantener Fecha de Venta?</strong></label>
                                     </div>
 
                                     <div class="form-group">
                                         @if ($lims_pos_setting_data)
-                                            <input class="mt-2" type="checkbox" name="require_transfer_authorization"
-                                                value="{{ $lims_pos_setting_data->require_transfer_authorization }}"
-                                                @if ($lims_pos_setting_data->require_transfer_authorization == 1) checked @endif>
+                                            <input class="mt-2" type="checkbox" name="require_transfer_authorization" value="1"
+                                                @if ($lims_pos_setting_data->require_transfer_authorization) checked @endif>
                                         @endif
                                         <label class="mt-2"><strong>Requerir Autorización de
                                                 transferencia?</strong></label>
@@ -305,9 +295,8 @@
                                 </div>
                                 <div class="form-group col-md-6">
                                     @if ($lims_pos_setting_data)
-                                        <input class="mt-2" type="checkbox" name="cufd_centralizado"
-                                            value="{{ $lims_pos_setting_data->cufd_centralizado }}"
-                                            @if ($lims_pos_setting_data->cufd_centralizado == 1) checked @endif>
+                                        <input class="mt-2" type="checkbox" name="cufd_centralizado" value="1"
+                                            @if ($lims_pos_setting_data->cufd_centralizado) checked @endif>
                                     @endif
                                     <label class="mt-2"><strong>CUFD Centralizado</strong></label>
                                 </div>

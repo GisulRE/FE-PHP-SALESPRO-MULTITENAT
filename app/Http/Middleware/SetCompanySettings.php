@@ -95,14 +95,14 @@ class SetCompanySettings
                 $alert_lote = ProductLote::where('status', '!=', 0)
                     ->whereNull('low_date')
                     ->whereNotNull('expiration')
-                    ->whereRaw('expiration <= DATE_ADD(CURDATE(), INTERVAL ? DAY)', [$alert_expiration])
+                    ->where('expiration', '<=', now()->addDays((int) $alert_expiration))
                     ->count();
             }
 
             if (class_exists(SiatPuntoVenta::class) && Schema::hasTable((new SiatPuntoVenta)->getTable())) {
                 $alert_cuis = SiatPuntoVenta::where('is_active', true)
                     ->whereNotNull('fecha_vigencia_cuis')
-                    ->whereRaw('ABS(DATEDIFF(fecha_vigencia_cuis, CURDATE())) < 6')
+                    ->whereBetween('fecha_vigencia_cuis', [now()->subDays(5), now()->addDays(5)])
                     ->count();
             }
         }

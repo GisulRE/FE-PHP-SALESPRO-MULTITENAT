@@ -332,6 +332,7 @@ class SiatPanelController extends Controller
             'nit' => $nitCollection,
             'datos_sucursal' => $datos_sucursal,
             'sucursal' => $sucursal,
+            'punto_venta' => $punto_venta,
         ]);
     }
 

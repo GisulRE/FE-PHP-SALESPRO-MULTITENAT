@@ -1496,9 +1496,11 @@
                 }*/
             },
             successmultiple: function(file, response) {
-                //location.href = '../';
-                window.location.href = document.referrer;
-                                //console.log('sss: '+ response);
+                $('#loader').show();
+                setTimeout(() => {
+                    $('#loader').hide();
+                    setPage("{{ route('products.index') }}");
+                }, 1000);
             },
             completemultiple: function(file, response) {
                 console.log(file, response, "completemultiple");

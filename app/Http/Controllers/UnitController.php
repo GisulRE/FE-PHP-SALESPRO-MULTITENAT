@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use Auth;
 use App\Unit;
+use App\PosSetting;
 use Illuminate\Http\Request;
-use App\SiatParametricaVario;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Session;
+use Log;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -17,11 +20,78 @@ class UnitController extends Controller
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('unit')) {
             $lims_unit_all = Unit::where('is_active', true)->get();
-            $parametros_unidades_medidas = SiatParametricaVario::where('tipo_clasificador','unidadMedida')->get();
-            return view('unit.create', compact('lims_unit_all','parametros_unidades_medidas'));
+            return view('unit.create', compact('lims_unit_all'));
         }
         else
             return redirect()->back()->with('not_permitted', '¡Lo siento! No tienes permiso para acceder a este módulo.');
+    }
+
+    public function getUnidadesMedida()
+    {
+        Log::info("UNIT GET UNIDADES MEDIDA: Iniciando petición");
+
+        $nitCollection = PosSetting::latest()->first()->pluck('nit_emisor');
+        $nitValue = $nitCollection->first();
+        $unidades = [];
+
+        if (Session::get('token_siat') != null) {
+            $pos_setting = PosSetting::latest()->first();
+            $bearer = 'Bearer ' . Session::get('token_siat');
+            $host = $pos_setting->url_optimo;
+            $url = $host . '/datosincronizado/v1/listar-nit';
+
+            Log::info("UNIT GET UNIDADES MEDIDA: Enviando petición", [
+                'url' => $url,
+                'nit' => $nitValue,
+                'parametro' => 'unidades_medida',
+            ]);
+
+            $body = [
+                'nit' => $nitValue,
+                'parametro' => 'unidades_medida',
+                'sucursal' => 0,
+                'codigoPuntoVenta' => 0,
+            ];
+
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => $bearer,
+                    'Content-Type' => 'application/json',
+                ])->post($url, $body);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    if ($data && isset($data['ENTITIES'])) {
+                        $unidades = $data['ENTITIES'];
+                        if (!empty($unidades)) {
+                            Log::info("UNIT GET UNIDADES MEDIDA: Primer item estructura", [
+                                'item' => json_encode($unidades[0])
+                            ]);
+                        }
+                    }
+                    Log::info("UNIT GET UNIDADES MEDIDA: Respuesta exitosa", [
+                        'total_unidades' => count($unidades),
+                    ]);
+                } else {
+                    Log::warning("UNIT GET UNIDADES MEDIDA: Error HTTP", [
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error("UNIT GET UNIDADES MEDIDA: Excepción", [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } else {
+            Log::warning("UNIT GET UNIDADES MEDIDA: token_siat es null, no se hace petición API");
+        }
+
+        Log::info("UNIT GET UNIDADES MEDIDA: Finalizado", [
+            'total_retornadas' => count($unidades),
+        ]);
+
+        return response()->json(['unidades' => $unidades]);
     }
 
     public function store(Request $request)

@@ -90,28 +90,28 @@ class CashierController extends Controller
             $debit = 0;
             $lims_account_data = Account::select('id', 'name', 'account_no', 'initial_balance')->find($account_id);
 
-            $payment_recieved = Payment::whereNotNull('sale_id')->where('account_id', $account_id)
+            $payment_recieved = (float) Payment::whereNotNull('sale_id')->where('account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
-            $payment_sent = Payment::whereNotNull('purchase_id')->where('account_id', $account_id)
+            $payment_sent = (float) Payment::whereNotNull('purchase_id')->where('account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
-            $returns = Returns::where('account_id', $account_id)->whereDate('created_at', '>=' , $startbef_date)
+            $returns = (float) Returns::where('account_id', $account_id)->whereDate('created_at', '>=' , $startbef_date)
             ->whereDate('created_at', '<=' , $endafter_date)->sum('grand_total');
-            $return_purchase = DB::table('return_purchases')->where('account_id', $account_id)
+            $return_purchase = (float) DB::table('return_purchases')->where('account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('grand_total');
-            $expenses = DB::table('expenses')->where('account_id', $account_id)
+            $expenses = (float) DB::table('expenses')->where('account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
-            $payrolls = DB::table('payrolls')->where('account_id', $account_id)
+            $payrolls = (float) DB::table('payrolls')->where('account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
-            $sent_money_via_transfer = MoneyTransfer::where('from_account_id', $account_id)
+            $sent_money_via_transfer = (float) MoneyTransfer::where('from_account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
-            $recieved_money_via_transfer = MoneyTransfer::where('to_account_id', $account_id)
+            $recieved_money_via_transfer = (float) MoneyTransfer::where('to_account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
-            $adjustment_account_ing = AdjustmentAccount::where([['account_id', $account_id],['is_active', true],['type_adjustment', 'ING']])
+            $adjustment_account_ing = (float) AdjustmentAccount::where([['account_id', $account_id],['is_active', true],['type_adjustment', 'ING']])
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
-            $adjustment_account_egr = AdjustmentAccount::where([['account_id', $account_id],['is_active', true],['type_adjustment', 'EGR']])
+            $adjustment_account_egr = (float) AdjustmentAccount::where([['account_id', $account_id],['is_active', true],['type_adjustment', 'EGR']])
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
 
-            $credit = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + $lims_account_data->initial_balance;
+            $credit = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + (float) $lims_account_data->initial_balance;
             $debit = $payment_sent + $returns + $expenses + $payrolls + $sent_money_via_transfer + $adjustment_account_egr;
             $saldoant = $credit - $debit;
             $total_old = $saldoant;

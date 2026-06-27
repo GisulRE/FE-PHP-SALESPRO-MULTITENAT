@@ -56,48 +56,106 @@ trait SiatTrait
     public function getToken()
     {
         $pos_setting = PosSetting::latest()->first();
-        
+
         $user_siat = optional($pos_setting)->user_siat ?? '';
         $pass_siat = optional($pos_setting)->pass_siat ?? '';
         $url_siat = optional($pos_setting)->url_siat ?? '';
 
-        if ($user_siat && $pass_siat && $url_siat) {
-            try {
-                $response = Http::timeout(3)->post($url_siat . '/TokenRest/v1/token', [
-                    'dataPassword' => $pass_siat,
-                    'dataUser' => $user_siat,
-                ]);
-            } catch (\Throwable $th) {
-                // Log del error pero NO bloquea el login
-                Log::warning('SIAT: No se pudo conectar durante login - ' . $th->getMessage());
-                Session::put('auth_siat', false);
-                return;
-            }
+        Log::info('[getToken] Inicio obtención de token SIAT', [
+            'url_siat'   => $url_siat ?: 'NO CONFIGURADA',
+            'user_siat'  => $user_siat ?: 'NO CONFIGURADO',
+            'pass_siat'  => $pass_siat ? 'configurada (' . strlen($pass_siat) . ' chars)' : 'NO CONFIGURADA',
+        ]);
 
-            Session::put('auth_siat', true);
-            //entre 200 y 299
-            if ($response->successful()) {
-                $token_siat = $response->json();
-                Session::put('token_siat', $token_siat['token']);
-                return;
-            }
-            //error >500
-            if ($response->serverError()) {
-                // Log del error pero NO bloquea el login
-                Log::warning('SIAT: Error del servidor durante login');
-                Session::put('auth_siat', false);
-                return;
-            }
-            //error >400
-            if ($response->clientError()) {
-                // Log del error pero NO bloquea el login
-                Log::warning('SIAT: Credenciales inválidas durante login');
-                Session::put('auth_siat', false);
-                return;
-            }
-        } else {
+        if (!$user_siat || !$pass_siat || !$url_siat) {
+            Log::error('[getToken] Credenciales SIAT incompletas en PosSetting — no se puede generar token', [
+                'user_siat_vacio' => empty($user_siat),
+                'pass_siat_vacio' => empty($pass_siat),
+                'url_siat_vacio'  => empty($url_siat),
+            ]);
             Session::put('auth_siat', false);
+            return;
         }
+
+        $url_token = $url_siat . '/TokenRest/v1/token';
+        Log::info('[getToken] Llamando endpoint de token', ['url' => $url_token]);
+
+        try {
+            $response = Http::timeout(3)->post($url_token, [
+                'dataPassword' => $pass_siat,
+                'dataUser' => $user_siat,
+            ]);
+        } catch (\Throwable $th) {
+            Log::warning('[getToken] Excepción de conexión al obtener token SIAT', [
+                'url'     => $url_token,
+                'error'   => $th->getMessage(),
+                'file'    => $th->getFile(),
+                'line'    => $th->getLine(),
+            ]);
+            Session::put('auth_siat', false);
+            return;
+        }
+
+        $http_status = $response->status();
+        Log::info('[getToken] HTTP status: ' . $http_status);
+
+        Session::put('auth_siat', true);
+        //entre 200 y 299
+        if ($response->successful()) {
+            $token_siat = $response->json();
+            if (empty($token_siat['token'])) {
+                Log::error('[getToken] Respuesta 200 pero sin campo "token" en la respuesta', ['body' => $token_siat]);
+                Session::put('auth_siat', false);
+                return;
+            }
+            Session::put('token_siat', $token_siat['token']);
+            Log::info('[getToken] Token SIAT obtenido correctamente', [
+                'token_length' => strlen($token_siat['token']),
+            ]);
+            $this->writeSiatDebug('TOKEN_GENERATED', [
+                'url' => $url_siat,
+                'has_token' => !empty($token_siat['token']),
+            ]);
+            return;
+        }
+        //error >500
+        if ($response->serverError()) {
+            Log::warning('[getToken] Error 5xx del servidor SIAT al obtener token', [
+                'http_status' => $http_status,
+                'body'        => $response->body(),
+            ]);
+            Session::put('auth_siat', false);
+            return;
+        }
+        //error 403 — cuenta suspendida por falta de pago
+        if ($http_status === 403) {
+            $body = $response->json();
+            $errorMsg = $body['error'] ?? 'El acceso al sistema SIAT ha sido suspendido. Regularice su situación.';
+            Log::error('[getToken] Acceso SIAT suspendido (403)', [
+                'url'   => $url_token,
+                'error' => $errorMsg,
+            ]);
+            Session::put('auth_siat', false);
+            Session::put('siat_account_suspended', $errorMsg);
+            return;
+        }
+        //error >400
+        if ($response->clientError()) {
+            Log::warning('[getToken] Error 4xx — credenciales SIAT inválidas o endpoint incorrecto', [
+                'http_status' => $http_status,
+                'url'         => $url_token,
+                'user_siat'   => $user_siat,
+                'body'        => $response->body(),
+            ]);
+            Session::put('auth_siat', false);
+            return;
+        }
+
+        Log::warning('[getToken] Respuesta inesperada del servidor de token', [
+            'http_status' => $http_status,
+            'body'        => $response->body(),
+        ]);
+        Session::put('auth_siat', false);
         return;
     }
 
@@ -106,13 +164,14 @@ trait SiatTrait
     {
         $pos_setting = PosSetting::latest()->first();
         $bearer = 'Bearer ' . Session::get('token_siat');
-        $host = $pos_setting->url_operaciones;
+        $host = $pos_setting->url_optimo;
         $path = '/sincronizacion/v1/registrossincronizar/nit';
         $query = '?nit=' . $nit . '&puntoVenta=' . $p_venta . '&sucursal=' . $sucursal_id;
-        
+        $url = $host . $path . $query;
+
         Log::info("SINCRONIZACION SIAT");
-        Log::info("URL => " . $host . $path . $query);
-        
+        Log::info("URL => " . $url);
+
         try {
             $response = Http::withHeaders([
                 'Authorization' => $bearer,
@@ -576,6 +635,21 @@ trait SiatTrait
         
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
+
+        if (!$data_cliente) {
+            return ['mensaje' => 'Error: No se encontraron datos del cliente para esta venta. Contacte al administrador.', 'status' => false];
+        }
+
+        $valorDoc = trim((string) ($data_cliente->valor_documento ?? ''));
+        if ($valorDoc === '' || $valorDoc === '0' || (int) $valorDoc === 0) {
+            Log::warning('SIAT generarFacturaIndividual: numeroDocumento inválido', [
+                'sale_id'        => $venta_id,
+                'valor_documento' => $data_cliente->valor_documento,
+                'tipo_documento'  => $data_cliente->tipo_documento,
+            ]);
+            return ['mensaje' => 'Error SIAT [1048]: El número de documento del cliente es inválido o está vacío (enviado: 0). Edite la venta e ingrese un NIT o CI válido antes de facturar.', 'status' => false];
+        }
+
         $leyendas = SiatLeyendaFactura::all();
         $data_leyenda = $this->pickRandomLeyenda($leyendas);
         if (!$data_siat_cufd) {
@@ -4311,12 +4385,20 @@ Descripción: " . $data_response['descripcion'];
             $respuesta = array('facturas' => $data['ENTITIES'], 'status' => true);
         } else {
             $error = $response->json();
-            $titulo_error = $error['status'];
-            if ($titulo_error == 500) {
-                $respuesta = array('mensaje' => 'Error interno del servidor. ', 'status' => false);
-            } elseif ($titulo_error == 400) {
-                $mensajes_error = $error['title'];
-                $respuesta = array('mensaje' => $mensajes_error, 'status' => false);
+            if (is_null($error)) {
+                $respuesta = array('mensaje' => 'Sin respuesta del servidor SIAT.', 'status' => false);
+            } elseif (isset($error['error'])) {
+                $respuesta = array('mensaje' => $error['error'], 'status' => false);
+            } else {
+                $titulo_error = $error['status'] ?? $response->status();
+                if ($titulo_error == 500) {
+                    $respuesta = array('mensaje' => 'Error interno del servidor.', 'status' => false);
+                } elseif ($titulo_error == 400) {
+                    $mensajes_error = $error['title'] ?? 'Solicitud inválida.';
+                    $respuesta = array('mensaje' => $mensajes_error, 'status' => false);
+                } else {
+                    $respuesta = array('mensaje' => 'Error desconocido del servidor SIAT.', 'status' => false);
+                }
             }
             log::warning('Error! archivo SiatTrait, buscarFacturas => ');
             log::warning($error);

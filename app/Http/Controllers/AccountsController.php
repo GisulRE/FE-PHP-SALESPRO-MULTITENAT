@@ -187,18 +187,18 @@ class AccountsController extends Controller
             $debit = [];
             $credit = [];
             foreach ($lims_account_list as $account) {
-                $payment_recieved = Payment::whereNotNull('sale_id')->where('account_id', $account->id)->sum('amount');
-                $payment_sent = Payment::whereNotNull('purchase_id')->where('account_id', $account->id)->sum('amount');
-                $returns = DB::table('returns')->where('account_id', $account->id)->sum('grand_total');
-                $return_purchase = DB::table('return_purchases')->where('account_id', $account->id)->sum('grand_total');
-                $expenses = DB::table('expenses')->where('account_id', $account->id)->sum('amount');
-                $payrolls = DB::table('payrolls')->where('account_id', $account->id)->sum('amount');
-                $sent_money_via_transfer = MoneyTransfer::where('from_account_id', $account->id)->sum('amount');
-                $recieved_money_via_transfer = MoneyTransfer::where('to_account_id', $account->id)->sum('amount');
-                $adjustment_account_ing = AdjustmentAccount::where([['account_id', $account->id], ['is_active', true], ['type_adjustment', 'ING']])->sum('amount');
-                $adjustment_account_egr = AdjustmentAccount::where([['account_id', $account->id], ['is_active', true], ['type_adjustment', 'EGR']])->sum('amount');
+                $payment_recieved = (float) Payment::whereNotNull('sale_id')->where('account_id', $account->id)->sum('amount');
+                $payment_sent = (float) Payment::whereNotNull('purchase_id')->where('account_id', $account->id)->sum('amount');
+                $returns = (float) DB::table('returns')->where('account_id', $account->id)->sum('grand_total');
+                $return_purchase = (float) DB::table('return_purchases')->where('account_id', $account->id)->sum('grand_total');
+                $expenses = (float) DB::table('expenses')->where('account_id', $account->id)->sum('amount');
+                $payrolls = (float) DB::table('payrolls')->where('account_id', $account->id)->sum('amount');
+                $sent_money_via_transfer = (float) MoneyTransfer::where('from_account_id', $account->id)->sum('amount');
+                $recieved_money_via_transfer = (float) MoneyTransfer::where('to_account_id', $account->id)->sum('amount');
+                $adjustment_account_ing = (float) AdjustmentAccount::where([['account_id', $account->id], ['is_active', true], ['type_adjustment', 'ING']])->sum('amount');
+                $adjustment_account_egr = (float) AdjustmentAccount::where([['account_id', $account->id], ['is_active', true], ['type_adjustment', 'EGR']])->sum('amount');
 
-                $credit[] = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + $account->initial_balance;
+                $credit[] = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + (float) $account->initial_balance;
                 $debit[] = $payment_sent + $returns + $expenses + $payrolls + $sent_money_via_transfer + $adjustment_account_egr;
 
                 /*$credit[] = $payment_recieved + $return_purchase + $account->initial_balance;
@@ -1103,28 +1103,28 @@ class AccountsController extends Controller
                     $saldoant = (float) $cashier_close_before_date->amount_end;
                 } else {
 
-                    $payment_recieved = Payment::whereNotNull('sale_id')->where('account_id', $cash_account_id)->where('paying_method', 'Efectivo')
+                    $payment_recieved = (float) Payment::whereNotNull('sale_id')->where('account_id', $cash_account_id)->where('paying_method', 'Efectivo')
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                    $payment_sent = Payment::whereNotNull('purchase_id')->where('account_id', $cash_account_id)
+                    $payment_sent = (float) Payment::whereNotNull('purchase_id')->where('account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                    $returns = Returns::where('account_id', $cash_account_id)->where('biller_id', $biller->id)
+                    $returns = (float) Returns::where('account_id', $cash_account_id)->where('biller_id', $biller->id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-                    $return_purchase = DB::table('return_purchases')->where('account_id', $cash_account_id)
+                    $return_purchase = (float) DB::table('return_purchases')->where('account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-                    $expenses = DB::table('expenses')->where('account_id', $cash_account_id)
+                    $expenses = (float) DB::table('expenses')->where('account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                    $payrolls = DB::table('payrolls')->where('account_id', $cash_account_id)
+                    $payrolls = (float) DB::table('payrolls')->where('account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                    $sent_money_via_transfer = MoneyTransfer::where('from_account_id', $cash_account_id)
+                    $sent_money_via_transfer = (float) MoneyTransfer::where('from_account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                    $recieved_money_via_transfer = MoneyTransfer::where('to_account_id', $cash_account_id)
+                    $recieved_money_via_transfer = (float) MoneyTransfer::where('to_account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                    $adjustment_account_ing = AdjustmentAccount::where('account_id', $cash_account_id)->where([['is_active', true], ['type_adjustment', 'ING']])
+                    $adjustment_account_ing = (float) AdjustmentAccount::where('account_id', $cash_account_id)->where([['is_active', true], ['type_adjustment', 'ING']])
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                    $adjustment_account_egr = AdjustmentAccount::where('account_id', $cash_account_id)->where([['is_active', true], ['type_adjustment', 'EGR']])
+                    $adjustment_account_egr = (float) AdjustmentAccount::where('account_id', $cash_account_id)->where([['is_active', true], ['type_adjustment', 'EGR']])
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
 
-                    $credit = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + $lims_account_data->initial_balance;
+                    $credit = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + (float) $lims_account_data->initial_balance;
                     $debit = $payment_sent + $returns + $expenses + $payrolls + $sent_money_via_transfer + $adjustment_account_egr;
                     $saldoant = $credit - $debit;
                 }
@@ -1243,26 +1243,26 @@ class AccountsController extends Controller
             $startbef_date = date("Y-m-d", strtotime($start_date . "- 5 year"));
             $endafter_date = date("Y-m-d", strtotime($start_date . "- 1 days"));
 
-            $ventas = Payment::whereNotNull('sale_id')->where([['account_id', $account_id], ['paying_method', 'Efectivo']])
+            $ventas = (float) Payment::whereNotNull('sale_id')->where([['account_id', $account_id], ['paying_method', 'Efectivo']])
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-            $compra_retornada = DB::table('return_purchases')->where('account_id', $account_id)
+            $compra_retornada = (float) DB::table('return_purchases')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('grand_total');
-            $tranferencia_recibida = MoneyTransfer::where('to_account_id', $account_id)
+            $tranferencia_recibida = (float) MoneyTransfer::where('to_account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-            $ajuste_ingreso = AdjustmentAccount::where([['account_id', $account_id], ['is_active', true], ['type_adjustment', 'ING']])
+            $ajuste_ingreso = (float) AdjustmentAccount::where([['account_id', $account_id], ['is_active', true], ['type_adjustment', 'ING']])
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
 
-            $compras = Payment::whereNotNull('purchase_id')->where('account_id', $account_id)
+            $compras = (float) Payment::whereNotNull('purchase_id')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-            $devolucion = Returns::where('account_id', $account_id)->whereDate('created_at', '>=', $start_date)
+            $devolucion = (float) Returns::where('account_id', $account_id)->whereDate('created_at', '>=', $start_date)
                 ->whereDate('created_at', '<=', $end_date)->sum('grand_total');
-            $gastos = DB::table('expenses')->where('account_id', $account_id)
+            $gastos = (float) DB::table('expenses')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-            $nominas = DB::table('payrolls')->where('account_id', $account_id)
+            $nominas = (float) DB::table('payrolls')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-            $transferencias = MoneyTransfer::where('from_account_id', $account_id)
+            $transferencias = (float) MoneyTransfer::where('from_account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-            $ajustegr = AdjustmentAccount::where([['account_id', $account_id], ['is_active', true], ['type_adjustment', 'EGR']])
+            $ajustegr = (float) AdjustmentAccount::where([['account_id', $account_id], ['is_active', true], ['type_adjustment', 'EGR']])
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
 
 
@@ -1271,28 +1271,28 @@ class AccountsController extends Controller
             $credit = 0;
             $debit = 0;
 
-            $payment_recieved = Payment::whereNotNull('sale_id')->where('account_id', $account_id)
+            $payment_recieved = (float) Payment::whereNotNull('sale_id')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-            $payment_sent = Payment::whereNotNull('purchase_id')->where('account_id', $account_id)
+            $payment_sent = (float) Payment::whereNotNull('purchase_id')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-            $returns = Returns::where('account_id', $account_id)->whereDate('created_at', '>=', $startbef_date)
+            $returns = (float) Returns::where('account_id', $account_id)->whereDate('created_at', '>=', $startbef_date)
                 ->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-            $return_purchase = DB::table('return_purchases')->where('account_id', $account_id)
+            $return_purchase = (float) DB::table('return_purchases')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-            $expenses = DB::table('expenses')->where('account_id', $account_id)
+            $expenses = (float) DB::table('expenses')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-            $payrolls = DB::table('payrolls')->where('account_id', $account_id)
+            $payrolls = (float) DB::table('payrolls')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-            $sent_money_via_transfer = MoneyTransfer::where('from_account_id', $account_id)
+            $sent_money_via_transfer = (float) MoneyTransfer::where('from_account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-            $recieved_money_via_transfer = MoneyTransfer::where('to_account_id', $account_id)
+            $recieved_money_via_transfer = (float) MoneyTransfer::where('to_account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-            $adjustment_account_ing = AdjustmentAccount::where([['account_id', $account_id], ['is_active', true], ['type_adjustment', 'ING']])
+            $adjustment_account_ing = (float) AdjustmentAccount::where([['account_id', $account_id], ['is_active', true], ['type_adjustment', 'ING']])
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-            $adjustment_account_egr = AdjustmentAccount::where([['account_id', $account_id], ['is_active', true], ['type_adjustment', 'EGR']])
+            $adjustment_account_egr = (float) AdjustmentAccount::where([['account_id', $account_id], ['is_active', true], ['type_adjustment', 'EGR']])
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
 
-            $credit = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + $lims_account_data->initial_balance;
+            $credit = $payment_recieved + $return_purchase + $recieved_money_via_transfer + $adjustment_account_ing + (float) $lims_account_data->initial_balance;
             $debit = $payment_sent + $returns + $expenses + $payrolls + $sent_money_via_transfer + $adjustment_account_egr;
             $saldoant = $credit - $debit;
 

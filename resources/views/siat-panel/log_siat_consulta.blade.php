@@ -13,13 +13,13 @@
             <div class="input-group col-3">
                 <label>Sucursal</label>
                 <select disabled id="sucursales_id" name="sucursal" class="form-control selectpicker" data-live-search="true" data-live-search-style="begins" title="Seleccionar sucursal...">
-                    @foreach ($sucursales as $sucursal)
-                        <option value="{{ $sucursal->sucursal }}" 
-                            @if ($sucursal->sucursal == $datos_sucursal->sucursal)
+                    @foreach ($sucursales as $s)
+                        <option value="{{ $s->sucursal }}" 
+                            @if ($s->sucursal == $datos_sucursal->sucursal)
                                 Selected
                             @endif
                             >
-                            {{ $sucursal->sucursal}}.- {{ $sucursal->nombre}} | {{ $sucursal->domicilio_tributario }}
+                            {{ $s->sucursal}}.- {{ $s->nombre}} | {{ $s->domicilio_tributario }}
                         </option>
                     @endforeach
                 </select>
@@ -27,7 +27,8 @@
             <div class="input-group col-3">
                 <label>Punto de Venta</label>
                 <select disabled id="punto_venta" name="punto_venta" class="form-control selectpicker" title="Punto Venta...">
-                    <option value="{{ $sucursal }}" selected>{{ $sucursal }}</option>
+                    @php $pv = \App\SiatPuntoVenta::where(['sucursal' => $sucursal, 'codigo_punto_venta' => $punto_venta])->first(); @endphp
+                    <option value="{{ $punto_venta }}" selected>{{ $pv->nombre_punto_venta ?? $punto_venta }}</option>
                 </select>
             </div>
             <div class="form-group col-2">

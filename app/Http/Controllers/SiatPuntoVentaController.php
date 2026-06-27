@@ -90,53 +90,81 @@ class SiatPuntoVentaController extends Controller
         $data['is_active'] = $data['is_active'] ?? true;
 
         if ($data['modoSIN'] == "1") {
+            Log::info('[store PuntoVenta] Registrando en SIAT', [
+                'sucursal'           => $data['sucursal'],
+                'tipo_punto_venta'   => $data['tipo_punto_venta'],
+                'modoComisionista'   => $data['modoComisionista'] ?? '0',
+                'cuis_manual'        => !empty($data['codigo_cuis']) ? 'sí' : 'no',
+            ]);
+
             if ($data['modoComisionista'] == "1") {
                 $result = $this->registrarPuntoVentaComisionista($data);
             } else {
                 $result = $this->registrarPuntoVenta($data);
             }
+
+            Log::info('[store PuntoVenta] Resultado registro SIAT', [
+                'status'  => $result['status'],
+                'mensaje' => $result['mensaje'] ?? ($result['data'] ?? null),
+            ]);
+
             if ($result['status'] == true) {
                 $data['codigo_punto_venta'] = $result['data']['CODIGO_PUNTO_VENTA'];
                 $data['is_siat'] = true;
-                
+
                 // Si el usuario ingresó manualmente un CUIS, lo usamos
                 if (!empty($data['codigo_cuis'])) {
+                    Log::info('[store PuntoVenta] CUIS ingresado manualmente', ['cuis' => $data['codigo_cuis']]);
                     $data['fecha_vigencia_cuis'] = $data['fecha_vigencia_cuis'] ?? date('Y-m-d H:i:s', strtotime('+1 year'));
                     $puntoVenta = SiatPuntoVenta::create($data);
                     $message = "CUIS ingresado manualmente.";
                     try {
                         $this->renovarVigenciaxPuntoVenta($puntoVenta);
-                        $message .= " CUDF Obtenido.";
+                        $message .= " CUFD Obtenido.";
                     } catch (\Throwable $th) {
-                        Log::error("Error: " . $th->getMessage());
-                        $message .= " Error al obtener CUDF diario, intente renovar en Ajustes POS.";
+                        Log::error('[store PuntoVenta] Error al obtener CUFD con CUIS manual: ' . $th->getMessage());
+                        $message .= " Error al obtener CUFD diario, intente renovar en Ajustes POS.";
                     }
-                    return redirect('punto_venta')->with('message', 'Punto de Venta creada correctamente! ' . $message);
+                    return redirect('punto_venta')->with('message', 'Punto de Venta creado correctamente! ' . $message);
                 } else {
                     // Intenta obtener automáticamente
+                    Log::info('[store PuntoVenta] Obteniendo CUIS automáticamente', [
+                        'codigo_punto_venta' => $result['data']['CODIGO_PUNTO_VENTA'],
+                        'sucursal'           => $data['sucursal'],
+                    ]);
                     $data_cuis = $this->obtenerCuis($result['data']['CODIGO_PUNTO_VENTA'], $data['sucursal']);
                     if ($data_cuis['status'] == true) {
+                        Log::info('[store PuntoVenta] CUIS automático obtenido OK', [
+                            'cuis'           => $data_cuis['data']['CUIS'] ?? '?',
+                            'fecha_vigencia' => $data_cuis['data']['FECHA_VIGENCIA_CUIS'] ?? '?',
+                        ]);
                         $data['codigo_cuis'] = $data_cuis['data']['CUIS'];
                         $data['fecha_vigencia_cuis'] = $data_cuis['data']['FECHA_VIGENCIA_CUIS'];
                         $puntoVenta = SiatPuntoVenta::create($data);
                         $message = "";
                         try {
                             $this->renovarVigenciaxPuntoVenta($puntoVenta);
-                            $message = "CUDF Obtenido.";
+                            $message = "CUFD Obtenido.";
                         } catch (\Throwable $th) {
-                            Log::error("Error: " . $th->getMessage());
-                            $message = "Error al obtener CUDF diario, por favor intente renovar en Ajustes POS.";
+                            Log::error('[store PuntoVenta] Error al obtener CUFD: ' . $th->getMessage());
+                            $message = "Error al obtener CUFD diario, por favor intente renovar en Ajustes POS.";
                         }
-                        return redirect('punto_venta')->with('message', 'Punto de Venta creada correctamente! ' . $message);
+                        return redirect('punto_venta')->with('message', 'Punto de Venta creado correctamente! ' . $message);
                     } else {
-                        // Fallback a guardar con CUIS pendiente para no bloquear la creación completa si falla la generación automática de CUIS
+                        Log::error('[store PuntoVenta] Falló la generación automática de CUIS', [
+                            'codigo_punto_venta' => $result['data']['CODIGO_PUNTO_VENTA'],
+                            'sucursal'           => $data['sucursal'],
+                            'error'              => $data_cuis['mensaje'] ?? 'sin detalle',
+                        ]);
+                        // Fallback: guardar con CUIS pendiente para no bloquear la creación
                         $data['codigo_cuis'] = 'CUIS-PENDIENTE';
                         $data['fecha_vigencia_cuis'] = date('Y-m-d H:i:s');
-                        $puntoVenta = SiatPuntoVenta::create($data);
-                        return redirect('punto_venta')->with('message', 'Punto de Venta registrado en SIAT, pero falló la generación automática de CUIS. Se guardó con CUIS pendiente. Intente renovarlo o ingresarlo manualmente. Error SIAT: ' . $data_cuis['mensaje']);
+                        SiatPuntoVenta::create($data);
+                        return redirect('punto_venta')->with('message', 'Punto de Venta registrado en SIAT, pero falló la generación automática de CUIS. Se guardó con CUIS pendiente. Intente renovarlo o ingresarlo manualmente. Error SIAT: ' . ($data_cuis['mensaje'] ?? 'desconocido'));
                     }
                 }
             } else {
+                Log::error('[store PuntoVenta] Falló el registro en SIAT', ['mensaje' => $result['mensaje'] ?? 'sin detalle']);
                 return redirect('punto_venta')->with('not_permitted', $result['mensaje']);
             }
         } else {
@@ -176,61 +204,114 @@ class SiatPuntoVentaController extends Controller
 
     public function renovarCuis($id, $idPuntoVenta, $idSucursal)
     {
+        Log::info('[renovarCuis] Inicio', [
+            'id'           => $id,
+            'idPuntoVenta' => $idPuntoVenta,
+            'idSucursal'   => $idSucursal,
+        ]);
+
         $update_data = SiatPuntoVenta::find($id);
+        if (!$update_data) {
+            Log::warning('[renovarCuis] Punto de venta no encontrado en BD', ['id' => $id]);
+            return array("status" => false, "mensaje" => "No se encuentra registrado el punto de venta en el POS");
+        }
+
         $data_cuis = $this->obtenerCuis($idPuntoVenta, $idSucursal);
-        if ($update_data && $data_cuis['status'] == true) {
+
+        if ($data_cuis['status'] == true) {
+            Log::info('[renovarCuis] CUIS obtenido, guardando en BD', [
+                'cuis'           => $data_cuis['data']['CUIS'] ?? '?',
+                'fecha_vigencia' => $data_cuis['data']['FECHA_VIGENCIA_CUIS'] ?? '?',
+            ]);
             $update_data->codigo_cuis = $data_cuis['data']['CUIS'];
             $update_data->fecha_vigencia_cuis = $data_cuis['data']['FECHA_VIGENCIA_CUIS'];
             $update_data->update();
+            Log::info('[renovarCuis] BD actualizada correctamente', ['id' => $id]);
+
             if (isset($data_cuis['data']['MENSAJES'])) {
                 $descripcion = "Mensajes: ";
                 foreach ($data_cuis['data']['MENSAJES'] as $mensaje) {
                     $descripcion .= " Código: " . $mensaje['codigo'] . " - Descripción: " . $mensaje['descripcion'];
                 }
-                $respuesta = array("status" => true, "mensaje" => "" . $descripcion);
-            } else
-                $respuesta = array("status" => true, "mensaje" => "Se Renovo y Actualizo el CUIS y Fecha Vigencia con éxito");
+                $respuesta = array("status" => true, "mensaje" => $descripcion);
+            } else {
+                $respuesta = array("status" => true, "mensaje" => "Se renovó y actualizó el CUIS y Fecha Vigencia con éxito");
+            }
         } else {
-            if ($update_data == null)
-                $respuesta = array("status" => false, "mensaje" => "No se encuentra Registrado el punto de venta en el POS");
-            else
-                $respuesta = array("status" => false, "mensaje" => $data_cuis['data']['mensaje']);
+            Log::error('[renovarCuis] Falló la obtención de CUIS', [
+                'id'          => $id,
+                'puntoVenta'  => $idPuntoVenta,
+                'sucursal'    => $idSucursal,
+                'mensaje_api' => $data_cuis['mensaje'] ?? 'sin detalle',
+            ]);
+            // Corrección: $data_cuis['mensaje'] directo, no $data_cuis['data']['mensaje']
+            $respuesta = array("status" => false, "mensaje" => $data_cuis['mensaje'] ?? 'Error desconocido al obtener CUIS');
         }
+
         return $respuesta;
     }
 
     public function renovacionMasivaCuis()
     {
-        $status = false;
         $list_puntosVentas = SiatPuntoVenta::where([['is_siat', true], ['is_active', true]])->get();
+        Log::info('[renovacionMasivaCuis] Inicio', ['total_puntos_venta' => $list_puntosVentas->count()]);
+
+        $status = false;
         $mensaje = "";
+        $exitosos = 0;
+        $fallidos = 0;
+
         foreach ($list_puntosVentas as $punto_venta) {
+            Log::info('[renovacionMasivaCuis] Procesando punto de venta', [
+                'id'                  => $punto_venta->id,
+                'codigo_punto_venta'  => $punto_venta->codigo_punto_venta,
+                'sucursal'            => $punto_venta->sucursal,
+                'cuis_actual'         => $punto_venta->codigo_cuis ?? 'sin CUIS',
+            ]);
+
             $data_cuis = $this->obtenerCuis($punto_venta->codigo_punto_venta, $punto_venta->sucursal);
-            if ($punto_venta && $data_cuis['status'] == true) {
+
+            if ($data_cuis['status'] == true) {
+                Log::info('[renovacionMasivaCuis] CUIS obtenido OK, actualizando BD', [
+                    'id'             => $punto_venta->id,
+                    'nuevo_cuis'     => $data_cuis['data']['CUIS'] ?? '?',
+                    'fecha_vigencia' => $data_cuis['data']['FECHA_VIGENCIA_CUIS'] ?? '?',
+                ]);
                 $punto_venta->codigo_cuis = $data_cuis['data']['CUIS'];
                 $punto_venta->fecha_vigencia_cuis = $data_cuis['data']['FECHA_VIGENCIA_CUIS'];
                 $punto_venta->update();
+                $exitosos++;
                 if (isset($data_cuis['data']['MENSAJES'])) {
                     $descripcion = "Mensajes: ";
                     foreach ($data_cuis['data']['MENSAJES'] as $code) {
                         $descripcion .= " Código: " . $code['codigo'] . " - Descripción: " . $code['descripcion'];
                     }
                     $status = true;
-                    $mensaje .= "" . $descripcion;
+                    $mensaje .= $descripcion . " | ";
                 } else {
                     $status = true;
-                    $mensaje .= "Se Renovo y Actualizo todos los CUIS y Fecha Vigencia con éxito";
+                    $mensaje .= "PV {$punto_venta->codigo_punto_venta} actualizado. | ";
                 }
             } else {
-                if ($punto_venta == null) {
-                    $status = false;
-                    $mensaje .= "No se encuentra Registrado el punto de venta en el POS";
-                } else {
-                    $status = false;
-                    $mensaje .= $data_cuis['mensaje'];
-                }
+                $fallidos++;
+                $error_msg = $data_cuis['mensaje'] ?? 'Error desconocido';
+                Log::error('[renovacionMasivaCuis] Falló obtención de CUIS', [
+                    'id'                 => $punto_venta->id,
+                    'codigo_punto_venta' => $punto_venta->codigo_punto_venta,
+                    'sucursal'           => $punto_venta->sucursal,
+                    'error'              => $error_msg,
+                ]);
+                $status = false;
+                $mensaje .= "Error PV {$punto_venta->codigo_punto_venta}: {$error_msg} | ";
             }
         }
+
+        Log::info('[renovacionMasivaCuis] Fin', [
+            'exitosos' => $exitosos,
+            'fallidos' => $fallidos,
+            'status'   => $status,
+        ]);
+
         return array("status" => $status, "mensaje" => $mensaje);
     }
 

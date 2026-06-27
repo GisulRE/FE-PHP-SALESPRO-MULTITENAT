@@ -912,8 +912,27 @@ class ReturnController extends Controller
         }
         $dataFilter['cuf'] = "";
         $list_facturas = $this->buscarFacturas($dataFilter);
-        if ($list_facturas['status'] == false) {
-            $list_facturas = [];
+        if (!isset($list_facturas['status']) || $list_facturas['status'] == false) {
+            $errorMsg = isset($list_facturas['mensaje']) ? $list_facturas['mensaje'] : 'Error al consultar facturas';
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => 0,
+                "recordsFiltered" => 0,
+                "data" => [],
+                "error" => $errorMsg
+            );
+            echo json_encode($json_data);
+            return;
+        }
+        if (!isset($list_facturas['facturas']) || !is_array($list_facturas['facturas'])) {
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => 0,
+                "recordsFiltered" => 0,
+                "data" => []
+            );
+            echo json_encode($json_data);
+            return;
         }
         $list_size = sizeof($list_facturas['facturas']);
         $totalFiltered = $list_size;

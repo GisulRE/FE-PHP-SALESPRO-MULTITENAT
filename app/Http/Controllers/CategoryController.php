@@ -11,8 +11,9 @@ use App\Category;
 use Exception;
 use Illuminate\Http\Request;
 use App\SiatProductoServicio;
-use App\SiatActividadEconomica;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Session;
 use Log;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
@@ -21,8 +22,37 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('category')) {
+        $user    = Auth::user();
+        $role_id = $user ? $user->role_id : null;
+
+        Log::info('[CategoryController@index] Intentando acceder', [
+            'user_id'  => $user ? $user->id   : null,
+            'user_name'=> $user ? $user->name  : null,
+            'role_id'  => $role_id,
+            'is_active'=> $user ? $user->is_active : null,
+        ]);
+
+        $role = Role::find($role_id);
+
+        if (!$role) {
+            Log::error('[CategoryController@index] Rol NO encontrado en BD, se bloquea acceso', [
+                'user_id' => $user ? $user->id : null,
+                'role_id' => $role_id,
+            ]);
+            return redirect()->route('home')->with('not_permitted', 'Error: rol de usuario no encontrado. Contacte al administrador.');
+        }
+
+        $hasPermission = $role->hasPermissionTo('category');
+
+        Log::info('[CategoryController@index] Resultado de verificación de permiso', [
+            'user_id'       => $user->id,
+            'role_id'       => $role_id,
+            'role_name'     => $role->name,
+            'permiso_requerido' => 'category',
+            'tiene_permiso' => $hasPermission,
+        ]);
+
+        if ($hasPermission) {
             $lims_pos_setting_data = PosSetting::latest()->first();
             $lims_categories = Category::where('is_active', true)->pluck('name', 'id');
             if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
@@ -31,11 +61,16 @@ class CategoryController extends Controller
             } else
                 $lims_category_all = Category::where('is_active', true)->get();
 
-            $actividades = SiatActividadEconomica::get()->sortBy('descripcion');
-            $actividades = $actividades->unique('codigo_caeb');
-            return view('category.create', compact('lims_categories', 'lims_category_all', 'actividades'));
-        } else
+            return view('category.create', compact('lims_categories', 'lims_category_all'));
+        } else {
+            Log::warning('[CategoryController@index] Acceso DENEGADO por falta de permiso, redirigiendo a back()', [
+                'user_id'   => $user->id,
+                'role_id'   => $role_id,
+                'role_name' => $role->name,
+                'referer'   => request()->headers->get('referer', 'sin_referer'),
+            ]);
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function categoryData(Request $request)
@@ -196,6 +231,9 @@ class CategoryController extends Controller
         $lims_category_data['codigo_actividad'] = $request->actividad_id;
         $lims_category_data['codigo_producto_servicio'] = $request->codigo_pro_ser;
         Category::create($lims_category_data);
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Categoría creado correctamente']);
+        }
         return redirect('category')->with('message', 'Categoría creado correctamente');
     }
 
@@ -233,6 +271,9 @@ class CategoryController extends Controller
         $lims_category_data['codigo_actividad'] = $request->actividad_id;
         $lims_category_data['codigo_producto_servicio'] = $request->codigo_pro_ser;
         $lims_category_data->update($input);
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Categoría actualizada con éxito']);
+        }
         return redirect('category')->with('message', 'Categoría actualizada con éxito');
     }
 
@@ -273,6 +314,9 @@ class CategoryController extends Controller
             $category->parent_id = $parent_id;
             $category->is_active = true;
             $category->save();
+        }
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Categoria Importado correctamente']);
         }
         return redirect('category')->with('message', 'Categoria Importado correctamente');
     }
@@ -315,7 +359,78 @@ class CategoryController extends Controller
             }
         $lims_category_data->is_active = false;
         $lims_category_data->save();
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Categoria Eliminada']);
+        }
         return redirect('category')->with('not_permitted', 'Categoria Eliminada, Productos relacionados fueron inactivados');
+    }
+
+    public function getActividadesEconomicas()
+    {
+        Log::info("CATEGORY GET ACTIVIDADES: Iniciando petición");
+
+        $nitCollection = PosSetting::latest()->first()->pluck('nit_emisor');
+        $nitValue = $nitCollection->first();
+        $actividades = [];
+
+        if (Session::get('token_siat') != null) {
+            $pos_setting = PosSetting::latest()->first();
+            $bearer = 'Bearer ' . Session::get('token_siat');
+            $host = $pos_setting->url_optimo;
+            $url = $host . '/datosincronizado/v1/listar-nit';
+
+            Log::info("CATEGORY GET ACTIVIDADES: Enviando petición", [
+                'url' => $url,
+                'nit' => $nitValue,
+                'parametro' => 'actividades',
+            ]);
+
+            $body = [
+                'nit' => $nitValue,
+                'parametro' => 'actividades',
+                'sucursal' => 0,
+                'codigoPuntoVenta' => 0,
+            ];
+
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => $bearer,
+                    'Content-Type' => 'application/json',
+                ])->post($url, $body);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    if ($data && isset($data['ENTITIES'])) {
+                        $actividades = $data['ENTITIES'];
+                        if (!empty($actividades)) {
+                            Log::info("CATEGORY GET ACTIVIDADES: Primer item estructura", [
+                                'item' => json_encode($actividades[0])
+                            ]);
+                        }
+                    }
+                    Log::info("CATEGORY GET ACTIVIDADES: Respuesta exitosa", [
+                        'total_actividades' => count($actividades),
+                    ]);
+                } else {
+                    Log::warning("CATEGORY GET ACTIVIDADES: Error HTTP", [
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error("CATEGORY GET ACTIVIDADES: Excepción", [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } else {
+            Log::warning("CATEGORY GET ACTIVIDADES: token_siat es null, no se hace petición API");
+        }
+
+        Log::info("CATEGORY GET ACTIVIDADES: Finalizado", [
+            'total_retornadas' => count($actividades),
+        ]);
+
+        return response()->json(['actividades' => $actividades]);
     }
 
     public function getProductosServicios($estatus)

@@ -2692,7 +2692,7 @@ class ReportController extends Controller
             'product_lot.qty',
             'product_lot.status',
             'product_lot.expiration',
-            'DATEDIFF(product_lot.expiration, CURDATE()) AS days',
+            '(CURRENT_DATE - product_lot.expiration) AS days',
         );
         if ($filter == null) {
             $filter = 0;

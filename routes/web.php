@@ -73,12 +73,14 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::post('importunit', 'UnitController@importUnit')->name('unit.import');
 	Route::post('unit/deletebyselection', 'UnitController@deleteBySelection');
 	Route::get('unit/lims_unit_search', 'UnitController@limsUnitSearch')->name('unit.search');
+	Route::post('unit/get-unidades-medida', 'UnitController@getUnidadesMedida')->name('unit.get-unidades-medida');
 	Route::resource('unit', 'UnitController');
 
 	Route::get('category/get/{estatus}', 'CategoryController@getProductosServicios')->name('category-get');
 	Route::post('category/import', 'CategoryController@import')->name('category.import');
 	Route::post('category/deletebyselection', 'CategoryController@deleteBySelection');
 	Route::post('category/category-data', 'CategoryController@categoryData');
+	Route::post('category/get-actividades', 'CategoryController@getActividadesEconomicas')->name('category.get-actividades');
 	Route::resource('category', 'CategoryController');
 
 	Route::post('importbrand', 'BrandController@importBrand')->name('brand.import');

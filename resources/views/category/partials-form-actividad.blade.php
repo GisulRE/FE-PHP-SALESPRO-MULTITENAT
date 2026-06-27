@@ -4,9 +4,6 @@
     <div class="form-group col-md-12">
         <label>Actividad Económica</label>
         <select name="actividad_id" id="actividad_id" class="form-control selectpicker" title="Seleccionar...">
-            @foreach ($actividades as $item)
-                <option value="{{ $item->codigo_caeb }}">{{ $item->descripcion }}</option>
-            @endforeach
         </select>
     </div>
     <div class="form-group col-md-12" id="codigos">
@@ -20,6 +17,31 @@
 <script>
     $(document).ready(function() {
         $('#codigos').hide();
+
+        $.ajax({
+            url: '{{ url("category/get-actividades") }}',
+            type: "POST",
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+            },
+            dataType: "json",
+            success: function(res) {
+                console.log('ACTIVIDADES response:', res);
+                var select = $("#createModal select[name='actividad_id']");
+                select.empty();
+                if (res.actividades && res.actividades.length > 0) {
+                    console.log('ACTIVIDADES primer item:', res.actividades[0]);
+                    $.each(res.actividades, function(i, item) {
+                        console.log('ACTIVIDADES item ' + i + ':', item);
+                        select.append('<option value="' + (item.valor || '') + '">' + (item.descripcion || '') + '</option>');
+                    });
+                } else {
+                    console.warn('ACTIVIDADES: no hay actividades en la respuesta');
+                }
+                $('.selectpicker').selectpicker('refresh');
+            }
+        });
+
         $('#actividad_id').on('change', onSelectProductoServicio);
 
         function limpiar() {

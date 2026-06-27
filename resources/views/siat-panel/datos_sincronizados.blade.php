@@ -14,9 +14,9 @@
                 <label>Sucursal</label>
                 <select id="sucursales_id" name="sucursal" class="form-control selectpicker" data-live-search="true" data-live-search-style="begins" title="Seleccionar sucursal...">
                     <option value="">-- Seleccionar --</option>
-                    @foreach ($sucursales as $sucursal)
-                        <option value="{{ $sucursal->sucursal }}">
-                            {{ $sucursal->sucursal }}.- {{ $sucursal->nombre }} | {{ $sucursal->domicilio_tributario }}
+                    @foreach ($sucursales as $s)
+                        <option value="{{ $s->sucursal }}">
+                            {{ $s->sucursal }}.- {{ $s->nombre }} | {{ $s->domicilio_tributario }}
                         </option>
                     @endforeach
                 </select>

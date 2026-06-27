@@ -47,6 +47,14 @@ class LoginController extends Controller
         Session::put('login_company_id', $companyId);
 
         $this->getToken();
+
+        $suspendedMsg = Session::pull('siat_account_suspended');
+        if ($suspendedMsg) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'nit_login' => [$suspendedMsg],
+            ]);
+        }
+
         $auth_siat = Session::get('auth_siat');
         Log::info('Login: auth_siat=' . ($auth_siat ? 'true' : 'false'));
         if ($auth_siat == true) {

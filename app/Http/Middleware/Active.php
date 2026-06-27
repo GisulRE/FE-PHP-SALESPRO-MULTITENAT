@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use DB;
 use Auth;
 use Closure;
+use Illuminate\Support\Facades\Log;
 
 class Active
 {
@@ -54,25 +55,33 @@ class Active
         return redirect('/dashboard');*/
 
 
-        if (Auth::check() && Auth::user()->isActive()) {
-            $permissions = DB::table('permissions')
-                ->select('name')
-                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                ->where('role_id', Auth::user()->role_id)
-                ->get();
+        $route = $request->path();
 
-            $permisos = json_decode(json_encode($permissions), true);
-            $p_ready = [];
-            foreach ($permisos as $p) {
-                $p_ready[] = $p['name'];
-            }
-
-            session()->put('permissions', $p_ready);
-
-            return $next($request);
+        if (!Auth::check()) {            
+            return redirect('/dashboard');
         }
 
-        return redirect('/dashboard');
+        $user = Auth::user();
+
+        if (!$user->isActive()) {            
+            return redirect('/dashboard');
+        }
+
+        $permissions = DB::table('permissions')
+            ->select('name')
+            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+            ->where('role_id', $user->role_id)
+            ->get();
+
+        $permisos = json_decode(json_encode($permissions), true);
+        $p_ready = [];
+        foreach ($permisos as $p) {
+            $p_ready[] = $p['name'];
+        }
+        
+        session()->put('permissions', $p_ready);
+
+        return $next($request);
 
     }
 }

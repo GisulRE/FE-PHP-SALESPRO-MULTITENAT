@@ -407,6 +407,86 @@
                 ],
             });
         });
+
+        // Envío AJAX de modales para evitar recarga completa (que rompe el guard localStorage)
+        $(document).on('submit', '#createModal form', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            $.ajax({
+                url: '{{ route("category.store") }}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function() {
+                    $('#createModal').modal('hide');
+                    setPage("{{ route('category.index') }}");
+                },
+                error: function(response) {
+                    if (response.responseJSON && response.responseJSON.errors && response.responseJSON.errors.name) {
+                        alert(response.responseJSON.errors.name[0]);
+                    }
+                }
+            });
+        });
+
+        $(document).on('submit', '#editModal form', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            $.ajax({
+                url: '{{ route("category.update", 1) }}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function() {
+                    $('#editModal').modal('hide');
+                    setPage("{{ route('category.index') }}");
+                },
+                error: function(response) {
+                    if (response.responseJSON && response.responseJSON.errors && response.responseJSON.errors.name) {
+                        alert(response.responseJSON.errors.name[0]);
+                    }
+                }
+            });
+        });
+
+        $(document).on('submit', '#importCategory form', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            $.ajax({
+                url: '{{ route("category.import") }}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function() {
+                    $('#importCategory').modal('hide');
+                    setPage("{{ route('category.index') }}");
+                },
+                error: function() {
+                    alert('Error al importar categorías');
+                }
+            });
+        });
+
+        $(document).on('submit', '#category-table form', function(e) {
+            e.preventDefault();
+            var form = $(this);
+            var url = form.attr('action');
+            var method = form.find('input[name="_method"]').val() || form.attr('method');
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: form.serialize(),
+                success: function() {
+                    $('#category-table').DataTable().ajax.reload();
+                },
+                error: function() {
+                    alert('Error al eliminar la categoría');
+                }
+            });
+        });
     </script>
 
     {{-- Modal de búsqueda de categoría padre (CREAR) --}}

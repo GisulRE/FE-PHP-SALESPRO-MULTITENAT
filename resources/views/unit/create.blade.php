@@ -140,9 +140,6 @@
                                 <select class="form-control selectpicker" name="codigo_clasificador_siat"
                                     id="codigo_clasificador_create" title="Seleccionar" data-live-search="true"
                                     data-live-search-style="begins"g>
-                                    @foreach ($parametros_unidades_medidas as $item)
-                                        <option value="{{ $item->codigo_clasificador }}">{{ $item->descripcion }}</option>
-                                    @endforeach
                                 </select>
                             </div>
                         </div>
@@ -203,10 +200,6 @@
                                 <select class="form-control selectpicker" name="codigo_clasificador_siat"
                                     id="codigo_clasificador_edit" title="Seleccionar" data-live-search="true"
                                     data-live-search-style="begins">
-                                    @foreach ($parametros_unidades_medidas as $item)
-                                        <option value="{{ $item->codigo_clasificador }}">{{ $item->descripcion }}
-                                        </option>
-                                    @endforeach
                                 </select>
                             </div>
                         </div>
@@ -288,32 +281,77 @@
         }
 
         function openDialog(idp) {
-            var url = "unit/"
+            var url = "unit/";
             url = url.concat(idp).concat("/edit");
 
-            $.get(url, function(data) {
-                $("input[name='unit_code']").val(data['unit_code']);
-                $("input[name='unit_name']").val(data['unit_name']);
-                $("input[name='operator']").val(data['operator']);
-                $("input[name='operation_value']").val(data['operation_value']);
-                $("input[name='unit_id']").val(data['id']);
-                $("#codigo_clasificador_edit").val(data['codigo_clasificador_siat']);
-                $("#base_unit_edit").val(data['base_unit']);
-                if (data['base_unit'] != null) {
-                    $(".operator").show();
-                    $(".operation_value").show();
-                } else {
-                    $(".operator").hide();
-                    $(".operation_value").hide();
-                }
-                $('.selectpicker').selectpicker('refresh');
+            $.ajax({
+                url: '{{ url("unit/get-unidades-medida") }}',
+                type: "POST",
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content'),
+                },
+                dataType: "json",
+                success: function(res) {
+                    console.log('UNIDADES EDIT response:', res);
+                    var select = $("#codigo_clasificador_edit");
+                    select.empty().append('<option value="">Seleccionar</option>');
+                    if (res.unidades && res.unidades.length > 0) {
+                        console.log('UNIDADES EDIT primer item:', res.unidades[0]);
+                        $.each(res.unidades, function(i, item) {
+                            console.log('UNIDADES EDIT item ' + i + ':', item);
+                            select.append('<option value="' + (item.valor || '') + '">' + (item.descripcion || '') + '</option>');
+                        });
+                    } else {
+                        console.warn('UNIDADES EDIT: no hay unidades en la respuesta');
+                    }
+                    $('.selectpicker').selectpicker('refresh');
 
+                    $.get(url, function(data) {
+                        $("input[name='unit_code']").val(data['unit_code']);
+                        $("input[name='unit_name']").val(data['unit_name']);
+                        $("input[name='operator']").val(data['operator']);
+                        $("input[name='operation_value']").val(data['operation_value']);
+                        $("input[name='unit_id']").val(data['id']);
+                        $("#codigo_clasificador_edit").val(data['codigo_clasificador_siat']);
+                        $("#base_unit_edit").val(data['base_unit']);
+                        if (data['base_unit'] != null) {
+                            $(".operator").show();
+                            $(".operation_value").show();
+                        } else {
+                            $(".operator").hide();
+                            $(".operation_value").hide();
+                        }
+                        $('.selectpicker').selectpicker('refresh');
+                    });
+                }
             });
         }
 
         $(document).ready(function() {
 
-
+            $.ajax({
+                url: '{{ url("unit/get-unidades-medida") }}',
+                type: "POST",
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content'),
+                },
+                dataType: "json",
+                success: function(res) {
+                    console.log('UNIDADES CREATE response:', res);
+                    var select = $("#codigo_clasificador_create");
+                    select.empty();
+                    if (res.unidades && res.unidades.length > 0) {
+                        console.log('UNIDADES CREATE primer item:', res.unidades[0]);
+                        $.each(res.unidades, function(i, item) {
+                            console.log('UNIDADES CREATE item ' + i + ':', item);
+                            select.append('<option value="' + (item.valor || '') + '">' + (item.descripcion || '') + '</option>');
+                        });
+                    } else {
+                        console.warn('UNIDADES CREATE: no hay unidades en la respuesta');
+                    }
+                    $('.selectpicker').selectpicker('refresh');
+                }
+            });
 
             $.ajaxSetup({
                 headers: {
