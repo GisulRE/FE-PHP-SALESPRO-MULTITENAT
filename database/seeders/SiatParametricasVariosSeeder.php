@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Support\Str;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -10,26 +9,28 @@ use Illuminate\Support\Facades\Schema;
 class SiatParametricasVariosSeeder extends Seeder
 {
     /**
-     * Carga catalogo completo desde el dump SQL compartido.
+     * Catalogo completo de parametricas SIAT (tipoDocumentoIdentidad, tipoMoneda,
+     * tipoMetodoPago, unidadMedida, etc.), reconstruido a partir de los backups
+     * en CSV ubicados en la raiz del proyecto.
      */
+    private const SOURCE_FILES = [
+        'backup_invoices.csv',
+        'data-1783175915106.csv',
+    ];
+
     public function run()
     {
         if (!Schema::hasTable('siat_parametricas_varios')) {
             return;
         }
 
-        $sourcePath = base_path('siat_parametricas_varios.sql');
-        if (!is_file($sourcePath)) {
-            return;
+        $rows = [];
+        foreach (self::SOURCE_FILES as $file) {
+            $this->readCsv(base_path($file), $rows);
         }
 
-        $sql = file_get_contents($sourcePath);
-        if ($sql === false) {
-            return;
-        }
-
-        $insertSql = $this->extractInsertStatement($sql);
-        if ($insertSql === null) {
+        if (empty($rows)) {
+            $this->command->warn('No se encontraron filas validas en los CSV de parametricas SIAT.');
             return;
         }
 
@@ -41,51 +42,75 @@ class SiatParametricasVariosSeeder extends Seeder
             DB::table('siat_parametricas_varios')->delete();
         }
 
-        DB::unprepared($this->normalizeInsertForDriver($insertSql, $driver));
+        foreach (array_chunk(array_values($rows), 200) as $chunk) {
+            DB::table('siat_parametricas_varios')->insert($chunk);
+        }
 
         if ($driver === 'pgsql') {
             DB::statement("SELECT setval(pg_get_serial_sequence('siat_parametricas_varios', 'id'), COALESCE((SELECT MAX(id) FROM siat_parametricas_varios), 1), true)");
         }
+
+        $this->command->info(count($rows) . ' registros de parametricas SIAT importados.');
     }
 
-    private function extractInsertStatement(string $sql): ?string
+    /**
+     * Lee un CSV (con o sin cabecera) con columnas:
+     * id, codigo_clasificador, descripcion, tipo_clasificador, datos,
+     * usuario_alta, usuario_modificacion, id_empresa, estado, sucursal,
+     * codigo_punto_venta, created_at, updated_at, deleted_at
+     *
+     * Se deduplica por (tipo_clasificador, codigo_clasificador), quedandose
+     * con la version mas reciente cuando el mismo dato aparece en varios backups.
+     */
+    private function readCsv(string $path, array &$rows): void
     {
-        $start = stripos($sql, 'INSERT INTO `siat_parametricas_varios`');
-        if ($start === false) {
-            $start = stripos($sql, 'INSERT INTO siat_parametricas_varios');
+        if (!is_file($path)) {
+            return;
         }
 
-        if ($start === false) {
-            return null;
+        $handle = fopen($path, 'r');
+        if ($handle === false) {
+            return;
         }
 
-        $end = stripos($sql, "\n\n--", $start);
-        if ($end === false) {
-            $end = stripos($sql, "\nALTER TABLE", $start);
+        while (($data = fgetcsv($handle)) !== false) {
+            if (count($data) < 13) {
+                continue;
+            }
+
+            // Salta la fila de cabecera si el CSV la trae.
+            if (!is_numeric($data[0])) {
+                continue;
+            }
+
+            [$id, $codigo_clasificador, $descripcion, $tipo_clasificador, $datos,
+             $usuario_alta, $usuario_modificacion, $id_empresa, $estado, $sucursal,
+             $codigo_punto_venta, $created_at, $updated_at] = array_pad($data, 13, null);
+
+            if ($tipo_clasificador === null || $tipo_clasificador === '') {
+                continue;
+            }
+
+            $key = $tipo_clasificador . '|' . $codigo_clasificador;
+
+            if (!isset($rows[$key]) || strtotime((string) $created_at) >= strtotime((string) $rows[$key]['created_at'])) {
+                $rows[$key] = [
+                    'codigo_clasificador' => $codigo_clasificador,
+                    'descripcion' => $descripcion,
+                    'tipo_clasificador' => $tipo_clasificador,
+                    'datos' => ($datos === '' || $datos === 'NULL') ? null : $datos,
+                    'usuario_alta' => is_numeric($usuario_alta) ? (int) $usuario_alta : null,
+                    'usuario_modificacion' => is_numeric($usuario_modificacion) ? (int) $usuario_modificacion : null,
+                    'id_empresa' => is_numeric($id_empresa) ? (int) $id_empresa : null,
+                    'estado' => is_numeric($estado) ? (int) $estado : 1,
+                    'sucursal' => ($sucursal === '' || $sucursal === null) ? '0' : $sucursal,
+                    'codigo_punto_venta' => ($codigo_punto_venta === '' || $codigo_punto_venta === null) ? '0' : $codigo_punto_venta,
+                    'created_at' => $created_at ?: now(),
+                    'updated_at' => $updated_at ?: now(),
+                ];
+            }
         }
-        if ($end === false) {
-            $end = strlen($sql);
-        }
 
-        $statement = trim(substr($sql, $start, $end - $start));
-        if (!Str::endsWith($statement, ';')) {
-            $statement .= ';';
-        }
-
-        return $statement;
-    }
-
-    private function normalizeInsertForDriver(string $insertSql, string $driver): string
-    {
-        if ($driver !== 'pgsql') {
-            return $insertSql;
-        }
-
-        // PostgreSQL no acepta backticks ni secuencias de escape de MySQL.
-        $normalized = str_replace('`', '"', $insertSql);
-        $normalized = str_replace('\\\\', '\\', $normalized);
-        $normalized = preg_replace('/\\bINSERT\\s+INTO\\s+"siat_parametricas_varios"\\b/i', 'INSERT INTO siat_parametricas_varios', $normalized);
-
-        return (string) Str::of($normalized)->trim();
+        fclose($handle);
     }
 }

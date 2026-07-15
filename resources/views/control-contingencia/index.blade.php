@@ -261,7 +261,7 @@
                             <form id="formCerrarEvento" action="{{ route('contingencia.cerrar_evento',0) }}" method="POST" data-action="{{ route('contingencia.cerrar_evento',0) }}" >
                                 @method('GET')
                                 @csrf
-                                <input hidden id="cerrarContigencia" type="submit" value="Confirmar cierre de contingencia" class="btn btn-danger">
+                                <input id="cerrarContigencia" type="submit" value="Confirmar cierre de contingencia" class="btn btn-danger">
                             </form>
                         </div>
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">{{__('file.Close')}}</button>

@@ -41,7 +41,10 @@ class ControlContingenciaController extends Controller
             $c_contingencias = ControlContingencia::orderBy('fecha_inicio_evento', 'DESC')->get();
 
             $sucursales = SiatSucursal::where('estado', true)->get();
-            $parametricas = SiatParametricaVario::where('tipo_clasificador', 'eventosSignificativos')->orderBy('codigo_clasificador', 'ASC')->get();
+            $parametricas = $this->obtenerEventosSignificativosDesdeSiat();
+            if (!$parametricas) {
+                $parametricas = SiatParametricaVario::where('tipo_clasificador', 'eventosSignificativos')->orderBy('codigo_clasificador', 'ASC')->get();
+            }
 
             return view('control-contingencia.index', [
                 'sucursales' => $sucursales,
@@ -64,6 +67,8 @@ class ControlContingenciaController extends Controller
             $user = Auth::user()->id;
             $data = $request->all();
 
+            Log::info('ControlContingenciaController@store - Creando contingencia. Usuario: ' . $user . ' - Datos: ' . json_encode($data));
+
             $update_p_venta = SiatPuntoVenta::where('codigo_punto_venta', $data['codigo_punto_venta'])->where('sucursal', $data['sucursal'])->first();
 
             $data_p_venta_siat = SiatCufd::where('sucursal', $data['sucursal'])->where('codigo_punto_venta', $data['codigo_punto_venta'])->where('estado', true)->first();
@@ -80,14 +85,16 @@ class ControlContingenciaController extends Controller
             $data['cufd_evento'] = $data_p_venta_siat->codigo_cufd;
             $data['estado'] = 'EN_PROCESO';
             $data['cuis'] = $update_p_venta->codigo_cuis;
-            ControlContingencia::create($data);
+            $c_contingencia = ControlContingencia::create($data);
 
             $mensaje = 'Evento registrado correctamente!';
+            Log::info('ControlContingenciaController@store - Contingencia creada correctamente. Id: ' . $c_contingencia->id . ' - Sucursal: ' . $c_contingencia->sucursal . ' - Punto Venta: ' . $c_contingencia->codigo_punto_venta);
 
             $update_p_venta->modo_contingencia = true;
             $update_p_venta->save();
         } catch (\Throwable $th) {
             $mensaje = 'Error, no se logró registrar el evento.';
+            Log::error('ControlContingenciaController@store - Error al crear contingencia: ' . $th->getMessage());
         }
         Session::flash('info', $mensaje);
         return redirect('contingencia');
@@ -108,18 +115,31 @@ class ControlContingenciaController extends Controller
 
     public function registrarEvento($id)
     {
-        $data_c_contingencia = ControlContingencia::where('id', $id)->first();
-        $data_p_venta = SiatPuntoVenta::where('sucursal', $data_c_contingencia->sucursal)->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)->first();
+        Log::info('ControlContingenciaController@registrarEvento - Creando evento significativo para control contingencia id: ' . $id);
+        try {
+            $data_c_contingencia = ControlContingencia::where('id', $id)->first();
+            $data_p_venta = SiatPuntoVenta::where('sucursal', $data_c_contingencia->sucursal)->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)->first();
 
-        // Se busca exactamente al regitro cufd registrado en control contingencia
-        $registro = SiatCufd::where('codigo_cufd', $data_c_contingencia->cufd_evento)->first();
-        $cufd_update = SiatCufd::find($registro->id);
-        $cufd_update->estado = false;
-        $cufd_update->save();
+            // El CUFD guardado al crear la contingencia puede haberse renovado (una o varias veces)
+            // entre ese momento y el click en "Registrar Evento". Se debe usar el CUFD realmente
+            // activo justo antes de renovar, no el valor congelado, o el SIN rechaza el evento
+            // con "EL EVENTO SIGNIFICATIVO NO CORRESPONDE AL CUFD DEL EVENTO REGISTRADO".
+            $cufd_update = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
+            if ($cufd_update) {
+                $data_c_contingencia->cufd_evento = $cufd_update->codigo_cufd;
+                $data_c_contingencia->save();
+                $cufd_update->estado = false;
+                $cufd_update->save();
+            }
 
-        $this->renovarCUFD($data_p_venta); // CufdTrait
-        $this->registrarEventoSignificativo($data_c_contingencia->id); // SiatTrait
-        $this->generarPaquetesAlControlContingenciaPaquete($id); // ControlContingencia
+            $this->renovarCUFD($data_p_venta); // CufdTrait
+            $this->registrarEventoSignificativo($data_c_contingencia->id); // SiatTrait
+            $this->generarPaquetesAlControlContingenciaPaquete($id); // ControlContingencia
+
+            Log::info('ControlContingenciaController@registrarEvento - Evento significativo procesado para control contingencia id: ' . $id);
+        } catch (\Throwable $th) {
+            Log::error('ControlContingenciaController@registrarEvento - Error al crear evento para control contingencia id: ' . $id . ' - ' . $th->getMessage());
+        }
 
         return redirect('contingencia');
     }
@@ -131,11 +151,15 @@ class ControlContingenciaController extends Controller
         $data_c_contingencia = ControlContingencia::where([['codigo_punto_venta', $data_biller->punto_venta_siat], ['estado', 'EN_PROCESO']])->first();
         $data_p_venta = SiatPuntoVenta::where('sucursal', $data_c_contingencia->sucursal)->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)->first();
 
-        // Se busca exactamente al regitro cufd registrado en control contingencia
-        $registro = SiatCufd::where('codigo_cufd', $data_c_contingencia->cufd_evento)->first();
-        $cufd_update = SiatCufd::find($registro->id);
-        $cufd_update->estado = false;
-        $cufd_update->save();
+        // Ver comentario equivalente en registrarEvento(): usar el CUFD realmente activo
+        // en este momento, no el valor congelado desde la creación de la contingencia.
+        $cufd_update = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
+        if ($cufd_update) {
+            $data_c_contingencia->cufd_evento = $cufd_update->codigo_cufd;
+            $data_c_contingencia->save();
+            $cufd_update->estado = false;
+            $cufd_update->save();
+        }
         $contpaquete = 0;
         $this->renovarCUFD($data_p_venta); // CufdTrait
         $this->registrarEventoSignificativo($data_c_contingencia->id); // SiatTrait
@@ -298,6 +322,12 @@ class ControlContingenciaController extends Controller
         }
 
         Log::info("El nro inicial es => " . $nro_factura_inicial . " El final es => " . $nro_factura_final);
+
+        if (empty($nro_factura_inicial) || empty($nro_factura_final)) {
+            $campo = $data_contingencia->codigo_evento > 4 ? 'nro_factura_manual' : 'nro_factura';
+            Log::warning("PAQUETE {$control_contingencia_paquete_id} - Falta {$campo} en alguna venta del paquete. sale_id inicial: {$array_lista[0]} ({$data_inicial->$campo}) - sale_id final: " . end($array_lista) . " ({$data_final->$campo}). Se enviará al SIN con el número vacío y probablemente responderá error 500.");
+        }
+
         $estado_paquete = $this->envioPaqueteRecepcion($control_contingencia_paquete_id, $nro_factura_inicial, $nro_factura_final); // SiatTrait
 
 
@@ -311,7 +341,7 @@ class ControlContingenciaController extends Controller
             $cant_max_paquete = $pos_setting->cant_max_contingencia;
             $data_c_contingencia = ControlContingencia::where('id', $id)->first();
 
-            $ventas = $count_ventas = CustomerSale::where('sucursal', $data_c_contingencia->sucursal)->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)->where('estado_factura', 'CONTINGENCIA')->where('codigo_documento_sector', $data_c_contingencia->codigo_documento_sector)->get();
+            $ventas = $count_ventas = CustomerSale::where('sucursal', $data_c_contingencia->sucursal)->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)->where('estado_factura', 'CONTINGENCIA')->where('codigo_documento_sector', $data_c_contingencia->codigo_documento_sector)->orderBy('id')->get();
 
             $cant_paquetes = ceil(($count_ventas->count() / $cant_max_paquete));
 

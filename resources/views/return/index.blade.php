@@ -350,21 +350,26 @@
 
         function loadPuntoVenta() {
             var id = $("select[name='sucursal']").val();
-            var url = '{{ route('getPuntosVentas', ':id') }}';
+            var url = '{{ route('return-sale.getPuntosVenta', ':id') }}';
             url = url.replace(':id', id);
             $("select[name='codigo_punto_venta']").empty();
             $.ajax({
                 url: url,
                 type: "GET",
                 success: function(data) {
-                    console.log(data);
+                    console.log('Puntos de venta:', data);
+                    if (!Array.isArray(data) || data.length === 0) {
+                        console.warn('No se encontraron puntos de venta para sucursal ' + id);
+                    }
                     for (let i = 0; i < data.length; i++) {
                         $("select[name='codigo_punto_venta']").append('<option value="' + data[i]
                             .codigo_punto_venta + '">' + data[i].codigo_punto_venta + ' - ' + data[
                                 i].nombre_punto_venta + '</option>');
-                    };
+                    }
                     $('.selectpicker').selectpicker('refresh');
-
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error al cargar puntos de venta:', xhr.status, xhr.responseText);
                 }
             });
         }
@@ -609,10 +614,10 @@
             $('.buttons-delete').addClass('d-none');
 
 
-        // Cuando se seleccione una sucursal, mostrar sus puntos de ventas respectivos. 
+        // Cuando se seleccione una sucursal, mostrar sus puntos de ventas respectivos.
         $('#sucursal').on('change', function() {
             var id = $(this).val();
-            var url = '{{ route('getPuntosVentas', ':id') }}';
+            var url = '{{ route('return-sale.getPuntosVenta', ':id') }}';
             url = url.replace(':id', id);
 
             $("select[name='codigo_punto_venta']").empty();
@@ -621,14 +626,16 @@
                 url: url,
                 type: "GET",
                 success: function(data) {
-                    console.log(data);
+                    console.log('Puntos de venta:', data);
                     for (let i = 0; i < data.length; i++) {
                         $("select[name='codigo_punto_venta']").append('<option value="' + data[i]
                             .codigo_punto_venta + '">' + data[i].codigo_punto_venta + ' - ' + data[
                                 i].nombre_punto_venta + '</option>');
-                    };
+                    }
                     $('.selectpicker').selectpicker('refresh');
-
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error al cargar puntos de venta:', xhr.status, xhr.responseText);
                 }
             });
         })

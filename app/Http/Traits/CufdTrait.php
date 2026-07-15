@@ -14,6 +14,8 @@ use Log;
 
 trait CufdTrait
 {
+    // guarda el último mensaje de error real devuelto por SIAT al renovar CUFD (getResponseCufdTask)
+    protected $lastSiatCufdError = null;
 
     protected function writeCufdDebug(string $event, array $context = []): void
     {
@@ -38,6 +40,11 @@ trait CufdTrait
 
         //iterar todos los puntos de ventas.
         foreach ($items as $item) {
+            if ($item->modo_contingencia) {
+                // No renovar el CUFD mientras el punto de venta esté en contingencia:
+                // el CUFD queda congelado hasta "Registrar Evento".
+                continue;
+            }
             if ($item->codigo_cuis) {
                 if ($this->estaVigenteCUFD($item)) { //verifica si está vigente boolean
                     //no hace nada
@@ -124,6 +131,56 @@ trait CufdTrait
         return;
     }
 
+    // Punto único de entrada para usar antes de facturar/anular: garantiza que el
+    // CUFD del punto de venta esté vigente, renovándolo contra SIAT si hizo falta.
+    // Devuelve true si hay un CUFD utilizable (vigente o recién renovado), false si no.
+    public function asegurarCufdVigente($p_venta)
+    {
+        if ($p_venta == null) {
+            Log::warning('asegurarCufdVigente: punto de venta nulo, no se puede verificar CUFD.');
+            return false;
+        }
+
+        if ($p_venta->modo_contingencia) {
+            // En contingencia el CUFD queda congelado hasta "Registrar Evento".
+            Log::info('asegurarCufdVigente: PV en modo contingencia, no se renueva CUFD.', [
+                'sucursal' => $p_venta->sucursal,
+                'codigo_punto_venta' => $p_venta->codigo_punto_venta,
+            ]);
+            return true;
+        }
+
+        if ($this->estaVigenteCUFD($p_venta)) {
+            Log::info('asegurarCufdVigente: CUFD vigente, no requiere renovación.', [
+                'sucursal' => $p_venta->sucursal,
+                'codigo_punto_venta' => $p_venta->codigo_punto_venta,
+            ]);
+            return true;
+        }
+
+        Log::warning('asegurarCufdVigente: CUFD vencido/inexistente, renovando antes de continuar.', [
+            'sucursal' => $p_venta->sucursal,
+            'codigo_punto_venta' => $p_venta->codigo_punto_venta,
+        ]);
+
+        $resultado = $this->renovarVigenciaxPuntoVenta($p_venta);
+
+        if (empty($resultado['status'])) {
+            Log::error('asegurarCufdVigente: no se pudo renovar el CUFD.', [
+                'sucursal' => $p_venta->sucursal,
+                'codigo_punto_venta' => $p_venta->codigo_punto_venta,
+                'mensaje' => $resultado['mensaje'] ?? null,
+            ]);
+            return false;
+        }
+
+        Log::info('asegurarCufdVigente: CUFD renovado exitosamente.', [
+            'sucursal' => $p_venta->sucursal,
+            'codigo_punto_venta' => $p_venta->codigo_punto_venta,
+        ]);
+        return true;
+    }
+
     public function estaVigenteCUFD($p_venta)
     {
         $registro = SiatCufd::where('sucursal', $p_venta->sucursal)->where('codigo_punto_venta', $p_venta->codigo_punto_venta)->where('estado', true)->first();
@@ -204,6 +261,11 @@ trait CufdTrait
 
         //iterar todos los puntos de ventas.
         foreach ($items as $item) {
+            if ($item->modo_contingencia) {
+                // No renovar el CUFD mientras el punto de venta esté en contingencia:
+                // el CUFD queda congelado hasta "Registrar Evento".
+                continue;
+            }
             if ($item->codigo_cuis) {
                 if ($this->estaVigenteCUFD($item)) { //verifica si está vigente boolean
                     Log::info("CUFD esta vigente para PV: ".$item->codigo_punto_venta);
@@ -241,6 +303,15 @@ trait CufdTrait
         $fecha_registro->subDay();
 
         $fecha_vigencia = new Carbon($item['fechaVigencia']);
+
+        // Desactivar los CUFD anteriores antes de insertar el nuevo, para no dejar
+        // varios registros con estado=true simultáneamente (rompe la referencia que
+        // usa "Registrar Evento" para saber cuál era el CUFD vigente antes de renovar).
+        SiatCufd::where('sucursal', $p_venta->sucursal)
+            ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
+            ->where('estado', true)
+            ->update(['estado' => false]);
+
         // proceso de guardar registro de cufd por punto de venta.
         $obj = new SiatCufd();
 
@@ -269,9 +340,12 @@ trait CufdTrait
     // retorna el response para Tarea Programada
     public function getResponseCufdTask($sucursal_id, $p_venta, $cuis)
     {
+        $this->lastSiatCufdError = null;
+
         $token_siat = $this->getTokenTask();
         if ($token_siat == null) {
             log::warning('Error: no ha obtenido el token   | archivo CufdTrait, operación_getResponseCufdTask');
+            $this->lastSiatCufdError = 'No se pudo obtener el token de autenticación SIAT.';
             return;
         }
         //http://66.94.100.10:5014/obtencion.codigos/cufd?codigoPuntoVenta=0&cuis=FD520714&nit=388615026&sucursal=0
@@ -299,6 +373,7 @@ trait CufdTrait
         } catch (\Throwable $th) {
             $msj = 'Problemas de conexión Siat o Internet';
             Session::flash('warning', $msj);
+            $this->lastSiatCufdError = $msj . ': ' . $th->getMessage();
             $this->writeCufdDebug('CUFD getResponseCufdTask: excepcion de conexion', [
                 'url' => $url,
                 'message' => $th->getMessage(),
@@ -325,6 +400,7 @@ trait CufdTrait
                 'status_http' => $response->status(),
                 'body' => $response->json(),
             ]);
+            $this->lastSiatCufdError = 'Error interno del servidor SIAT (HTTP ' . $response->status() . ').';
             return;
         }
         // error > 400
@@ -338,11 +414,18 @@ trait CufdTrait
                 'body' => $response->json(),
             ]);
             $respuesta = $response->json();
-            if (isset($respuesta['mensajes'])) {
-                $msj = 'Error 400: problema en servicios causa: ';
+            if (isset($respuesta['mensajes']) && is_array($respuesta['mensajes'])) {
+                $descripcion = '';
+                foreach ($respuesta['mensajes'] as $mensaje_error) {
+                    $descripcion .= ' Código: ' . ($mensaje_error['codigo'] ?? '?') . ' - Descripción: ' . ($mensaje_error['descripcion'] ?? '?');
+                }
+                $msj = 'Error 400: problema en servicios causa:' . $descripcion;
+            } elseif (isset($respuesta['title'])) {
+                $msj = 'Error 400: ' . $respuesta['title'];
             } else {
                 $msj = 'Error 400: problema en servicios causa, contacte con soporte';
             }
+            $this->lastSiatCufdError = $msj;
             Session::flash('warning', $msj);
             return;
         }
@@ -469,7 +552,7 @@ trait CufdTrait
     {
         if ($p_venta == null) {
             $this->writeCufdDebug('CUFD renovarVigenciaxPuntoVenta: punto de venta nulo', []);
-            return;
+            return array('status' => false, 'mensaje' => 'No se encontró el punto de venta.');
         }
 
         $this->writeCufdDebug('CUFD renovarVigenciaxPuntoVenta: inicio', [
@@ -483,8 +566,9 @@ trait CufdTrait
             $this->writeCufdDebug('CUFD renovarVigenciaxPuntoVenta: respuesta nula', [
                 'sucursal' => $p_venta->sucursal,
                 'codigo_punto_venta' => $p_venta->codigo_punto_venta,
+                'error' => $this->lastSiatCufdError,
             ]);
-            return;
+            return array('status' => false, 'mensaje' => $this->lastSiatCufdError ?: 'No se pudo renovar el CUFD: sin respuesta de SIAT.');
         }
         $item = $response['DATOS'];
         Log::info(json_encode($item));
@@ -492,6 +576,13 @@ trait CufdTrait
         $fecha_registro->subDay();
 
         $fecha_vigencia = new Carbon($item['fechaVigencia']);
+
+        // Ver comentario equivalente en taskRenovarCUFD(): evitar múltiples CUFD activos a la vez.
+        SiatCufd::where('sucursal', $p_venta->sucursal)
+            ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
+            ->where('estado', true)
+            ->update(['estado' => false]);
+
         // proceso de guardar registro de cufd por punto de venta.
         $obj = new SiatCufd();
 
@@ -514,7 +605,7 @@ trait CufdTrait
         ]);
 
         log::info('operación renovarVigenciaxPuntoVenta, renovación CUFD exitosa para el Punto de Venta => ' . $p_venta->codigo_punto_venta . ' de la Sucursal => ' . $p_venta->sucursal);
-        return;
+        return array('status' => true, 'mensaje' => 'CUFD renovado correctamente para el punto de venta: ' . $p_venta->codigo_punto_venta);
     }
 
     public function obtenerCuis(int $puntoVenta, int $sucursalId = null)
@@ -888,6 +979,8 @@ trait CufdTrait
                     $puntos_venta = $res_data['DATOS'];
                 } elseif (isset($res_data['listaPuntosVentas'])) {
                     $puntos_venta = $res_data['listaPuntosVentas'];
+                } elseif (isset($res_data['PUNTOS_VENTA'])) {
+                    $puntos_venta = $res_data['PUNTOS_VENTA'];
                 } elseif (is_array($res_data)) {
                     $puntos_venta = $res_data;
                 }
@@ -900,8 +993,8 @@ trait CufdTrait
                         $codigo = (int) $codigo;
 
                         $nombre = $pv['nombrePuntoVenta'] ?? $pv['nombre_punto_venta'] ?? 'Punto de Venta ' . $codigo;
-                        $tipo = $pv['codigoTipoPuntoVenta'] ?? $pv['tipo_punto_venta'] ?? 1;
-                        $descripcion = $pv['descripcionPuntoVenta'] ?? $pv['descripcion'] ?? '';
+                        $tipo = $pv['codigoTipoPuntoVenta'] ?? $pv['tipoPuntoVenta'] ?? $pv['tipo_punto_venta'] ?? 1;
+                        $descripcion = $pv['descripcionPuntoVenta'] ?? $pv['tipoPuntoVenta'] ?? $pv['descripcion'] ?? '';
 
                         $local_pv = SiatPuntoVenta::where('sucursal', $sucursalCode)
                             ->where('codigo_punto_venta', $codigo)

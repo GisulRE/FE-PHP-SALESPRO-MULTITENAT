@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class ProductsCompany3Seeder extends Seeder
 {
-    private const COMPANY_ID = 3;
+    private const COMPANY_ID = 1;
 
     public function run(): void
     {

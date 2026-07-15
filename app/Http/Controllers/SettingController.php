@@ -1064,24 +1064,29 @@ class SettingController extends Controller
         ]);
 
         $data_biller = Biller::where('id', $biller_id)->first();
+        if (!$data_biller) {
+            return array('status' => false, 'mensaje' => 'No se encontró el biller: ' . $biller_id);
+        }
         $data_p_venta = SiatPuntoVenta::where('codigo_punto_venta', $data_biller->punto_venta_siat)->first();
+        if (!$data_p_venta) {
+            return array('status' => false, 'mensaje' => 'No se encontró el punto de venta asociado al biller: ' . $biller_id);
+        }
         $registro = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->get()->each->updateEstado();
 
-        $bandera = false;
         try {
             Log::info('Renovando CUFD Manualmente desde Ajustes');
-            $this->renovarVigenciaxPuntoVenta($data_p_venta);
+            $resultado = $this->renovarVigenciaxPuntoVenta($data_p_venta);
             Log::info('POS_SETTING vigenciaRenovarCUFD: resultado', [
-                'resultado' => true,
+                'resultado' => $resultado,
                 'sucursal' => optional($data_p_venta)->sucursal,
                 'codigo_punto_venta' => optional($data_p_venta)->codigo_punto_venta,
             ]);
             $this->writeCufdDebug('POS_SETTING vigenciaRenovarCUFD: resultado', [
-                'resultado' => true,
+                'resultado' => $resultado,
                 'sucursal' => optional($data_p_venta)->sucursal,
                 'codigo_punto_venta' => optional($data_p_venta)->codigo_punto_venta,
             ]);
-            return $bandera = true;
+            return $resultado;
         } catch (\Throwable $th) {
             Log::error('POS_SETTING vigenciaRenovarCUFD: excepción', [
                 'message' => $th->getMessage(),
@@ -1091,7 +1096,7 @@ class SettingController extends Controller
                 'message' => $th->getMessage(),
                 'biller_id' => $biller_id,
             ]);
-            return $bandera;
+            return array('status' => false, 'mensaje' => $th->getMessage());
         }
     }
 
@@ -1112,23 +1117,25 @@ class SettingController extends Controller
         ]);
 
         $data_p_venta = SiatPuntoVenta::find($id);
+        if (!$data_p_venta) {
+            return array('status' => false, 'mensaje' => 'No se encontró el punto de venta: ' . $id);
+        }
         $registro = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->get()->each->updateEstado();
 
-        $bandera = false;
         try {
             Log::info('Renovando CUFD Manualmente desde Ajustes');
-            $this->renovarVigenciaxPuntoVenta($data_p_venta);
+            $resultado = $this->renovarVigenciaxPuntoVenta($data_p_venta);
             Log::info('POS_SETTING vigenciaRenovarCUFDPuntoVenta: resultado', [
-                'resultado' => true,
+                'resultado' => $resultado,
                 'sucursal' => optional($data_p_venta)->sucursal,
                 'codigo_punto_venta' => optional($data_p_venta)->codigo_punto_venta,
             ]);
             $this->writeCufdDebug('POS_SETTING vigenciaRenovarCUFDPuntoVenta: resultado', [
-                'resultado' => true,
+                'resultado' => $resultado,
                 'sucursal' => optional($data_p_venta)->sucursal,
                 'codigo_punto_venta' => optional($data_p_venta)->codigo_punto_venta,
             ]);
-            return $bandera = true;
+            return $resultado;
         } catch (\Throwable $th) {
             Log::error('POS_SETTING vigenciaRenovarCUFDPuntoVenta: excepción', [
                 'message' => $th->getMessage(),
@@ -1138,7 +1145,7 @@ class SettingController extends Controller
                 'message' => $th->getMessage(),
                 'siat_punto_venta_id' => $id,
             ]);
-            return $bandera;
+            return array('status' => false, 'mensaje' => $th->getMessage());
         }
     }
 

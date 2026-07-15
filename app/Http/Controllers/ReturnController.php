@@ -375,15 +375,15 @@ class ReturnController extends Controller
                     }
                     log::info($info_par_unit);
                     $item_return = array(
-                        "actividadEconomica" => $lims_product_data->codigo_actividad,
+                        "actividadEconomica" => $lims_product_data->codigo_actividad ? (string) $lims_product_data->codigo_actividad : "620100",
                         "cantidad" => $qty[$key],
                         "codigoDetalleTransaccion" => 2,
                         "codigoProducto" => $lims_product_data->code,
-                        "codigoProductoSin" => $lims_product_data->codigo_producto_servicio,
+                        "codigoProductoSin" => $lims_product_data->codigo_producto_servicio ? (int) $lims_product_data->codigo_producto_servicio : 83141,
                         "descripcion" => $lims_product_data->name,
-                        "montoDescuento" => $discount[$key],
-                        "precioUnitario" => $produc_price[$key],
-                        "subTotal" => $total[$key],
+                        "montoDescuento" => number_format((float) $discount[$key], 2, '.', ''),
+                        "precioUnitario" => number_format((float) $net_unit_price[$key], 2, '.', ''),
+                        "subTotal" => number_format($qty[$key] * $net_unit_price[$key], 2, '.', ''),
                         "unidadMedida" => $info_par_unit['codigo_clasificador'],
                         "nombreUnidadMedida" => $info_par_unit['descripcion'],
                     );
@@ -476,6 +476,7 @@ class ReturnController extends Controller
 
     public function productReturnData($id)
     {
+        $product_return = [];
         $lims_product_return_data = ProductReturn::where('return_id', $id)->get();
         foreach ($lims_product_return_data as $key => $product_return_data) {
             $product = Product::find($product_return_data->product_id);
@@ -893,6 +894,31 @@ class ReturnController extends Controller
         return redirect('return-sale')->with('not_permitted', 'Datos eliminados con éxito');
     }
 
+    public function getPuntosVentaParaDevolucion($sucursal)
+    {
+        if (!is_numeric($sucursal)) {
+            return response()->json([]);
+        }
+
+        $sucursalCode = (int) $sucursal;
+        $companyId = Auth::user()->company_id ?? null;
+
+        $query = DB::table('puntos_venta')
+            ->select('codigo_punto_venta', 'nombre_punto_venta')
+            ->where('sucursal', $sucursalCode)
+            ->whereNull('deleted_at')
+            ->where('is_active', 1);
+
+        if ($companyId) {
+            $query->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
+                  ->orWhereNull('company_id');
+            });
+        }
+
+        return response()->json($query->get());
+    }
+
     public function listarFacturas(Request $request)
     {
         $list_invoices = [];
@@ -904,7 +930,7 @@ class ReturnController extends Controller
         $dataFilter['fechaFin'] = $data['fechaFin'];
         $dataFilter['opcion'] = $data['opcion'];
         $dataFilter['puntoVenta'] = $data['puntoVenta'];
-        $dataFilter['sucursal'] = 0;
+        $dataFilter['sucursal'] = isset($data['sucursal']) ? (int) $data['sucursal'] : 0;
         if ($data['valor'] == null) {
             $dataFilter['valor'] = "";
         } else {
@@ -993,13 +1019,17 @@ class ReturnController extends Controller
 
     public function anularNotaFiscal($id, $id_motivo)
     {
+        Log::info("anularNotaFiscal - Return ID: " . $id . " - Motivo ID: " . $id_motivo);
+
         $lims_return_data = Returns::find($id);
         $lims_product_return_data = ProductReturn::where('return_id', $id)->get();
         if ($lims_return_data->cuf && $lims_return_data->customer_sale_id) {
             $factura = $this->getFacturaData($lims_return_data->cuf);
             if ($factura) {
                 $data_cliente = CustomerSale::find($lims_return_data->customer_sale_id);
+                Log::info("anularNotaFiscal - Anulando nota - CUF: " . $lims_return_data->cuf . " - CustomerSale ID: " . $lims_return_data->customer_sale_id);
                 $result = $this->anularNotaDebitoCredito($factura, $id_motivo, $data_cliente);
+                Log::info("anularNotaFiscal - Resultado => " . json_encode($result, JSON_UNESCAPED_UNICODE));
                 if ($result['status'] == true) {
                     $data_cliente->estado_factura = "ANULADO";
                     foreach ($lims_product_return_data as $key => $product_return_data) {
@@ -1051,12 +1081,14 @@ class ReturnController extends Controller
                     $data_cliente->save();
                     $lims_return_data->is_active = false;
                     $lims_return_data->save();
+                    Log::info("anularNotaFiscal - ANULADO OK - Return ID: " . $id . " - CUF: " . $lims_return_data->cuf);
                     $json_data = array(
                         "mensaje" => "Se anulo nota debito/credito con éxito. ",
                         "status" => true
                     );
                     echo json_encode($json_data);
                 } else {
+                    Log::warning("anularNotaFiscal - FALLÓ ANULACIÓN - Return ID: " . $id . " - " . ($result["mensaje"] ?? 'Error desconocido'));
                     $json_data = array(
                         "mensaje" => $result["mensaje"],
                         "status" => false
@@ -1064,6 +1096,7 @@ class ReturnController extends Controller
                     echo json_encode($json_data);
                 }
             } else {
+                Log::warning("anularNotaFiscal - Nota debito/credito no encontrada en SIAT - Return ID: " . $id . " - CUF: " . $lims_return_data->cuf);
                 $json_data = array(
                     "mensaje" => "No, se pudo anular la nota de retorno, nota debito/credito no encontrado.",
                     "status" => false
@@ -1071,6 +1104,7 @@ class ReturnController extends Controller
                 echo json_encode($json_data);
             }
         } else {
+            Log::warning("anularNotaFiscal - Falta CUF o customer_sale_id - Return ID: " . $id);
             $json_data = array(
                 "mensaje" => "Cuf ó Registro de Nota de Anulacion no encontrado.",
                 "status" => false

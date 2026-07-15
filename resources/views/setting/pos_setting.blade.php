@@ -1407,11 +1407,11 @@
                 url: url_data,
                 type: "GET",
                 success: function(data) {
-                    if (data == true) {
-                        swal('Renovación Exitosa', 'Cufd renovado para el punto de venta: ' + codigo);
+                    if (data && data.status === true) {
+                        swal('Renovación Exitosa', data.mensaje || ('Cufd renovado para el punto de venta: ' + codigo));
                         refrescarDatosTablaCUFD();
                     } else {
-                        swal('Error', 'no se logró renovar los cufd');
+                        swal('Error', (data && data.mensaje) ? data.mensaje : 'no se logró renovar los cufd');
                     }
                 },
                 complete: function() {

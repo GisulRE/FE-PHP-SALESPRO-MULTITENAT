@@ -1,0 +1,11 @@
+"id","codigo_clasificador","descripcion","tipo_clasificador","datos","usuario_alta","usuario_modificacion","id_empresa","estado","sucursal","codigo_punto_venta","created_at","updated_at","deleted_at"
+"76557","1","CI - CÉDULA DE IDENTIDAD","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2024-12-04 21:42:29","2024-12-04 21:42:29",NULL
+"76558","2","CEX - CÉDULA DE IDENTIDAD DE EXTRANJERO","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2024-12-04 21:42:29","2024-12-04 21:42:29",NULL
+"76559","5","NIT - NÚMERO DE IDENTIFICACIÓN TRIBUTARIA","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2024-12-04 21:42:29","2024-12-04 21:42:29",NULL
+"76560","3","PAS - PASAPORTE","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2024-12-04 21:42:29","2024-12-04 21:42:29",NULL
+"76561","4","OD - OTRO DOCUMENTO DE IDENTIDAD","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2024-12-04 21:42:29","2024-12-04 21:42:29",NULL
+"77154","1","CI - CÉDULA DE IDENTIDAD","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2026-03-18 19:06:01","2026-03-18 19:06:01",NULL
+"77155","2","CEX - CÉDULA DE IDENTIDAD DE EXTRANJERO","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2026-03-18 19:06:01","2026-03-18 19:06:01",NULL
+"77156","5","NIT - NÚMERO DE IDENTIFICACIÓN TRIBUTARIA","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2026-03-18 19:06:01","2026-03-18 19:06:01",NULL
+"77157","3","PAS - PASAPORTE","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2026-03-18 19:06:01","2026-03-18 19:06:01",NULL
+"77158","4","OD - OTRO DOCUMENTO DE IDENTIDAD","tipoDocumentoIdentidad",NULL,1,1,NULL,1,"0","0","2026-03-18 19:06:01","2026-03-18 19:06:01",NULL

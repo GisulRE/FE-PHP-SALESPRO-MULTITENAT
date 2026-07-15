@@ -119,8 +119,13 @@ class SiatPuntoVentaController extends Controller
                     $puntoVenta = SiatPuntoVenta::create($data);
                     $message = "CUIS ingresado manualmente.";
                     try {
-                        $this->renovarVigenciaxPuntoVenta($puntoVenta);
-                        $message .= " CUFD Obtenido.";
+                        $resultadoCufd = $this->renovarVigenciaxPuntoVenta($puntoVenta);
+                        if ($resultadoCufd['status'] == true) {
+                            $message .= " CUFD Obtenido.";
+                        } else {
+                            Log::error('[store PuntoVenta] Error al obtener CUFD con CUIS manual: ' . ($resultadoCufd['mensaje'] ?? 'sin detalle'));
+                            $message .= " Error al obtener CUFD diario: " . ($resultadoCufd['mensaje'] ?? 'sin detalle') . " Intente renovar en Ajustes POS.";
+                        }
                     } catch (\Throwable $th) {
                         Log::error('[store PuntoVenta] Error al obtener CUFD con CUIS manual: ' . $th->getMessage());
                         $message .= " Error al obtener CUFD diario, intente renovar en Ajustes POS.";
@@ -143,8 +148,13 @@ class SiatPuntoVentaController extends Controller
                         $puntoVenta = SiatPuntoVenta::create($data);
                         $message = "";
                         try {
-                            $this->renovarVigenciaxPuntoVenta($puntoVenta);
-                            $message = "CUFD Obtenido.";
+                            $resultadoCufd = $this->renovarVigenciaxPuntoVenta($puntoVenta);
+                            if ($resultadoCufd['status'] == true) {
+                                $message = "CUFD Obtenido.";
+                            } else {
+                                Log::error('[store PuntoVenta] Error al obtener CUFD: ' . ($resultadoCufd['mensaje'] ?? 'sin detalle'));
+                                $message = "Error al obtener CUFD diario: " . ($resultadoCufd['mensaje'] ?? 'sin detalle') . " Por favor intente renovar en Ajustes POS.";
+                            }
                         } catch (\Throwable $th) {
                             Log::error('[store PuntoVenta] Error al obtener CUFD: ' . $th->getMessage());
                             $message = "Error al obtener CUFD diario, por favor intente renovar en Ajustes POS.";

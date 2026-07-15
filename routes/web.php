@@ -287,6 +287,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('return-sale/product_return/{id}', 'ReturnController@productReturnData');
 	Route::post('return-sale/deletebyselection', 'ReturnController@deleteBySelection');
 	Route::post('return-sale/list_invoice', 'ReturnController@listarFacturas');
+	Route::get('return-sale/get_punto_venta/{sucursal}', 'ReturnController@getPuntosVentaParaDevolucion')->name('return-sale.getPuntosVenta');
 	Route::get('return/obtener_bytes_factura/{return_id}', 'ReturnController@getBytesFactura')->name('return.obtener_bytes_factura');
 	Route::get('return-sale/anula_nota/{id}/{id_motivo}', 'ReturnController@anularNotaFiscal')->name('return-sale.anula_nota');
 	Route::resource('return-sale', 'ReturnController');

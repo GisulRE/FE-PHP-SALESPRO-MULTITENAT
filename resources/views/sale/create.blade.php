@@ -3137,13 +3137,13 @@
             type: "GET",
             async: false,
             success: function (data) {
-                if (data == true) {
+                if (data && data.status === true) {
                     $("input[name='bandera_vigencia_cufd_hidden']").val(1);
-                    swal('Renovación Exitosa', 'Cufd renovado para el punto de venta!'); 
+                    swal('Renovación Exitosa', data.mensaje || 'Cufd renovado para el punto de venta!');
                 }
                 else{
                     $("input[name='bandera_vigencia_cufd_hidden']").val(0);
-                    swal('Error', 'no se logró renovar los cufd.'); 
+                    swal('Error', (data && data.mensaje) ? data.mensaje : 'no se logró renovar los cufd.');
                 }
             },
             complete: function () {

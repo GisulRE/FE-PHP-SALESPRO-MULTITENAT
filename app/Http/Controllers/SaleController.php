@@ -149,26 +149,6 @@ class SaleController extends Controller
         }
     }
 
-    /**
-     * Fallback: devuelve una leyenda aleatoria o por defecto.
-     * Se añadió para prevenir errores cuando alguna vista/JS espera este método.
-     */
-    public function pickRandomLeyenda()
-    {
-        try {
-            $leyendas = [
-                'Gracias por su compra.',
-                '¡Vuelva pronto!',
-                'Operación realizada correctamente.'
-            ];
-            $selected = $leyendas[array_rand($leyendas)];
-            return response()->json(['leyenda' => $selected]);
-        } catch (\Throwable $e) {
-            Log::warning('pickRandomLeyenda fallback error: ' . $e->getMessage());
-            return response()->json(['leyenda' => 'Gracias por su compra.']);
-        }
-    }
-
     public function saleData(Request $request)
     {
         $start_date = date('Y-m-d', strtotime(' -7 day'));
@@ -1587,16 +1567,16 @@ class SaleController extends Controller
                     $data_credencial_cafc->save();
                 } else {
                     if ($obj_cliente->codigo_documento_sector == 1) {
-                        $obj_cliente->nro_factura = $data_p_venta->correlativo_factura;
-                        $update_p_venta->correlativo_factura += 1;
+                        $obj_cliente->nro_factura = $data_p_venta->correlativo_factura ?? 1;
+                        $update_p_venta->correlativo_factura = ($update_p_venta->correlativo_factura ?? 1) + 1;
                     }
                     if ($obj_cliente->codigo_documento_sector == 2) {
-                        $obj_cliente->nro_factura = $data_p_venta->correlativo_alquiler;
-                        $update_p_venta->correlativo_alquiler += 1;
+                        $obj_cliente->nro_factura = $data_p_venta->correlativo_alquiler ?? 1;
+                        $update_p_venta->correlativo_alquiler = ($update_p_venta->correlativo_alquiler ?? 1) + 1;
                     }
                     if ($obj_cliente->codigo_documento_sector == 13) {
-                        $obj_cliente->nro_factura = $data_p_venta->correlativo_servicios_basicos;
-                        $update_p_venta->correlativo_servicios_basicos += 1;
+                        $obj_cliente->nro_factura = $data_p_venta->correlativo_servicios_basicos ?? 1;
+                        $update_p_venta->correlativo_servicios_basicos = ($update_p_venta->correlativo_servicios_basicos ?? 1) + 1;
 
                         $obj_cliente->gestion = $data['gestion'];
                         $obj_cliente->mes = $data['mes'];
@@ -1757,6 +1737,12 @@ class SaleController extends Controller
                             $respuesta = $this->generarFacturaServicioBasico($lims_sale_data->id);
                         }
                         if ($respuesta['status']) {
+                            // Modo comisionista: el nro. de factura lo asigna el servidor central,
+                            // por lo que el correlativo local debe resincronizarse con ese valor
+                            // para que la siguiente venta no repita ni se desfase.
+                            if (!empty($respuesta['nro_factura_central']) && (int) $update_p_venta->correlativo_factura < ((int) $respuesta['nro_factura_central'] + 1)) {
+                                $update_p_venta->correlativo_factura = (int) $respuesta['nro_factura_central'] + 1;
+                            }
                             $update_p_venta->save();
                             DB::commit();
                             // fin dFe correlativo factura
@@ -1993,14 +1979,14 @@ class SaleController extends Controller
                 }
             } else {
                 if ($obj_cliente->codigo_documento_sector == 1) {
-                    $obj_cliente->nro_factura = $data_p_venta->correlativo_factura;
-                    $update_p_venta->correlativo_factura += 1;
+                    $obj_cliente->nro_factura = $data_p_venta->correlativo_factura ?? 1;
+                    $update_p_venta->correlativo_factura = ($update_p_venta->correlativo_factura ?? 1) + 1;
                 } elseif ($obj_cliente->codigo_documento_sector == 2) {
-                    $obj_cliente->nro_factura = $data_p_venta->correlativo_alquiler;
-                    $update_p_venta->correlativo_alquiler += 1;
+                    $obj_cliente->nro_factura = $data_p_venta->correlativo_alquiler ?? 1;
+                    $update_p_venta->correlativo_alquiler = ($update_p_venta->correlativo_alquiler ?? 1) + 1;
                 } elseif ($obj_cliente->codigo_documento_sector == 13) {
-                    $obj_cliente->nro_factura = $data_p_venta->correlativo_servicios_basicos;
-                    $update_p_venta->correlativo_servicios_basicos += 1;
+                    $obj_cliente->nro_factura = $data_p_venta->correlativo_servicios_basicos ?? 1;
+                    $update_p_venta->correlativo_servicios_basicos = ($update_p_venta->correlativo_servicios_basicos ?? 1) + 1;
                     // Campos exclusivos de servicios básicos
                     $obj_cliente->gestion                  = $data['gestion'] ?? null;
                     $obj_cliente->mes                      = $data['mes'] ?? null;
@@ -2126,6 +2112,12 @@ class SaleController extends Controller
             ]);
 
             if ($respuesta && $respuesta['status']) {
+                // Modo comisionista: el nro. de factura lo asigna el servidor central,
+                // por lo que el correlativo local debe resincronizarse con ese valor
+                // para que la siguiente venta no repita ni se desfase.
+                if (!empty($respuesta['nro_factura_central']) && (int) $update_p_venta->correlativo_factura < ((int) $respuesta['nro_factura_central'] + 1)) {
+                    $update_p_venta->correlativo_factura = (int) $respuesta['nro_factura_central'] + 1;
+                }
                 $update_p_venta->save();
                 DB::commit();
                 return response()->json([
@@ -3120,6 +3112,9 @@ class SaleController extends Controller
 
     public function getCustomerGroup($id)
     {
+        if (!is_numeric($id)) {
+            return 0;
+        }
         $lims_customer_data = Customer::find($id);
         if (!$lims_customer_data || !$lims_customer_data->customer_group_id) {
             return 0;

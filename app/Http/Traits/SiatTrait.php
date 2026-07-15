@@ -37,6 +37,15 @@ use PhpOffice\PhpSpreadsheet\Writer\Csv;
 trait SiatTrait
 {
 
+    public function pickRandomLeyenda($leyendas)
+    {
+        if ($leyendas instanceof \Illuminate\Support\Collection && $leyendas->isNotEmpty()) {
+            return $leyendas->random();
+        }
+
+        return new SiatLeyendaFactura(['descripcion_leyenda' => 'Gracias por su preferencia.']);
+    }
+
     private function writeSiatDebug(string $event, array $context = []): void
     {
         try {
@@ -337,6 +346,50 @@ trait SiatTrait
         }
     }
 
+    //Obtiene el catálogo de Eventos Significativos (motivos de Modo Contingencia) directamente del SIAT,
+    //usando el mismo endpoint /datosincronizado/v1/listar-nit que "Datos Sincronizados" del Panel SIAT.
+    public function obtenerEventosSignificativosDesdeSiat()
+    {
+        $pos_setting = PosSetting::latest()->first();
+        if (!$pos_setting || !$pos_setting->nit_emisor) {
+            return null;
+        }
+
+        if (!Session::get('token_siat')) {
+            $this->getToken();
+        }
+        if (!Session::get('token_siat')) {
+            return null;
+        }
+
+        $body = [
+            'nit' => $pos_setting->nit_emisor,
+            'parametro' => 'evento_significativos',
+            'sucursal' => 0,
+            'codigoPuntoVenta' => 0,
+        ];
+
+        $response = $this->postListarNit($body);
+        if (!$response || !isset($response['ENTITIES']) || !is_array($response['ENTITIES'])) {
+            return null;
+        }
+
+        $eventos = collect($response['ENTITIES'])
+            ->unique('valor')
+            ->sortBy(function ($item) {
+                return (int) $item['valor'];
+            })
+            ->map(function ($item) {
+                return (object) [
+                    'codigo_clasificador' => $item['valor'],
+                    'descripcion' => $item['descripcion'],
+                ];
+            })
+            ->values();
+
+        return $eventos->isEmpty() ? null : $eventos;
+    }
+
     //Consulta la operación, y busca la tabla determinada
     public function llenarTablaxOperacion($operacion, $response, $sucursal, $p_venta)
     {
@@ -631,8 +684,9 @@ trait SiatTrait
             return array('mensaje' => 'Error Punto de venta SIAT no encontrado, revise configuración. ', 'status' => false);
         }
 
+        $this->asegurarCufdVigente($data_p_venta);
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
-        
+
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
@@ -1159,6 +1213,20 @@ trait SiatTrait
                 $update_customer_sale->cuf = $data_json['cuf'];
             }
 
+            // En modo comisionista, el número de factura lo asigna el servidor central
+            // y viene en la respuesta: debe prevalecer sobre el correlativo local, ya que
+            // es el número que luego se usará para generar la nota de crédito/débito.
+            if (isset($data_json['nro_factura'])) {
+                if ((int) $data_json['nro_factura'] !== (int) $update_customer_sale->nro_factura) {
+                    Log::warning('SIAT generarFacturaIndividualComisionista: nro_factura local difiere del asignado por el servidor central', [
+                        'sale_id' => $data_cliente->sale_id,
+                        'nro_factura_local' => $update_customer_sale->nro_factura,
+                        'nro_factura_central' => $data_json['nro_factura'],
+                    ]);
+                }
+                $update_customer_sale->nro_factura = (int) $data_json['nro_factura'];
+            }
+
             // En modo comisionista, NO guardamos codigo_cufd local porque es gestionado centralmente
             // El servidor central maneja el CUFD
             if (isset($data_json['xmlfactura'])) {
@@ -1169,10 +1237,15 @@ trait SiatTrait
 
             $msj = "Venta Facturada correctamente";
             $respuesta = array('mensaje' => $msj, 'status' => true);
+            if (isset($data_json['nro_factura'])) {
+                // Número asignado por el servidor central: el llamador debe resincronizar
+                // el correlativo local de SiatPuntoVenta con este valor.
+                $respuesta['nro_factura_central'] = (int) $data_json['nro_factura'];
+            }
         } else {
             $http_status = $response->status();
             $response_body = $response->body();
-            
+
             try {
                 $error = $response->json();
             } catch (\Exception $e) {
@@ -1222,6 +1295,7 @@ trait SiatTrait
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
+        $this->asegurarCufdVigente($data_p_venta);
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
@@ -1237,6 +1311,7 @@ trait SiatTrait
         // obteniendo los productos vendidos
         // y guardalos en un array
         $array_product_sales = DB::table('product_sales')->where('sale_id', '=', $venta_id)->get();
+        $totalVenta = 0;
         foreach ($array_product_sales as $nro_prod_sales => $product_sales) {
             $info_product = Product::where('id', $product_sales->product_id)->first();
             $info_par_unit = null;
@@ -1265,17 +1340,22 @@ trait SiatTrait
                 $descripcion_adicional = ' - ' . $product_sales->description;
             }
 
+            $qty_clean = number_format($product_sales->qty, 2, '.', '');
+            $price_clean = number_format($product_sales->net_unit_price, 2, '.', '');
+            $subtotal = number_format($qty_clean * $price_clean, 2, '.', '');
+            $totalVenta += $subtotal;
+
             $data_product_sales[$nro_prod_sales] = array(
-                "actividadEconomica" => $info_product->codigo_actividad,
+                "actividadEconomica" => $info_product->codigo_actividad ? (string) $info_product->codigo_actividad : "620100",
                 "cantidad" => $product_sales->qty,
                 "codigoProducto" => $info_product->code,
-                "codigoProductoSin" => $info_product->codigo_producto_servicio,
+                "codigoProductoSin" => $info_product->codigo_producto_servicio ? (int) $info_product->codigo_producto_servicio : 83141,
                 "descripcion" => $info_product->name . $descripcion_adicional,
                 "montoDescuento" => number_format($product_sales->discount, 2, '.', ''),
                 "numeroImei" => "",
                 "numeroSerie" => "",
-                "precioUnitario" => number_format($product_sales->net_unit_price, 2, '.', ''),
-                "subTotal" => number_format($product_sales->total, 2, '.', ''),
+                "precioUnitario" => $price_clean,
+                "subTotal" => $subtotal,
                 "unidadMedida" => $info_par_unit['codigo_clasificador'],
                 "nombreUnidadMedida" => $info_par_unit['descripcion'],
             );
@@ -1340,9 +1420,9 @@ trait SiatTrait
                 'fechaEmision' => $fecha_emision,
                 'leyenda' => $data_leyenda->descripcion_leyenda,
                 'montoGiftCard' => number_format($data_gift_card->amount, 2, '.', ''),
-                'montoTotal' => number_format($data_venta->grand_total, 2, '.', ''),
-                'montoTotalMoneda' => number_format($data_venta->grand_total, 2, '.', ''),
-                'montoTotalSujetoIva' => number_format(($data_venta->grand_total - $data_gift_card->amount), 2, '.', ''),
+                'montoTotal' => number_format($totalVenta, 2, '.', ''),
+                'montoTotalMoneda' => number_format($totalVenta, 2, '.', ''),
+                'montoTotalSujetoIva' => number_format(($totalVenta - $data_gift_card->amount), 2, '.', ''),
                 "codigoMetodoPago" => $data_cliente->tipo_metodo_pago,
                 "municipio" => $data_sucursal->ciudad_municipio,
 
@@ -1445,6 +1525,7 @@ trait SiatTrait
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
+        $this->asegurarCufdVigente($data_p_venta);
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
@@ -1493,10 +1574,10 @@ trait SiatTrait
             }
 
             $data_product_sales[$nro_prod_sales] = array(
-                "actividadEconomica" => $info_product->codigo_actividad,
+                "actividadEconomica" => $info_product->codigo_actividad ? (string) $info_product->codigo_actividad : "620100",
                 "cantidad" => $product_sales->qty,
                 "codigoProducto" => $info_product->code,
-                "codigoProductoSin" => $info_product->codigo_producto_servicio,
+                "codigoProductoSin" => $info_product->codigo_producto_servicio ? (int) $info_product->codigo_producto_servicio : 83141,
                 "descripcion" => $info_product->name . $descripcion_adicional,
                 "montoDescuento" => number_format($product_sales->discount, 2, '.', ''),
                 "numeroImei" => "",
@@ -1700,6 +1781,7 @@ trait SiatTrait
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
+        $this->asegurarCufdVigente($data_p_venta);
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
@@ -1739,10 +1821,10 @@ trait SiatTrait
             }
 
             $data_product_sales[$nro_prod_sales] = array(
-                "actividadEconomica" => $info_product->codigo_actividad,
+                "actividadEconomica" => $info_product->codigo_actividad ? (string) $info_product->codigo_actividad : "620100",
                 "cantidad" => $product_sales->qty,
                 "codigoProducto" => $info_product->code,
-                "codigoProductoSin" => $info_product->codigo_producto_servicio,
+                "codigoProductoSin" => $info_product->codigo_producto_servicio ? (int) $info_product->codigo_producto_servicio : 83141,
                 "descripcion" => $info_product->name,
                 "montoDescuento" => number_format($product_sales->discount, 2, '.', ''),
                 "numeroImei" => "",
@@ -1910,130 +1992,53 @@ trait SiatTrait
         $pos_setting = PosSetting::latest()->first();
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
-        $path = ($pos_setting->cufd_centralizado == 0) ? '/factura.venta/anula.factura' : '/factura.venta/anula.factura.gestionado';
-        
-        Log::info("ANULACION DE FACTURA - Venta ID: " . $id);
-        if ($pos_setting->cufd_centralizado == 0) {
-            if ($tipo_id) {
-                $factura = $this->getFacturaData($id);
-                $venta_facturada = CustomerSale::where('cuf', $id)->first();
-                
-                // Optimización: Consultar punto de venta y CUFD en una sola consulta
-                $data_p_venta = SiatPuntoVenta::where([
-                    'sucursal' => $factura['codigoSucursal'],
-                    'codigo_punto_venta' => $factura['codigoPuntoVenta']
-                ])->first(['codigo_cuis', 'sucursal', 'codigo_punto_venta']);
-                
-                $data_siat_cufd = SiatCufd::where('sucursal', $factura['codigoSucursal'])
-                    ->where('codigo_punto_venta', $factura['codigoPuntoVenta'])
-                    ->where('estado', true)
-                    ->orderBy('fecha_registro', 'desc')
-                    ->first(['codigo_control', 'codigo_punto_venta', 'sucursal', 'codigo_cufd']);
-                    
-                $body = [
-                    'codigoControl' => $data_siat_cufd->codigo_control,
-                    'codigoDocumento' => $factura['codigoDocumentoSector'],
-                    'codigoMotivoAnulacion' => $motivo_anulacion_id,
-                    'codigoPuntoVenta' => $data_siat_cufd->codigo_punto_venta,
-                    'sucursal' => $data_siat_cufd->sucursal,
-                    'cuis' => $data_p_venta->codigo_cuis,
-                    'cufd' => $factura['cufd'],
-                    'cuf' => $factura['cuf'],
-                    'nit' => $pos_setting->nit_emisor,
-                ];
-                try {
-                    $venta_id = $venta_facturada->sale_id;
-                } catch (Exception $e) {
-                    log::error("venta no encontrada");
-                    $venta_id = 0;
-                }
-            } else {
-                // Optimización: Usar eager loading para reducir consultas
-                $data_venta = Sale::with('biller')->where('id', $venta_id)->first(['id', 'biller_id']);
-                $data_biller = $data_venta->biller;
-                
-                $data_p_venta = SiatPuntoVenta::where([
-                    'sucursal' => $data_biller->sucursal,
-                    'codigo_punto_venta' => $data_biller->punto_venta_siat
-                ])->first(['codigo_cuis', 'sucursal', 'codigo_punto_venta']);
-                
-                $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
-                    ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
-                    ->where('estado', true)
-                    ->orderBy('fecha_registro', 'desc')
-                    ->first(['codigo_control', 'codigo_punto_venta', 'sucursal', 'codigo_cufd']);
+        $path = '/factura.venta/anula.factura.gestionado';
 
-                $venta_facturada = CustomerSale::where('sale_id', $data_venta->id)
-                    ->first(['sale_id', 'codigo_documento_sector', 'cuf', 'nro_factura', 'estado_factura']);
-                    
-                $body = [
-                    'codigoControl' => $data_siat_cufd->codigo_control,
-                    'codigoDocumento' => $venta_facturada->codigo_documento_sector,
-                    'codigoMotivoAnulacion' => $motivo_anulacion_id,
-                    'codigoPuntoVenta' => $data_siat_cufd->codigo_punto_venta,
-                    'sucursal' => $data_siat_cufd->sucursal,
-                    'cuis' => $data_p_venta->codigo_cuis,
-                    'cufd' => $data_siat_cufd->codigo_cufd,
-                    'cuf' => $venta_facturada->cuf,
-                    'nit' => $pos_setting->nit_emisor,
-                ];
-                $venta_id = $data_venta->id;
+        Log::info("anularFactura - Venta ID: " . $id . " - Endpoint: " . $host . $path);
+
+        if ($tipo_id) {
+            // $id es el CUF
+            $cuf = $id;
+            $venta_facturada = CustomerSale::where('cuf', $id)->first(['sale_id', 'cuf', 'nro_factura', 'estado_factura']);
+            if ($venta_facturada) {
+                $venta_id = $venta_facturada->sale_id;
             }
         } else {
-            // Modo centralizado
-            if ($tipo_id) {
-                // Si es CUF, buscar el venta_facturada para obtener sale_id
-                $venta_facturada = CustomerSale::where('cuf', $id)->first(['sale_id', 'nro_factura', 'estado_factura']);
-                if ($venta_facturada) {
-                    $venta_id = $venta_facturada->sale_id;
-                }
-            }
-            
-            $body = [
-                'codigoMotivoAnulacion' => $motivo_anulacion_id,
-                'codigoPuntoVenta' => $codigo_punto_venta,
-                'sucursal' => $sucursal,
-                'cuf' => $id,
-                'nit' => $pos_setting->nit_emisor,
-            ];
+            // $id es el sale_id
+            $venta_facturada = CustomerSale::where('sale_id', $venta_id)->first(['sale_id', 'cuf', 'nro_factura', 'estado_factura']);
+            $cuf = $venta_facturada->cuf ?? null;
         }
-        
-        Log::info("URL => " . $host . $path);
-        Log::info(json_encode($body, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        
+
+        $body = [
+            'codigoMotivoAnulacion' => $motivo_anulacion_id,
+            'codigoPuntoVenta' => $codigo_punto_venta,
+            'sucursal' => $sucursal,
+            'cuf' => $cuf,
+            'nit' => $pos_setting->nit_emisor,
+        ];
+
+        Log::info("anularFactura - URL => " . $host . $path);
+        Log::info("anularFactura - Body => " . json_encode($body, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
         try {
             $response = Http::withHeaders([
                 'Authorization' => $bearer,
             ])->post($host . $path, $body);
-            
+
             $http_status = $response->status();
-            
+            Log::info("anularFactura - HTTP Status => " . $http_status);
+            Log::info("anularFactura - Response => " . $response->body());
+
         } catch (\Exception $e) {
-            Log::error("ERROR DE CONEXIÓN CON SERVIDOR SIAT: " . $e->getMessage());
+            Log::error("anularFactura - ERROR DE CONEXIÓN CON SERVIDOR SIAT: " . $e->getMessage());
             return array('mensaje' => 'Error de conexión: ' . $e->getMessage(), 'estado' => false);
         }
-        
-        // procedemos a cambiar el estado de la factura de VIGENTE -> ANULADO
-        // Obtenemos los datos que necesitamos para el mensaje ANTES de hacer el UPDATE
-        // (los $venta_facturada previos pueden tener select limitado sin PK, así que
-        //  usamos UPDATE directo por WHERE-clause en lugar de fetch+save para evitar
-        //  que Eloquent falle silenciosamente por PK nula)
-        if (!isset($factura)) {
-            $factura = $this->getFacturaData($id);
-        }
 
-        // Datos para el mensaje de respuesta
-        $nro_factura_msj = null;
-        if (!$tipo_id && isset($venta_facturada)) {
-            $nro_factura_msj = $venta_facturada->nro_factura;
-        } elseif ($tipo_id && isset($factura['numeroFactura'])) {
-            $nro_factura_msj = $factura['numeroFactura'];
-        }
+        // procedemos a cambiar el estado de la factura de VIGENTE -> ANULADO
+        $nro_factura_msj = $venta_facturada->nro_factura ?? null;
 
         if ($response->successful()) {
             $data_response = $response->json();
-
-            Log::info("Response => " . json_encode($data_response, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
             // UPDATE directo: no depende de PK cargada en el modelo
             $campos_anulacion = [
@@ -2042,39 +2047,24 @@ trait SiatTrait
                 'codigo_cufd'    => null,
             ];
 
-            if (!$tipo_id && $venta_id) {
-                // Anulación por sale_id
+            if ($cuf) {
+                $rows = CustomerSale::where('cuf', $cuf)->update($campos_anulacion);
+                Log::info("anularFactura - ANULADO en customer_sales por cuf={$cuf} | rows={$rows}");
+            } elseif ($venta_id) {
                 $rows = CustomerSale::where('sale_id', $venta_id)->update($campos_anulacion);
-                Log::info("ANULADO en customer_sales por sale_id={$venta_id} | rows={$rows}");
-            } else {
-                // Anulación por CUF (libro de ventas)
-                $cuf_original = $tipo_id ? $id : ($venta_facturada->cuf ?? null);
-                if (!$nro_factura_msj && isset($venta_facturada)) {
-                    $nro_factura_msj = $venta_facturada->nro_factura ?? null;
-                }
-                if ($cuf_original) {
-                    $rows = CustomerSale::where('cuf', $cuf_original)->update($campos_anulacion);
-                    Log::info("ANULADO en customer_sales por cuf={$cuf_original} | rows={$rows}");
-                } elseif ($venta_id) {
-                    $rows = CustomerSale::where('sale_id', $venta_id)->update($campos_anulacion);
-                    Log::info("ANULADO en customer_sales fallback por sale_id={$venta_id} | rows={$rows}");
-                }
+                Log::info("anularFactura - ANULADO en customer_sales fallback por sale_id={$venta_id} | rows={$rows}");
             }
 
-            if ($tipo_id) {
-                $msj = 'Factura Nro. ' . ($nro_factura_msj ?? 'N/A') . '\n Estado: ' . $data_response['codigo_estado'] . ' - ' . $data_response['codigo_descripcion'];
-            } else {
-                $msj = 'Factura Nro. ' . ($nro_factura_msj ?? 'N/A') . '\n Estado: ' . $data_response['codigo_estado'] . ' - ' . $data_response['codigo_descripcion'];
-            }
+            $msj = 'Factura Nro. ' . ($nro_factura_msj ?? 'N/A') . '\n Estado: ' . $data_response['codigo_estado'] . ' - ' . $data_response['codigo_descripcion'];
 
             $respuesta = array('mensaje' => $msj, 'estado' => true);
         } else {
             $http_status = $response->status();
             $error = $response->json();
-            
+
             $titulo_error = $error['status'] ?? $http_status;
             $error_info = "";
-            
+
             if ($titulo_error == 500) {
                 $error_info = "Tipo Error: INTERNO DEL SERVIDOR (500)";
                 $msj = 'Error interno del servidor.';
@@ -2084,22 +2074,17 @@ trait SiatTrait
                 $error_info = "Tipo Error: BAD REQUEST (400)
 Código: " . $data_response['codigo'] . "
 Descripción: " . $data_response['descripcion'];
-                
-                if ($tipo_id) {
-                    $msj = 'Factura Nro. ' . $factura['numeroFactura'] . '\n Estado: ' . $data_response['codigo'] . ' - ' . $data_response['descripcion'];
-                } else {
-                    $msj = 'Factura Nro. ' . $venta_facturada->nro_factura . '\n Estado: ' . $data_response['codigo'] . ' - ' . $data_response['descripcion'];
-                }
+
+                $msj = 'Factura Nro. ' . ($nro_factura_msj ?? 'N/A') . '\n Estado: ' . $data_response['codigo'] . ' - ' . $data_response['descripcion'];
                 $respuesta = array('mensaje' => $msj, 'estado' => false);
             } else {
                 $error_info = "Tipo Error: DESCONOCIDO (" . $titulo_error . ")";
                 $msj = 'Error en anulación de factura';
                 $respuesta = array('mensaje' => $msj, 'estado' => false);
             }
-            
-            Log::error("HTTP Status: " . $http_status);
-            Log::error("Response => " . json_encode($error, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-            
+
+            Log::error("anularFactura - " . $error_info);
+
             Session::flash('info', $msj);
         }
         return $respuesta;
@@ -2236,6 +2221,7 @@ Descripción: " . $data_response['descripcion'];
             $data_control->save();
 
             $msj = 'Evento Significativo fue registrado exitosamente. Recepción: ' . $data_response['CODIGO_RECEPCION'];
+            log::info('SiatTrait@registrarEventoSignificativo - ' . $msj . ' - Control Contingencia id: ' . $control_contingencia_id);
             Session::flash('info', $msj);
         } else {
             log::warning('Error! archivo SiatTrait, operacion_registrarEventoSignificativo => ');
@@ -3203,6 +3189,7 @@ Descripción: " . $data_response['descripcion'];
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
+        $this->asegurarCufdVigente($data_p_venta);
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
@@ -3247,10 +3234,10 @@ Descripción: " . $data_response['descripcion'];
             }
 
             $data_product_sales[$nro_prod_sales] = array(
-                "actividadEconomica" => $info_product->codigo_actividad,
+                "actividadEconomica" => $info_product->codigo_actividad ? (string) $info_product->codigo_actividad : "620100",
                 "cantidad" => $product_sales->qty,
                 "codigoProducto" => $info_product->code,
-                "codigoProductoSin" => $info_product->codigo_producto_servicio,
+                "codigoProductoSin" => $info_product->codigo_producto_servicio ? (int) $info_product->codigo_producto_servicio : 83141,
                 "descripcion" => $info_product->name . $descripcion_adicional,
                 "montoDescuento" => number_format($product_sales->discount, 2, '.', ''),
                 "numeroImei" => "",
@@ -3404,6 +3391,7 @@ Descripción: " . $data_response['descripcion'];
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
+        $this->asegurarCufdVigente($data_p_venta);
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
@@ -3452,10 +3440,10 @@ Descripción: " . $data_response['descripcion'];
             }
 
             $data_product_sales[$nro_prod_sales] = array(
-                "actividadEconomica" => $info_product->codigo_actividad,
+                "actividadEconomica" => $info_product->codigo_actividad ? (string) $info_product->codigo_actividad : "620100",
                 "cantidad" => $product_sales->qty,
                 "codigoProducto" => $info_product->code,
-                "codigoProductoSin" => $info_product->codigo_producto_servicio,
+                "codigoProductoSin" => $info_product->codigo_producto_servicio ? (int) $info_product->codigo_producto_servicio : 83141,
                 "descripcion" => $info_product->name . $descripcion_adicional,
                 "montoDescuento" => number_format($product_sales->discount, 2, '.', ''),
                 "numeroImei" => "",
@@ -4238,11 +4226,22 @@ Descripción: " . $data_response['descripcion'];
             'factura_final' => $nro_factura_final
         ];
 
-        $response = Http::withHeaders([
-            'Authorization' => $bearer,
-        ])->post($host . $path, $query);
-
         log::info('Endpoint para obtenerArregloDeVentas tipoContingencia => ' . $host . $path, $query);
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $bearer,
+            ])->post($host . $path, $query);
+        } catch (\Exception $e) {
+            Log::error("ERROR DE CONEXIÓN CON SERVIDOR SIAT (consultafacturasrecepcion): " . $e->getMessage());
+            return false;
+        }
+
+        if (!$response->successful()) {
+            Log::error("obtenerVentasEnviadasEnPaquetesModoContingencia - HTTP Status: " . $response->status());
+            Log::error("Response => " . json_encode($response->json(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            return false;
+        }
 
         $item = $response->json();
 
@@ -4889,7 +4888,11 @@ Descripción: " . $data_response['descripcion'];
         $pos_setting = PosSetting::latest()->first();
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
-        $path = '/documento.ajuste/nota.ajuste';
+        $modo_centralizado = ($pos_setting->cufd_centralizado ?? 0) == 1;
+        // Nuevo servicio SIAT para notas de ajuste (crédito/débito) - reemplaza a
+        // /documento.ajuste/nota.ajuste, que ya no se utiliza.
+        $path = '/documento.ajuste/nota.ajuste.gestionado';
+        log::info('generaNotaFiscal - Modo centralizado: ' . ($modo_centralizado ? 'SI' : 'NO') . ' - Endpoint: ' . $host . $path);
 
         $data_venta = Sale::where('id', $venta_id)->first();
         $data_biller = Biller::where([['id', $data_venta->biller_id], ['is_active', true]])->first();
@@ -4897,10 +4900,11 @@ Descripción: " . $data_response['descripcion'];
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
+        $this->asegurarCufdVigente($data_p_venta);
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
-        $tax = Tax::where([['name', 'IVA'], ['is_active', true]])->first();
+        $tax = Tax::where('name', 'like', 'IVA%')->where('is_active', true)->first();
         if (!$data_siat_cufd) {
             $respuesta = array('mensaje' => "Datos Cufd del Dia nulo, debe renovar CUFD", 'status' => false);
         }
@@ -4921,25 +4925,6 @@ Descripción: " . $data_response['descripcion'];
         $leyendas = SiatLeyendaFactura::all();
         $data_leyenda = $this->pickRandomLeyenda($leyendas);
         $fechaemision = str_replace('-', '/', $factura['fechaEmision']);
-        $tipo_impresion = 'rollo';
-        $nro_impresion = $pos_setting->type_print;
-        switch ($nro_impresion) {
-            case '1':
-                $tipo_impresion = "rollo";
-                break;
-            case '2':
-                $tipo_impresion = "rollo";
-                break;
-            case '3':
-                $tipo_impresion = "media_carta";
-                break;
-            case '4':
-                $tipo_impresion = "media_carta";
-                break;
-            default:
-                $tipo_impresion = "rollo";
-                break;
-        }
         $list_items = [];
         foreach ($factura["detalle"] as $item) {
             $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $item["unidadMedida"])->where('tipo_clasificador', 'unidadMedida')->first();
@@ -4962,17 +4947,17 @@ Descripción: " . $data_response['descripcion'];
         foreach ($list_return as $item_return) {
             $list_items[] = $item_return;
         }
-        $montoIVA = ($return_data->total_price * $tax->rate) / 100;
-        
+        $montoDevuelto = 0;
+        foreach ($list_return as $item_return) {
+            $montoDevuelto += (float) $item_return['subTotal'];
+        }
+        $montoIVA = ($montoDevuelto * $tax->rate) / 100;
+
         // Construir data_body base - Nota Fiscal
         $data_body = [
-            'codigoControl' => $data_siat_cufd->codigo_control,
-            'codigoDocumento' => 24,
             'codigoPuntoVenta' => $data_siat_cufd->codigo_punto_venta,
-            'cuis' => $data_p_venta->codigo_cuis,
             'nit' => $pos_setting->nit_emisor,
             'sucursal' => $data_siat_cufd->sucursal,
-            'formato' => $tipo_impresion,
             'notaFiscal' => [
                 "codigoCliente" => $data_cliente->codigofijo,
                 "codigoDocumentoSector" => 24,
@@ -4989,7 +4974,7 @@ Descripción: " . $data_response['descripcion'];
                 "leyenda" => $data_leyenda->descripcion_leyenda,
                 "montoDescuentoCreditoDebito" => 0,
                 "montoEfectivoCreditoDebito" => number_format((float) $montoIVA, 2, '.', ''),
-                "montoTotalDevuelto" => number_format($return_data->total_price, 2, '.', ''),
+                "montoTotalDevuelto" => number_format($montoDevuelto, 2, '.', ''),
                 "montoTotalOriginal" => number_format($factura['montoTotalMoneda'] + $factura['descuentoAdicional'], 2, '.', ''),
                 "municipio" => $data_sucursal->ciudad_municipio,
                 "nitEmisor" => $pos_setting->nit_emisor,
@@ -5005,20 +4990,17 @@ Descripción: " . $data_response['descripcion'];
                 "detalle" => $list_items,
             ],
         ];
-        
-        // Solo enviar CUFD cuando NO esté en modo centralizado - Nota Fiscal
-        if (($pos_setting->cufd_centralizado ?? 0) == 0) {
-            $data_body['cufd'] = $data_siat_cufd->codigo_cufd;
-            log::info('CUFD incluido en request (modo estándar) - Nota Fiscal');
-        } else {
-            log::info('CUFD NO incluido en request (modo centralizado - flag activa) - Nota Fiscal');
-        }
 
-        log::info("URL => " . $host . $path);
-        log::info("Body => " . json_encode($data_body));
+        // El endpoint /documento.ajuste/nota.ajuste.gestionado no acepta
+        // codigoControl/codigoDocumento/cuis/formato a nivel raíz (no existen
+        // en su schema); el único "cufd" válido va dentro de notaFiscal.
+        log::info("generaNotaFiscal - URL => " . $host . $path);
+        log::info("generaNotaFiscal - Body => " . json_encode($data_body));
         $response = Http::withHeaders([
             'Authorization' => $bearer,
         ])->post($host . $path, $data_body);
+        log::info("generaNotaFiscal - HTTP Status => " . $response->status());
+        log::info("generaNotaFiscal - Response => " . $response->body());
         // entre 200 y 299
         // procedemos a incrementar el correlativo factura
         // y actualizamos los datos Cuf y Codigo Recepción de la Factura Exitosamente
@@ -5081,11 +5063,26 @@ Descripción: " . $data_response['descripcion'];
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
         $path = '/documento.ajuste/anula.nota.ajuste';
+
+        Log::info("anularNotaDebitoCredito - CustomerSale ID: " . $customerSale->id . " - CUF: " . $customerSale->cuf . " - Motivo: " . $motivo . " - Endpoint: " . $host . $path);
+
         $data_p_venta = SiatPuntoVenta::where([
             'sucursal' => $customerSale->sucursal,
             'codigo_punto_venta' => $customerSale->codigo_punto_venta
         ])->first();
+
+        if (!$data_p_venta) {
+            Log::error("anularNotaDebitoCredito - No se encontró SiatPuntoVenta para sucursal={$customerSale->sucursal} codigoPuntoVenta={$customerSale->codigo_punto_venta}");
+            return array('mensaje' => 'No se encontró el punto de venta configurado en SIAT.', 'status' => false);
+        }
+
+        $this->asegurarCufdVigente($data_p_venta);
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
+
+        if (!$data_siat_cufd) {
+            Log::error("anularNotaDebitoCredito - No se encontró CUFD vigente para sucursal={$data_p_venta->sucursal} codigoPuntoVenta={$data_p_venta->codigo_punto_venta}");
+            return array('mensaje' => 'No se encontró un CUFD vigente para anular la nota.', 'status' => false);
+        }
 
         $data_body = [
             "codigoDocumento" => 24,
@@ -5097,39 +5094,57 @@ Descripción: " . $data_response['descripcion'];
             "nit" => $pos_setting->nit_emisor,
             "sucursal" => $customerSale->sucursal
         ];
-        $response = Http::withHeaders([
-            'Authorization' => $bearer,
-        ])->post($host . $path, $data_body);
-        log::info("URL => " . $host . $path, $data_body);
-        log::info("Body => " . json_encode($data_body));
+
+        Log::info("anularNotaDebitoCredito - URL => " . $host . $path);
+        Log::info("anularNotaDebitoCredito - Body => " . json_encode($data_body, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $bearer,
+            ])->post($host . $path, $data_body);
+        } catch (\Exception $e) {
+            Log::error("anularNotaDebitoCredito - ERROR DE CONEXIÓN CON SERVIDOR SIAT: " . $e->getMessage());
+            return array('mensaje' => 'Error de conexión: ' . $e->getMessage(), 'status' => false);
+        }
+
+        $http_status = $response->status();
+        Log::info("anularNotaDebitoCredito - HTTP Status => " . $http_status);
+        Log::info("anularNotaDebitoCredito - Response => " . $response->body());
+
         $respuesta = array();
         if ($response->successful()) {
             $data = $response->json();
             $respuesta = array('data' => $data, 'status' => true);
-            log::info("respuesta => " . json_encode($data));
+            Log::info("anularNotaDebitoCredito - ANULADO OK - CUF: " . $customerSale->cuf . " - respuesta => " . json_encode($data, JSON_UNESCAPED_UNICODE));
         } else {
             $error = $response->json();
-            $titulo_error = $error['status'];
+            $titulo_error = $error['status'] ?? $http_status;
             if ($titulo_error == 500) {
-                $respuesta = array('mensaje' => 'Error interno del servidor. ', 'status' => false);
+                $msj = 'Error interno del servidor. ';
+                $respuesta = array('mensaje' => $msj, 'status' => false);
             } elseif ($titulo_error == 400) {
                 if (isset($error['mensajesRecepcion'])) {
                     $mensajes_error = $error['mensajesRecepcion'];
-                    log::warning("mensajes de Error => " . json_encode($mensajes_error));
+                    Log::warning("anularNotaDebitoCredito - mensajes de Error => " . json_encode($mensajes_error, JSON_UNESCAPED_UNICODE));
                     $descripcion = "";
                     foreach ($mensajes_error as $mensaje) {
                         $descripcion .= " Código: " . $mensaje['codigo'] . " - Descripción: " . $mensaje['descripcion'];
-                        log::info($descripcion);
                     }
                     $msj = $descripcion;
                 } else {
-                    $mensajes_error = $error['title'];
-                    log::warning("mensajes de Error => " . json_encode($mensajes_error));
+                    $mensajes_error = $error['title'] ?? 'Error desconocido';
+                    Log::warning("anularNotaDebitoCredito - mensajes de Error => " . json_encode($mensajes_error, JSON_UNESCAPED_UNICODE));
                     $msj = 'Problemas de conexión Siat, la nota de crédito/débito no ha sido anulada. Error: ' . $titulo_error . " - " . $mensajes_error;
                 }
                 $respuesta = array('mensaje' => $msj, 'status' => false);
+            } else {
+                $msj = 'Error desconocido al anular la nota de crédito/débito (HTTP ' . $titulo_error . ').';
+                $respuesta = array('mensaje' => $msj, 'status' => false);
             }
+
+            Log::error("anularNotaDebitoCredito - FALLÓ ANULACIÓN - CUF: " . $customerSale->cuf . " - " . ($respuesta['mensaje'] ?? 'Error desconocido'));
         }
+
         return $respuesta;
     }
 
