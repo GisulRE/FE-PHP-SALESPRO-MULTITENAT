@@ -275,6 +275,7 @@ class FacturaMasivaController extends Controller
                     $obj_cliente->ajuste_sujeto_iva = $sheet->ajusteSujetoIva;
                     $obj_cliente->detalle_ajuste_sujeto_iva = $sheet->detalleAjusteSujetoIva;
                     $obj_cliente->otros_pagos_no_sujeto_iva = $sheet->otrosPagosNoSujetoIva;
+                    // $data_siat['detalle_otros_pagos_no_sujeto_iva'] = $sheet->detalleOtrosPagosNoSujetoIva;
                 }
                 $this->create_customersale($lims_sale_data->id, $data_siat, $obj_cliente);
 
@@ -364,6 +365,7 @@ class FacturaMasivaController extends Controller
     private function create_product(string $code, array $data)
     {
         $lims_category_data = Category::firstOrCreate(['name' => $data['category'], 'is_active' => true]);
+        // $lims_unit_data = Unit::firstOrCreate(['unit_code' => $data['unitcode'], 'is_active' => true]);
         $lims_unit_data = 0;
 
         $product = Product::firstOrNew(['code' => $code, 'is_active' => true]);
@@ -396,6 +398,19 @@ class FacturaMasivaController extends Controller
     {
         $customer = new CustomerController();
         $codigo_excepcion = 0;
+        /*if ($obj_cliente->tipo_documento == 5) {
+            $result = $customer->verificarNIT($obj_cliente->valor_documento);
+            if (isset($result['status']) && $result['status'] == false) {
+                $codigo_excepcion = 0;
+            } else {
+                if ($result != null && $result['codigo'] == 994) {
+                    $codigo_excepcion = 1;
+                } else {
+                    $codigo_excepcion = 0;
+                }
+            }
+
+        }*/
         $obj_cliente->codigo_excepcion = $codigo_excepcion;
 
         // En caso de tarjeta de crédito/débito se procede enmascarar.
@@ -543,12 +558,14 @@ class FacturaMasivaController extends Controller
 
         $this->crearArchivoCsvFacturaMasiva($listas, $data_factura_masiva); // SiatTrait
         $estado_paquete = $this->facturaMasivaRecepcion($factura_masiva_paquete_id); // SiatTrait
+        // return 'Hola mundo';
 
         return $estado_paquete;
     }
 
     private function formatNumber($number, $scale = 2)
     {
+        //(float) $number = str_replace('.', '', $number);
         (float) $number = str_replace(',', '', $number);
         return $number;
     }
@@ -808,6 +825,7 @@ class FacturaMasivaController extends Controller
         // en caso esté validada se procede a cambiar el estado de las ventas facturadas de contingencia => facturadas; y el paquete contingencia se actualiza
         if ($data_estado['codigo_descripcion'] == 'VALIDADA') {
             $data_factura_masiva_paquete = FacturaMasivaPaquetes::where('id', $factura_masiva_paquete_id)->first();
+            // $this->obtenerVentasEnviadasEnPaquetesModoMasivo($factura_masiva_paquete_id); // SiatTrait
             $data_factura_masiva_paquete->estado = 'VALIDADA';
             $data_factura_masiva_paquete->respuesta_servicio = '908';
             $data_factura_masiva_paquete->save();

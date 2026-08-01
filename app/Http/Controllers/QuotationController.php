@@ -67,7 +67,7 @@ class QuotationController extends Controller
         }
 
         $start = $request->input('start');
-        $order = 'quotations.' . $columns[$request->input('order.0.column')];
+        $order = 'quotations.' . ($columns[$request->input('order.0.column')] ?? $columns[1]);
         $dir = $request->input('order.0.dir');
         if (empty($request->input('search.value'))) {
             if (Auth::user()->role_id > 2) {

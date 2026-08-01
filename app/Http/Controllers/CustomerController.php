@@ -60,7 +60,7 @@ class CustomerController extends Controller
         }
 
         $start = $request->input('start');
-        $order = $columns[$request->input('order.0.column')];
+        $order = $columns[$request->input('order.0.column')] ?? $columns[2];
         $dir = $request->input('order.0.dir');
         if (empty($request->input('search.value'))) {
             $customers = Customer::where('is_active', true)->offset($start)

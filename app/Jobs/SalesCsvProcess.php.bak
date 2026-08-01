@@ -217,6 +217,7 @@ class SalesCsvProcess implements ShouldQueue
                             $data_siat['detalle_ajuste_sujeto_iva'] = $data_row['detalleAjusteSujetoIva'];
 
                             $data_siat['otros_pagos_no_sujeto_iva'] = $data_row['otrosPagosNoSujetoIva'];
+                            // $data_siat['detalle_otros_pagos_no_sujeto_iva'] = $data_row['detalleOtrosPagosNoSujetoIva'];
                         }
                         $this->create_customersale($lims_sale_data->id, $data_siat, $this->facturaMasiva);
                         $bandera_llenado_datos = true;
@@ -327,6 +328,7 @@ class SalesCsvProcess implements ShouldQueue
                             $data_siat['detalle_ajuste_sujeto_iva'] = $data_row['detalleAjusteSujetoIva'];
 
                             $data_siat['otros_pagos_no_sujeto_iva'] = $data_row['otrosPagosNoSujetoIva'];
+                            // $data_siat['detalle_otros_pagos_no_sujeto_iva'] = $data_row['detalleOtrosPagosNoSujetoIva'];
                         }
                         $this->create_customersale($lims_sale_data->id, $data_siat, $this->facturaMasiva);
                         $bandera_llenado_datos = true;
@@ -356,16 +358,26 @@ class SalesCsvProcess implements ShouldQueue
         }
         $dataHead['reference_no'] = 'NVR-' . $nro;
         $lims_sale_data = Sale::create($dataHead);
+        //$total = 0;
         foreach ($dataDetails as $key => $value) {
             $value['sale_id'] = $lims_sale_data->id;
+            //$total =  $total + $value['total'];
             Product_Sale::create($value);
         }
+        /*$lims_sale_data->grand_total = $total;
+        $lims_sale_data->total_price = $total;
+        $lims_sale_data->paid_amount = $total;
+        $lims_sale_data->save();
+        log::info("Venta Masiva Nro: ".$lims_sale_data->reference_no);
+        log::info($dataHead);
+        log::info($dataDetails);*/
         return $lims_sale_data;
     }
 
     private function create_product(string $code, array $data)
     {
         $lims_category_data = Category::firstOrCreate(['name' => $data['category'], 'is_active' => true]);
+        // $lims_unit_data = Unit::firstOrCreate(['unit_code' => $data['unitcode'], 'is_active' => true]);
         $lims_unit_data = 0;
 
         $product = Product::firstOrNew(['code' => $code, 'is_active' => true]);
@@ -447,6 +459,7 @@ class SalesCsvProcess implements ShouldQueue
             $obj_cliente->detalle_ajuste_sujeto_iva = $data['detalle_ajuste_sujeto_iva'];
 
             $obj_cliente->otros_pagos_no_sujeto_iva = $data['otros_pagos_no_sujeto_iva'];
+            // $obj_cliente->detalle_otros_pagos_no_sujeto_iva = $data['detalle_otros_pagos_no_sujeto_iva'];
         }
 
         // En caso de tarjeta de crédito/débito se procede enmascarar.
@@ -506,6 +519,7 @@ class SalesCsvProcess implements ShouldQueue
 
     private function formatNumber($number, $scale = 2)
     {
+        //(float) $number = str_replace('.', '', $number);
         (float) $number = str_replace(',', '', $number);
         return $number;
     }

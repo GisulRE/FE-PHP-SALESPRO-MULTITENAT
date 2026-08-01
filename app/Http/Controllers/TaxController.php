@@ -43,10 +43,10 @@ class TaxController extends Controller
         return redirect('tax')->with('message', 'Data inserted successfully');
     }
 
-    public function limsTaxSearch()
+    public function limsTaxSearch(Request $request)
     {
-        $lims_tax_name = $_GET['lims_taxNameSearch'];
-        $lims_tax_all = tax::where('name', $lims_tax_name)->paginate(5);
+        $lims_tax_name = trim((string) $request->input('lims_taxNameSearch', ''));
+        $lims_tax_all = tax::where('name', 'like', '%' . $lims_tax_name . '%')->paginate(5);
         $lims_tax_list = tax::all();
         return view('tax.create', compact('lims_tax_all','lims_tax_list'));
     }
