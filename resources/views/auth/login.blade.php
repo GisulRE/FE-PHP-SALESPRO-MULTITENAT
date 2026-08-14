@@ -79,7 +79,7 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                         @csrf
                         <div class="form-group-material">
                             <input id="login-nit" type="text" name="nit_login" required class="input-material"
-                                value="{{ old('nit_login') }}" maxlength="30">
+                                value="{{ old('nit_login') ?? \Illuminate\Support\Facades\Cookie::get('remember_nit') ?? session('login_nit') }}" maxlength="30">
                             <label for="login-nit" class="label-material">NIT *</label>
                             @if ($errors->has('nit_login'))
                                 <p>
@@ -188,10 +188,12 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
         $(this).find('i').toggleClass('fa-eye fa-eye-slash');
     });
 
-    // Persist NIT in localStorage and prefill on next login.
-    var savedNit = localStorage.getItem('login_nit');
+    // Persist NIT in localStorage and Cookies, and prefill on next login.
+    var savedNit = localStorage.getItem('login_nit') || (typeof $.cookie === 'function' ? $.cookie('remember_nit') : '');
     if (savedNit && !$('#login-nit').val()) {
         $('#login-nit').val(savedNit);
+    }
+    if ($('#login-nit').val() !== '') {
         $('#login-nit').siblings('.label-material').addClass('active');
     }
 
@@ -199,6 +201,9 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
         var nit = $('#login-nit').val();
         if (nit) {
             localStorage.setItem('login_nit', nit);
+            if (typeof $.cookie === 'function') {
+                $.cookie('remember_nit', nit, { expires: 365, path: '/' });
+            }
         }
     });
 </script>

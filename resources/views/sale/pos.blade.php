@@ -4422,6 +4422,22 @@
             } else {
                 $('#submit-btn').text('Confirmar Venta');
             }
+
+            // Consultar cliente actual o predeterminado
+            if (typeof resetBillingFormFields === 'function') {
+                resetBillingFormFields();
+            } else {
+                var current_customer_id = $('#customer_id').val();
+                if (current_customer_id) {
+                    if (typeof consultarCliente === 'function') {
+                        consultarCliente();
+                    } else if (typeof consultarClientePOS === 'function') {
+                        consultarClientePOS();
+                    }
+                } else if ($('input[name="customer_id_hidden"]').val()) {
+                    setClientePredeterminado();
+                }
+            }
         });
 
         // actualizar texto del botón según pestaña activa

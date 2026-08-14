@@ -38,12 +38,11 @@ class LoginController extends Controller
 
     public function credentials(Request $request)
     {
-        $request->validate([
-            'nit_login' => ['required', 'string', 'max:30'],
-        ]);
-        Session::put('login_nit', $request->input('nit_login'));
+        $nitLogin = trim((string) $request->input('nit_login'));
+        Session::put('login_nit', $nitLogin);
+        \Illuminate\Support\Facades\Cookie::queue('remember_nit', $nitLogin, 525600);
 
-        $companyId = Company::where('nit', trim((string) $request->input('nit_login')))->value('id');
+        $companyId = Company::where('nit', $nitLogin)->value('id');
         Session::put('login_company_id', $companyId);
 
         $this->getToken();

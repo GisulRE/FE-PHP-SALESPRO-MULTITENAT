@@ -114,7 +114,12 @@
     // Caso 0, cliente varios, se llena los datos.
     
     $(document).ready(function() {
-        consultarCliente();
+        var current_customer_id = $('#customer_id').val();
+        if (current_customer_id) {
+            consultarCliente();
+        } else if ($('input[name="customer_id_hidden"]').val()) {
+            setClientePredeterminado();
+        }
         console.log("Ready!");
     });
     // Caso 1, el cliente seleccionado no tiene todos los datos, 
@@ -144,6 +149,20 @@
             }
         });
         setValoresTipoDocumentoCasoEspecial()
+    }
+
+    function resetBillingFormFields() {
+        // Consultar cliente actual o predeterminado
+        var current_customer_id = $('#customer_id').val();
+        if (current_customer_id) {
+            if (typeof consultarCliente === 'function') {
+                consultarCliente();
+            } else if (typeof consultarClientePOS === 'function') {
+                consultarClientePOS();
+            }
+        } else if ($('input[name="customer_id_hidden"]').val()) {
+            setClientePredeterminado();
+        }
     }
 
 
