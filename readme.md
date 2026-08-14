@@ -68,7 +68,7 @@ Este proyecto utiliza **Laravel 8** y **PHP 7.4**.
   php artisan test
   ```
 
-## Notas
+## Despliegue Automático (CI/CD)
 
-- No se incluyen instrucciones de migraciones.
-- Consulta la [documentación oficial de Laravel 8](https://laravel.com/docs/8.x) para más detalles.
+- Este repositorio cuenta con un flujo de trabajo de **GitHub Actions** (`.github/workflows/deploy.yml`) que despliega automáticamente los cambios en el VPS de producción al realizar push a la rama `main`.
+
