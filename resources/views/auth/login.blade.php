@@ -119,8 +119,15 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                                     <strong>{{ $errors->first('g-recaptcha-response') }}</strong>
                                 </span>
                             @endif
-
                         </div>
+
+                        <div class="form-group text-left mb-3">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" name="remember" class="custom-control-input" id="remember" {{ old('remember') || true ? 'checked' : '' }}>
+                                <label class="custom-control-label" for="remember" style="font-size: 0.85rem; color: #6c757d; cursor: pointer;">Recordar sesión</label>
+                            </div>
+                        </div>
+
                         <button type="submit" class="btn btn-primary btn-block">{{ trans('file.LogIn') }}</button>
                     </form>
                     <!-- This two button for demo only-->
