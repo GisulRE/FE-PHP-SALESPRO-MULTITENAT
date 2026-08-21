@@ -24,7 +24,7 @@
                                                 <label>{{ trans('file.Biller') }} *</label>
                                                 <select required name="biller_id" class="selectpicker form-control"
                                                     data-live-search="true" id="biller-id" data-live-search-style="begins"
-                                                    title="Select Biller...">
+                                                    title="{{ trans('file.Select Biller...') }}">
                                                     @foreach ($lims_biller_list as $biller)
                                                         <option value="{{ $biller->id }}">
                                                             {{ $biller->name . ' (' . $biller->company_name . ')' }}
@@ -38,7 +38,7 @@
                                                 <label>{{ trans('file.Supplier') }}</label>
                                                 <select name="supplier_id" class="selectpicker form-control"
                                                     data-live-search="true" id="supplier-id" data-live-search-style="begins"
-                                                    title="Select Supplier...">
+                                                    title="{{ trans('file.Select Supplier...') }}">
                                                     @foreach ($lims_supplier_list as $supplier)
                                                         <option value="{{ $supplier->id }}">
                                                             {{ $supplier->name . ' (' . $supplier->company_name . ')' }}
@@ -69,7 +69,7 @@
                                                 <label>{{ trans('file.Warehouse') }} *</label>
                                                 <select id="warehouse_id" name="warehouse_id" required
                                                     class="selectpicker form-control" data-live-search="true"
-                                                    data-live-search-style="begins" title="Select warehouse...">
+                                                    data-live-search-style="begins" title="{{ trans('file.Select warehouse...') }}">
                                                     @foreach ($lims_warehouse_list as $warehouse)
                                                         <option value="{{ $warehouse->id }}">{{ $warehouse->name }}
                                                         </option>
@@ -82,7 +82,7 @@
                                             <div class="search-box input-group">
                                                 <button type="button" id="product-code-btn" class="btn btn-secondary" onclick="$('#lims_productcodeSearch').focus();"><i class="fa fa-barcode"></i></button>
                                                 <input type="text" name="product_code_name" id="lims_productcodeSearch"
-                                                    placeholder="Please type product code and select..."
+                                                    placeholder="{{ trans('file.Please type product code and select...') }}"
                                                     class="form-control ui-autocomplete-input" autocomplete="off" />
                                             </div>
                                         </div>
