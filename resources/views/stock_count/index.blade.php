@@ -1,12 +1,3 @@
-<script>
-    if (!localStorage.getItem('clicked')) {
-
-        localStorage.setItem('url', "{{ route('stock-count.index') }}");
-
-        window.location.href = "{{ route('home') }}";
-    }
-</script>
-
 @extends('layout.layout')
 @section('content')
     @if (session()->has('message'))

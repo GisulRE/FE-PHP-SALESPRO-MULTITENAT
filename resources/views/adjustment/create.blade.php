@@ -1,11 +1,3 @@
-<script>
-    if (!localStorage.getItem('clicked')) {
-
-        localStorage.setItem('url', "{{ route('qty_adjustment.create') }}");
-
-        window.location.href = "{{ route('home') }}";
-    }
-</script>
 @extends('layout.layout')
 @section('content')
     <section class="forms">

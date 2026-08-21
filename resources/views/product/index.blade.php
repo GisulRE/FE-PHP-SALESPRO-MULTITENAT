@@ -1,12 +1,3 @@
-<script>
-    if (!localStorage.getItem('clicked')) {
-
-        localStorage.setItem('url', "{{ route('products.index') }}");
-
-        window.location.href = "{{ route('home') }}";
-    }
-</script>
-
 @extends('layout.layout')
 @section('content')
     @if (session()->has('create_message'))

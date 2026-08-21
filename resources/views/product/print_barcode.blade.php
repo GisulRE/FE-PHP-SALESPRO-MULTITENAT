@@ -1,12 +1,3 @@
-<script>
-    if (!localStorage.getItem('clicked')) {
-
-        localStorage.setItem('url', "{{ route('product.printBarcode') }}");
-
-        window.location.href = "{{ route('home') }}";
-    }
-</script>
-
 @extends('layout.layout') @section('content')
     @if (session()->has('not_permitted'))
         <div class="alert alert-danger alert-dismissible text-center"><button type="button" class="close" data-dismiss="alert"
