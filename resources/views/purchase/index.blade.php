@@ -317,23 +317,27 @@
                 '<!DOCTYPE html><html><head><title>Comprobante de Compra - Gisul</title>' +
                 '<link rel="stylesheet" href="/public/vendor/bootstrap/css/bootstrap.min.css" type="text/css">' +
                 '<style type="text/css">' +
-                '@media print { @page { size: A4; margin: 10mm 12mm 10mm 12mm; } } ' +
-                'body { font-family: "Segoe UI", Roboto, Arial, sans-serif; color: #1e293b; background: #ffffff; padding: 25px; font-size: 13px; line-height: 1.5; } ' +
+                '@page { size: letter portrait; margin: 12mm 15mm; } ' +
+                '* { box-sizing: border-box !important; } ' +
+                'html, body { width: 100% !important; font-family: Arial, Helvetica, sans-serif !important; color: #1e293b; background: #ffffff !important; margin: 0 !important; padding: 0 !important; font-size: 12px; line-height: 1.4; } ' +
                 '.d-print-none, .btn, .close { display: none !important; } ' +
-                '.container.mt-3.pb-2.border-bottom { border-bottom: 3px solid #0f172a !important; padding-bottom: 12px; margin-bottom: 20px; text-align: center; } ' +
-                '.modal-title { font-size: 26px !important; font-weight: 800 !important; color: #0f172a !important; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; } ' +
-                'i { font-size: 14px; color: #475569; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; } ' +
-                '.style-card-from, .style-card-to { background-color: #f8fafc !important; border: 1px solid #cbd5e1 !important; border-radius: 6px; padding: 12px 15px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                'table.product-purchase-list { width: 100% !important; border-collapse: collapse !important; margin-top: 15px; margin-bottom: 15px; } ' +
-                'table.product-purchase-list th { background-color: #0f172a !important; color: #ffffff !important; font-weight: 700 !important; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; padding: 10px 12px; border: 1px solid #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                'table.product-purchase-list td { padding: 8px 12px; border: 1px solid #cbd5e1; font-size: 12px; color: #334155; } ' +
+                '.modal, .modal-dialog, .modal-content, .modal-body, .container, .container-fluid { width: 100% !important; max-width: 100% !important; min-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; position: static !important; overflow: visible !important; display: block !important; } ' +
+                '.container.mt-3.pb-2.border-bottom { border-bottom: 2px solid #0f172a !important; padding-bottom: 10px !important; margin-bottom: 20px !important; text-align: center !important; } ' +
+                '.modal-title { font-size: 24px !important; font-weight: 800 !important; color: #0f172a !important; text-transform: uppercase; margin-bottom: 2px !important; } ' +
+                '.row { display: flex !important; flex-wrap: wrap !important; width: 100% !important; margin-left: 0 !important; margin-right: 0 !important; } ' +
+                '.col-md-6 { width: 50% !important; max-width: 50% !important; flex: 0 0 50% !important; padding: 0 10px !important; } ' +
+                '.col-md-4 { width: 33.33% !important; max-width: 33.33% !important; flex: 0 0 33.33% !important; padding: 0 10px !important; } ' +
+                '.col-md-12 { width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; padding: 0 10px !important; } ' +
+                '.style-card-from, .style-card-to { background-color: #f8fafc !important; border: 1px solid #cbd5e1 !important; border-radius: 6px; padding: 12px 15px; margin-bottom: 15px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                'table.product-purchase-list { width: 100% !important; border-collapse: collapse !important; margin-top: 15px; margin-bottom: 15px; table-layout: auto !important; } ' +
+                'table.product-purchase-list th { background-color: #0f172a !important; color: #ffffff !important; font-weight: 700 !important; text-transform: uppercase; font-size: 11px; padding: 8px 10px; border: 1px solid #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                'table.product-purchase-list td { padding: 7px 10px; border: 1px solid #cbd5e1; font-size: 12px; color: #334155; } ' +
                 'table.product-purchase-list tr:nth-child(even) td { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
                 'tr.table-secondary td { background-color: #e2e8f0 !important; font-weight: 700; color: #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                'tr.table-primary td { background-color: #0284c7 !important; color: #ffffff !important; font-weight: 700; font-size: 14px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                'tr.table-warning td { background-color: #fef08a !important; color: #854d0e !important; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                '.badge-success { background-color: #16a34a !important; color: #fff !important; padding: 4px 8px; border-radius: 4px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                '.badge-warning { background-color: #ca8a04 !important; color: #fff !important; padding: 4px 8px; border-radius: 4px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                '.badge-secondary { background-color: #475569 !important; color: #fff !important; padding: 4px 8px; border-radius: 4px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                'tr.table-primary td { background-color: #0284c7 !important; color: #ffffff !important; font-weight: 700; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                '.badge-success { background-color: #16a34a !important; color: #fff !important; padding: 3px 6px; border-radius: 4px; font-size: 11px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                '.badge-warning { background-color: #ca8a04 !important; color: #fff !important; padding: 3px 6px; border-radius: 4px; font-size: 11px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                '.badge-secondary { background-color: #475569 !important; color: #fff !important; padding: 3px 6px; border-radius: 4px; font-size: 11px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
                 '</style>' +
                 '</head><body>' +
                 divToPrint.innerHTML + '</body></html>'
