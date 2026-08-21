@@ -63,6 +63,18 @@
         <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
         <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script><![endif]-->
 
+    <link rel="stylesheet" href="/public/css/dark-mode.css" type="text/css" id="dark-mode-style">
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark-mode');
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.body.classList.add('dark-mode');
+                });
+            }
+        })();
+    </script>
     <script type="text/javascript" src="/public/vendor/jquery/jquery.min.js"></script>
     <script type="text/javascript" src="/public/vendor/jquery/jquery-ui.min.js"></script>
     <script type="text/javascript"

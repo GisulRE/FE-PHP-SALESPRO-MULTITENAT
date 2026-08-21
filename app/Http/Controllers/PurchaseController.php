@@ -100,66 +100,34 @@ class PurchaseController extends Controller
             }
         } else {
             $search = $request->input('search.value');
+            $cleanSearch = str_replace(',', '', $search);
+
+            $q = Purchase::select('purchases.*')
+                ->with('supplier', 'warehouse')
+                ->leftJoin('suppliers', function($join) {
+                    $join->on('purchases.supplier_id', '=', 'suppliers.id')
+                         ->where('suppliers.company_id', '=', auth()->user()->company_id);
+                });
+
             if (Auth::user()->role_id > 2 && config('staff_access') == 'own') {
-                $purchases = Purchase::select('purchases.*')
-                    ->with('supplier', 'warehouse')
-                    ->leftJoin('suppliers', function($join) {
-                        $join->on('purchases.supplier_id', '=', 'suppliers.id')
-                             ->where('suppliers.company_id', '=', auth()->user()->company_id);
-                    })
-                    ->whereDate('purchases.created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
-                    ->where('purchases.user_id', Auth::id())
-                    ->orwhere([
-                        ['purchases.reference_no', 'LIKE', "%{$search}%"],
-                        ['purchases.user_id', Auth::id()],
-                    ])
-                    ->orwhere([
-                        ['suppliers.name', 'LIKE', "%{$search}%"],
-                        ['purchases.user_id', Auth::id()],
-                    ])
-                    ->offset($start)
-                    ->limit($limit)
-                    ->orderBy($order, $dir)->get();
-
-                $totalFiltered = Purchase::leftJoin('suppliers', function($join) {
-                        $join->on('purchases.supplier_id', '=', 'suppliers.id')
-                             ->where('suppliers.company_id', '=', auth()->user()->company_id);
-                    })
-                    ->whereDate('purchases.created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
-                    ->where('purchases.user_id', Auth::id())
-                    ->orwhere([
-                        ['purchases.reference_no', 'LIKE', "%{$search}%"],
-                        ['purchases.user_id', Auth::id()],
-                    ])
-                    ->orwhere([
-                        ['suppliers.name', 'LIKE', "%{$search}%"],
-                        ['purchases.user_id', Auth::id()],
-                    ])
-                    ->count();
-            } else {
-                $purchases = Purchase::select('purchases.*')
-                    ->with('supplier', 'warehouse')
-                    ->leftJoin('suppliers', function($join) {
-                        $join->on('purchases.supplier_id', '=', 'suppliers.id')
-                             ->where('suppliers.company_id', '=', auth()->user()->company_id);
-                    })
-                    ->whereDate('purchases.created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
-                    ->orwhere('purchases.reference_no', 'LIKE', "%{$search}%")
-                    ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
-                    ->offset($start)
-                    ->limit($limit)
-                    ->orderBy($order, $dir)
-                    ->get();
-
-                $totalFiltered = Purchase::leftJoin('suppliers', function($join) {
-                        $join->on('purchases.supplier_id', '=', 'suppliers.id')
-                             ->where('suppliers.company_id', '=', auth()->user()->company_id);
-                    })
-                    ->whereDate('purchases.created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
-                    ->orwhere('purchases.reference_no', 'LIKE', "%{$search}%")
-                    ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
-                    ->count();
+                $q->where('purchases.user_id', Auth::id());
             }
+
+            $q->where(function($query) use ($search, $cleanSearch) {
+                $query->whereDate('purchases.created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
+                      ->orWhere('purchases.reference_no', 'LIKE', "%{$search}%")
+                      ->orWhere('suppliers.name', 'LIKE', "%{$search}%")
+                      ->orWhere('purchases.grand_total', 'LIKE', "%{$cleanSearch}%")
+                      ->orWhere('purchases.paid_amount', 'LIKE', "%{$cleanSearch}%")
+                      ->orWhereRaw('(purchases.grand_total - purchases.paid_amount) LIKE ?', ["%{$cleanSearch}%"]);
+            });
+
+            $totalFiltered = $q->count();
+
+            $purchases = $q->offset($start)
+                ->limit($limit)
+                ->orderBy($order, $dir)
+                ->get();
         }
         $data = array();
         if (!empty($purchases)) {
@@ -246,31 +214,31 @@ class PurchaseController extends Controller
                 }
 
                 $nestedData['purchase'] = array(
-                    '[ "' . date(config('date_format'), strtotime($purchase->created_at->toDateString())) . '"',
-                    ' "' . $purchase->reference_no . '"',
-                    ' "' . $purchase_status . '"',
-                    ' "' . $purchase->id . '"',
-                    ' "' . $warehouse->name . '"',
-                    ' "' . $warehouse->phone . '"',
-                    ' "' . $warehouse->address . '"',
-                    ' "' . $supplier->name . '"',
-                    ' "' . ($supplier->company_name ?? '') . '"',
-                    ' "' . ($supplier->email ?? '') . '"',
-                    ' "' . ($supplier->phone_number ?? '') . '"',
-                    ' "' . ($supplier->address ?? '') . '"',
-                    ' "' . ($supplier->city ?? '') . '"',
-                    ' "' . $purchase->total_tax . '"',
-                    ' "' . $purchase->total_discount . '"',
-                    ' "' . $purchase->total_cost . '"',
-                    ' "' . $purchase->order_tax . '"',
-                    ' "' . $purchase->order_tax_rate . '"',
-                    ' "' . $purchase->order_discount . '"',
-                    ' "' . $purchase->shipping_cost . '"',
-                    ' "' . $purchase->grand_total . '"',
-                    ' "' . $purchase->paid_amount . '"',
-                    ' "' . $purchase->note . '"',
-                    ' "' . $user->name . '"',
-                    ' "' . $user->email . '"]',
+                    date(config('date_format'), strtotime($purchase->created_at->toDateString())),
+                    $purchase->reference_no,
+                    $purchase_status,
+                    $purchase->id,
+                    $warehouse->name,
+                    $warehouse->phone,
+                    $warehouse->address,
+                    $supplier->name,
+                    $supplier->company_name ?? '',
+                    $supplier->email ?? '',
+                    $supplier->phone_number ?? '',
+                    $supplier->address ?? '',
+                    $supplier->city ?? '',
+                    $purchase->total_tax,
+                    $purchase->total_discount,
+                    $purchase->total_cost,
+                    $purchase->order_tax,
+                    $purchase->order_tax_rate,
+                    $purchase->order_discount,
+                    $purchase->shipping_cost,
+                    $purchase->grand_total,
+                    $purchase->paid_amount,
+                    $purchase->note,
+                    $user->name,
+                    $user->email
                 );
                 $data[] = $nestedData;
             }

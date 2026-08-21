@@ -593,8 +593,8 @@
                 },
                 "createdRow": function (row, data, dataIndex) {
                     $(row).addClass('product-link');
-                    $(row).attr('data-product', data['product']);
-                    $(row).attr('data-imagedata', data['imagedata']);
+                    $(row).data('product', data['product']);
+                    $(row).data('imagedata', data['imagedata']);
                 },
                 "columns": [{
                     "data": "key"

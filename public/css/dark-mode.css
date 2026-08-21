@@ -1,0 +1,242 @@
+/* ==========================================================================
+   SalesPro ERP - Dark Mode (Modo Nocturno) Stylesheet
+   ========================================================================== */
+
+/* Active theme on documentElement & body */
+html.dark-mode,
+body.dark-mode {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+}
+
+/* Page container & main section */
+body.dark-mode .page,
+body.dark-mode section,
+body.dark-mode div#page,
+body.dark-mode .content-inner {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+}
+
+/* Header Navbar */
+body.dark-mode header.header,
+body.dark-mode .navbar {
+    background-color: #0f172a !important;
+    border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-mode .navbar a,
+body.dark-mode .navbar .nav-link,
+body.dark-mode .navbar .brand-big,
+body.dark-mode .navbar .brand-big h1,
+body.dark-mode .navbar .menu-btn {
+    color: #f8fafc !important;
+}
+
+/* Side Navigation Bar */
+body.dark-mode nav.side-navbar {
+    background-color: #0f172a !important;
+    border-right: 1px solid #334155 !important;
+}
+
+body.dark-mode nav.side-navbar a {
+    color: #cbd5e1 !important;
+}
+
+body.dark-mode nav.side-navbar a:hover,
+body.dark-mode nav.side-navbar a:focus,
+body.dark-mode nav.side-navbar li.active > a {
+    background-color: #1e293b !important;
+    color: #38bdf8 !important;
+}
+
+body.dark-mode nav.side-navbar ul ul {
+    background-color: #0b1329 !important;
+}
+
+/* Cards & Panels */
+body.dark-mode .card,
+body.dark-mode .card-header,
+body.dark-mode .card-footer,
+body.dark-mode .box,
+body.dark-mode .panel {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+}
+
+body.dark-mode .card-header {
+    border-bottom: 1px solid #334155 !important;
+}
+
+/* Tables & DataTables */
+body.dark-mode table,
+body.dark-mode .table,
+body.dark-mode table.dataTable {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+}
+
+body.dark-mode table th,
+body.dark-mode table td,
+body.dark-mode .table th,
+body.dark-mode .table td {
+    background-color: #1e293b !important;
+    color: #e2e8f0 !important;
+    border-color: #334155 !important;
+}
+
+body.dark-mode table.table-striped tbody tr:nth-of-type(odd) {
+    background-color: #162032 !important;
+}
+
+body.dark-mode table.table-hover tbody tr:hover td {
+    background-color: #334155 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .dataTables_wrapper .dataTables_length,
+body.dark-mode .dataTables_wrapper .dataTables_filter,
+body.dark-mode .dataTables_wrapper .dataTables_info,
+body.dark-mode .dataTables_wrapper .dataTables_processing,
+body.dark-mode .dataTables_wrapper .dataTables_paginate {
+    color: #cbd5e1 !important;
+}
+
+body.dark-mode .dataTables_wrapper input,
+body.dark-mode .dataTables_wrapper select {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    border: 1px solid #475569 !important;
+}
+
+body.dark-mode .paginate_button {
+    background-color: #1e293b !important;
+    color: #cbd5e1 !important;
+    border: 1px solid #334155 !important;
+}
+
+body.dark-mode .paginate_button.active,
+body.dark-mode .paginate_button.current {
+    background-color: #0284c7 !important;
+    color: #ffffff !important;
+}
+
+/* Forms & Inputs */
+body.dark-mode input.form-control,
+body.dark-mode select.form-control,
+body.dark-mode textarea.form-control,
+body.dark-mode .bootstrap-select .btn {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    border-color: #475569 !important;
+}
+
+body.dark-mode input.form-control:focus,
+body.dark-mode select.form-control:focus,
+body.dark-mode textarea.form-control:focus {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 0 0.2rem rgba(56, 189, 248, 0.25) !important;
+}
+
+body.dark-mode .input-group-text,
+body.dark-mode .input-group-addon {
+    background-color: #334155 !important;
+    color: #f8fafc !important;
+    border-color: #475569 !important;
+}
+
+/* Selectpicker dropdowns */
+body.dark-mode .dropdown-menu {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border: 1px solid #334155 !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
+}
+
+body.dark-mode .dropdown-menu a,
+body.dark-mode .dropdown-menu .dropdown-item {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode .dropdown-menu a:hover,
+body.dark-mode .dropdown-menu .dropdown-item:hover,
+body.dark-mode .dropdown-menu .dropdown-item:focus {
+    background-color: #334155 !important;
+    color: #38bdf8 !important;
+}
+
+/* Modals */
+body.dark-mode .modal-content {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border: 1px solid #334155 !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6) !important;
+}
+
+body.dark-mode .modal-header,
+body.dark-mode .modal-footer {
+    border-color: #334155 !important;
+}
+
+body.dark-mode .close,
+body.dark-mode button.close {
+    color: #f8fafc !important;
+    text-shadow: none !important;
+    opacity: 0.8;
+}
+
+body.dark-mode .close:hover {
+    color: #38bdf8 !important;
+    opacity: 1;
+}
+
+/* Summary Row Highlights in Dark Mode */
+body.dark-mode .table-secondary,
+body.dark-mode tr.table-secondary td {
+    background-color: #334155 !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode .table-primary,
+body.dark-mode tr.table-primary td {
+    background-color: #0369a1 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .table-warning,
+body.dark-mode tr.table-warning td {
+    background-color: #854d0e !important;
+    color: #fef08a !important;
+}
+
+/* POS Specific Overrides */
+body.dark-mode .pos-page,
+body.dark-mode .pos-container,
+body.dark-mode #pos-layout {
+    background-color: #0f172a !important;
+}
+
+body.dark-mode .product-img,
+body.dark-mode .product-title {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode .filter-window {
+    background-color: #1e293b !important;
+}
+
+/* Buttons */
+body.dark-mode .btn-default,
+body.dark-mode .btn-secondary {
+    background-color: #334155 !important;
+    color: #f8fafc !important;
+    border-color: #475569 !important;
+}
+
+body.dark-mode .btn-default:hover,
+body.dark-mode .btn-secondary:hover {
+    background-color: #475569 !important;
+}

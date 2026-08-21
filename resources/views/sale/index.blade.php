@@ -84,9 +84,9 @@
                         <th>{{ trans('file.customer') }}</th>
                         <th>{{ trans('file.Sale Status') }}</th>
                         <th>{{ trans('file.Payment Status') }}</th>
-                        <th>{{ trans('file.grand total') }}</th>
-                        <th>{{ trans('file.Paid') }}</th>
-                        <th>{{ trans('file.Due') }}</th>
+                        <th class="text-right">{{ trans('file.grand total') }}</th>
+                        <th class="text-right">{{ trans('file.Paid') }}</th>
+                        <th class="text-right">{{ trans('file.Due') }}</th>
                         <th>Metodo Pago</th>
                         <th class="not-exported">{{ trans('file.action') }}</th>
                     </tr>
@@ -100,9 +100,9 @@
                     <th></th>
                     <th></th>
                     <th></th>
-                    <th></th>
-                    <th></th>
-                    <th></th>
+                    <th class="text-right"></th>
+                    <th class="text-right"></th>
+                    <th class="text-right"></th>
                     <th></th>
                     <th></th>
                 </tfoot>
@@ -1125,7 +1125,7 @@
                 },
                 "createdRow": function(row, data, dataIndex) {
                     $(row).addClass('sale-link');
-                    $(row).attr('data-sale', data['sale']);
+                    $(row).data('sale', data['sale']);
                     
                     // Aplicar filtro de facturación si está activo
                     var filtro = $('#filtro_facturacion').val();
@@ -1232,6 +1232,10 @@
                             'selectAllRender': '<div class="checkbox"><input type="checkbox" class="dt-checkboxes"><label></label></div>'
                         },
                         'targets': [0]
+                    },
+                    {
+                        'className': 'text-right',
+                        'targets': [7, 8, 9]
                     }
                 ],
                 'select': {
@@ -1337,28 +1341,32 @@
             });
         }
 
+        function fmt(n) {
+            return parseFloat(n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
         function datatable_sum(dt_selector, is_calling_first) {
             if (dt_selector.rows('.selected').any() && is_calling_first) {
                 var rows = dt_selector.rows('.selected').indexes();
-                $(dt_selector.column(7).footer()).html(dt_selector.cells(rows, 7, {
+                $(dt_selector.column(7).footer()).html(fmt(dt_selector.cells(rows, 7, {
                     page: 'current'
-                }).data().sum().toFixed(2));
-                $(dt_selector.column(8).footer()).html(dt_selector.cells(rows, 8, {
+                }).data().sum()));
+                $(dt_selector.column(8).footer()).html(fmt(dt_selector.cells(rows, 8, {
                     page: 'current'
-                }).data().sum().toFixed(2));
-                $(dt_selector.column(9).footer()).html(dt_selector.cells(rows, 9, {
+                }).data().sum()));
+                $(dt_selector.column(9).footer()).html(fmt(dt_selector.cells(rows, 9, {
                     page: 'current'
-                }).data().sum().toFixed(2));
+                }).data().sum()));
             } else {
-                $(dt_selector.column(7).footer()).html(dt_selector.cells(rows, 7, {
+                $(dt_selector.column(7).footer()).html(fmt(dt_selector.column(7, {
                     page: 'current'
-                }).data().sum().toFixed(2));
-                $(dt_selector.column(8).footer()).html(dt_selector.cells(rows, 8, {
+                }).data().sum()));
+                $(dt_selector.column(8).footer()).html(fmt(dt_selector.column(8, {
                     page: 'current'
-                }).data().sum().toFixed(2));
-                $(dt_selector.column(9).footer()).html(dt_selector.cells(rows, 9, {
+                }).data().sum()));
+                $(dt_selector.column(9).footer()).html(fmt(dt_selector.column(9, {
                     page: 'current'
-                }).data().sum().toFixed(2));
+                }).data().sum()));
             }
         }
 

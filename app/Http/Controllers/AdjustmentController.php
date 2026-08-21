@@ -32,40 +32,47 @@ class AdjustmentController extends Controller
                 $lims_adjustment_all = Adjustment::orderBy('id', 'desc')->where('user_id', Auth::id())->get();
             else
                 $lims_adjustment_all = Adjustment::orderBy('id', 'desc')->get();
-            return view('adjustment.index', compact('lims_adjustment_all', 'all_permission'));
+
+            $warehouses = DB::table('warehouses')->pluck('name', 'id')->toArray();
+            $product_adjustments = DB::table('product_adjustments')
+                ->leftJoin('products', 'product_adjustments.product_id', '=', 'products.id')
+                ->select('product_adjustments.adjustment_id', 'product_adjustments.code as adjustment_code', 'products.name as product_name', 'products.is_variant')
+                ->get()
+                ->groupBy('adjustment_id');
+
+            return view('adjustment.index', compact('lims_adjustment_all', 'all_permission', 'warehouses', 'product_adjustments'));
         } else
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
     }
 
     public function getProduct($id)
     {
-        $products = Product::select('code', 'id', 'name')->where('is_active', 1)->where('type', 'standard')->orwhere('type', 'insumo')->get();
+        $lims_product_warehouse_data = DB::table('products')
+            ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
+            ->leftJoin('product_variants', function ($join) {
+                $join->on('product_warehouse.product_id', '=', 'product_variants.product_id')
+                    ->on('product_warehouse.variant_id', '=', 'product_variants.variant_id');
+            })
+            ->where([
+                ['products.is_active', true],
+                ['product_warehouse.warehouse_id', $id]
+            ])
+            ->whereNull('products.deleted_at')
+            ->whereIn('products.type', ['standard', 'insumo'])
+            ->select('products.name', 'products.code', 'product_warehouse.qty', 'product_variants.item_code')
+            ->get();
+
         $product_code = [];
         $product_name = [];
         $product_qty = [];
-        $product_data = [];
-        foreach ($products as $product) {
-            $product_name[] = $product->name;
-            $product_warehouse = Product_Warehouse::where(['product_id' => $product->id], ['warehouse_id', $id])->first();
-            if ($product_warehouse) {
-                if ($product->variant_id) {
-                    $lims_product_variant_data = ProductVariant::select('item_code')->FindExactProduct($product_warehouse->id, $product_warehouse->variant_id)->first();
-                    $product_code[] = $lims_product_variant_data->item_code;
-                } else {
-                    $product_code[] = $product->code;
-                }
-                $product_qty[] = $product_warehouse->qty;
-            } else {
-                if ($product->variant_id) {
-                    $lims_product_variant_data = ProductVariant::select('item_code')->FindExactProduct($product_warehouse->id, $product_warehouse->variant_id)->first();
-                    $product_code[] = $lims_product_variant_data->item_code;
-                } else {
-                    $product_code[] = $product->code;
-                }
-                $product_qty[] = 0;
-            }
+
+        foreach ($lims_product_warehouse_data as $product_warehouse) {
+            $product_name[] = $product_warehouse->name;
+            $product_code[] = $product_warehouse->item_code ? $product_warehouse->item_code : $product_warehouse->code;
+            $product_qty[] = $product_warehouse->qty;
         }
 
+        $product_data = [];
         $product_data[] = $product_code;
         $product_data[] = $product_name;
         $product_data[] = $product_qty;

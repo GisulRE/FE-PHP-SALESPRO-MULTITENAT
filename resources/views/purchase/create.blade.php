@@ -815,10 +815,14 @@
             calculateRowProductData(purchase_qty);
         }
 
+        function fmt(n) {
+            return parseFloat(n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
         function calculateRowProductData(quantity) {
             unitConversion();
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(7)').text((product_discount[
-                rowindex] * quantity).toFixed(2));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(7)').text(fmt(product_discount[
+                rowindex] * quantity));
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[
                 rowindex] * quantity).toFixed(2));
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex]
@@ -829,15 +833,12 @@
                 var tax = net_unit_cost * quantity * (tax_rate[rowindex] / 100);
                 var sub_total = (net_unit_cost * quantity) + tax;
 
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(6)').text(net_unit_cost
-                    .toFixed(2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(6)').text(fmt(net_unit_cost));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost
                     .toFixed(2));
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(8)').text(tax.toFixed(
-                    2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(8)').text(fmt(tax));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed(2));
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(9)').text(sub_total
-                    .toFixed(2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(9)').text(fmt(sub_total));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total
                     .toFixed(2));
             } else {
@@ -847,15 +848,12 @@
                 var tax = iva * quantity;
                 var sub_total = sub_total_unit * quantity;
 
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(6)').text(net_unit_cost
-                    .toFixed(2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(6)').text(fmt(net_unit_cost));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost
                     .toFixed(2));
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(8)').text(tax.toFixed(
-                    2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(8)').text(fmt(tax));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed(2));
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(9)').text(sub_total
-                    .toFixed(2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(9)').text(fmt(sub_total));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total
                     .toFixed(2));
             }
@@ -892,25 +890,25 @@
             //Sum of discount
             var total_discount = 0;
             $(".discount").each(function() {
-                total_discount += parseFloat($(this).text());
+                total_discount += parseFloat($(this).text().replace(/,/g, ''));
             });
-            $("#total-discount").text(total_discount.toFixed(2));
+            $("#total-discount").text(fmt(total_discount));
             $('input[name="total_discount"]').val(total_discount.toFixed(2));
 
             //Sum of tax
             var total_tax = 0;
             $(".tax").each(function() {
-                total_tax += parseFloat($(this).text());
+                total_tax += parseFloat($(this).text().replace(/,/g, ''));
             });
-            $("#total-tax").text(total_tax.toFixed(2));
+            $("#total-tax").text(fmt(total_tax));
             $('input[name="total_tax"]').val(total_tax.toFixed(2));
 
             //Sum of subtotal
             var total = 0;
             $(".sub-total").each(function() {
-                total += parseFloat($(this).text());
+                total += parseFloat($(this).text().replace(/,/g, ''));
             });
-            $("#total").text(total.toFixed(2));
+            $("#total").text(fmt(total));
             $('input[name="total_cost"]').val(total.toFixed(2));
 
             calculateGrandTotal();
@@ -921,7 +919,7 @@
             var item = $('table.order-list tbody tr:last').index();
 
             var total_qty = parseFloat($('#total-qty').text());
-            var subtotal = parseFloat($('#total').text());
+            var subtotal = parseFloat($('#total').text().replace(/,/g, ''));
             var order_tax = parseFloat($('select[name="order_tax_rate"]').val());
             var order_discount = parseFloat($('input[name="order_discount"]').val());
             var shipping_cost = parseFloat($('input[name="shipping_cost"]').val());
@@ -937,12 +935,12 @@
 
             $('#item').text(item);
             $('input[name="item"]').val($('table.order-list tbody tr:last').index() + 1);
-            $('#subtotal').text(subtotal.toFixed(2));
-            $('#order_tax').text(order_tax.toFixed(2));
+            $('#subtotal').text(fmt(subtotal));
+            $('#order_tax').text(fmt(order_tax));
             $('input[name="order_tax"]').val(order_tax.toFixed(2));
-            $('#order_discount').text(order_discount.toFixed(2));
-            $('#shipping_cost').text(shipping_cost.toFixed(2));
-            $('#grand_total').text(grand_total.toFixed(2));
+            $('#order_discount').text(fmt(order_discount));
+            $('#shipping_cost').text(fmt(shipping_cost));
+            $('#grand_total').text(fmt(grand_total));
             $('input[name="grand_total"]').val(grand_total.toFixed(2));
         }
 

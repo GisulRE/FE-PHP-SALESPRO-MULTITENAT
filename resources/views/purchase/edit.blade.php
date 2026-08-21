@@ -249,16 +249,16 @@
                                                                         value="{{ $product_purchase->recieved }}"
                                                                         step="any" /></td>
                                                                 <td class="net_unit_cost">
-                                                                    {{ number_format((float) $product_purchase->net_unit_cost, 2, '.', '') }}
+                                                                    {{ number_format((float) $product_purchase->net_unit_cost, 2, '.', ',') }}
                                                                 </td>
                                                                 <td class="discount">
-                                                                    {{ number_format((float) $product_purchase->discount, 2, '.', '') }}
+                                                                    {{ number_format((float) $product_purchase->discount, 2, '.', ',') }}
                                                                 </td>
                                                                 <td class="tax">
-                                                                    {{ number_format((float) $product_purchase->tax, 2, '.', '') }}
+                                                                    {{ number_format((float) $product_purchase->tax, 2, '.', ',') }}
                                                                 </td>
                                                                 <td class="sub-total">
-                                                                    {{ number_format((float) $product_purchase->total, 2, '.', '') }}
+                                                                    {{ number_format((float) $product_purchase->total, 2, '.', ',') }}
                                                                 </td>
                                                                 <td>
                                                                     @if ($lims_purchase_data->status == 3 || $lims_purchase_data->status == 4)
@@ -301,7 +301,7 @@
                                                                         name="lote_data[]" value="{{ $lotedata }}" />
                                                                 @else
                                                                     <input type="hidden" class="lote-data"
-                                                                        name="lote_data[]" />
+                                                                        name="lote_data[]" value="" />
                                                                 @endif
                                                                 <input type="hidden" class="tax-method"
                                                                     value="{{ $product_data->tax_method }}" />
@@ -326,13 +326,13 @@
                                                         <th></th>
                                                         <th class="recieved-product-qty d-none"></th>
                                                         <th id="total-discount">
-                                                            {{ number_format((float) $lims_purchase_data->total_discount, 2, '.', '') }}
+                                                            {{ number_format((float) $lims_purchase_data->total_discount, 2, '.', ',') }}
                                                         </th>
                                                         <th id="total-tax">
-                                                            {{ number_format((float) $lims_purchase_data->total_tax, 2, '.', '') }}
+                                                            {{ number_format((float) $lims_purchase_data->total_tax, 2, '.', ',') }}
                                                         </th>
                                                         <th id="total">
-                                                            {{ number_format((float) $lims_purchase_data->total_cost, 2, '.', '') }}
+                                                            {{ number_format((float) $lims_purchase_data->total_cost, 2, '.', ',') }}
                                                         </th>
                                                         <th><i class="dripicons-trash"></i></th>
                                                     </tfoot>
@@ -619,6 +619,10 @@
         var fechaMinExp = new Date('1990-01-01');
 
 
+        function fmt(n) {
+            return parseFloat(n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
         var rownumber = $('table.order-list tbody tr:last').index();
 
         for (rowindex = 0; rowindex <= rownumber; rowindex++) {
@@ -626,7 +630,7 @@
             product_cost.push(parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find(
                 '.product-cost').val()));
             var total_discount = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find(
-                'td:nth-child(6)').text());
+                'td:nth-child(6)').text().replace(/,/g, ''));
             var quantity = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val());
             product_discount.push((total_discount / quantity).toFixed(2));
             tax_rate.push(parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate')
@@ -658,8 +662,8 @@
         $('.selectpicker').selectpicker('refresh');
 
         $('#item').text($('input[name="item"]').val() + '(' + $('input[name="total_qty"]').val() + ')');
-        $('#subtotal').text(parseFloat($('input[name="total_cost"]').val()).toFixed(2));
-        $('#order_tax').text(parseFloat($('input[name="order_tax"]').val()).toFixed(2));
+        $('#subtotal').text(fmt($('input[name="total_cost"]').val()));
+        $('#order_tax').text(fmt($('input[name="order_tax"]').val()));
         if ($('select[name="status"]').val() == 2) {
             $(".recieved-product-qty").removeClass("d-none");
             $(".qty").prop('readOnly', true);
@@ -672,11 +676,11 @@
         }
         if (!$('input[name="order_discount"]').val())
             $('input[name="order_discount"]').val('0.00');
-        $('#order_discount').text(parseFloat($('input[name="order_discount"]').val()).toFixed(2));
+        $('#order_discount').text(fmt($('input[name="order_discount"]').val()));
         if (!$('input[name="shipping_cost"]').val())
             $('input[name="shipping_cost"]').val('0.00');
-        $('#shipping_cost').text(parseFloat($('input[name="shipping_cost"]').val()).toFixed(2));
-        $('#grand_total').text(parseFloat($('input[name="grand_total"]').val()).toFixed(2));
+        $('#shipping_cost').text(fmt($('input[name="shipping_cost"]').val()));
+        $('#grand_total').text(fmt($('input[name="grand_total"]').val()));
 
         $('select[name="status"]').on('change', function() {
             if ($('select[name="status"]').val() == 2) {
@@ -1138,8 +1142,8 @@
 
         function calculateRowProductData(quantity) {
             unitConversion();
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(7)').text((product_discount[
-                rowindex] * quantity).toFixed(2));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(7)').text(fmt(product_discount[
+                rowindex] * quantity));
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[
                 rowindex] * quantity).toFixed(2));
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex]
@@ -1150,15 +1154,12 @@
                 var tax = net_unit_cost * quantity * (tax_rate[rowindex] / 100);
                 var sub_total = (net_unit_cost * quantity) + tax;
 
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(6)').text(net_unit_cost
-                    .toFixed(2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(6)').text(fmt(net_unit_cost));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost
                     .toFixed(2));
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(8)').text(tax.toFixed(
-                    2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(8)').text(fmt(tax));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed(2));
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(9)').text(sub_total
-                    .toFixed(2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(9)').text(fmt(sub_total));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total
                     .toFixed(2));
             } else {
@@ -1168,15 +1169,12 @@
                 var tax = iva * quantity;
                 var sub_total = sub_total_unit * quantity;
 
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(6)').text(net_unit_cost
-                    .toFixed(2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(6)').text(fmt(net_unit_cost));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost
                     .toFixed(2));
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(8)').text(tax.toFixed(
-                    2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(8)').text(fmt(tax));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed(2));
-                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(9)').text(sub_total
-                    .toFixed(2));
+                $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(9)').text(fmt(sub_total));
                 $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total
                     .toFixed(2));
             }
@@ -1213,25 +1211,25 @@
             //Sum of discount
             var total_discount = 0;
             $(".discount").each(function() {
-                total_discount += parseFloat($(this).text());
+                total_discount += parseFloat($(this).text().replace(/,/g, ''));
             });
-            $("#total-discount").text(total_discount.toFixed(2));
+            $("#total-discount").text(fmt(total_discount));
             $('input[name="total_discount"]').val(total_discount.toFixed(2));
 
             //Sum of tax
             var total_tax = 0;
             $(".tax").each(function() {
-                total_tax += parseFloat($(this).text());
+                total_tax += parseFloat($(this).text().replace(/,/g, ''));
             });
-            $("#total-tax").text(total_tax.toFixed(2));
+            $("#total-tax").text(fmt(total_tax));
             $('input[name="total_tax"]').val(total_tax.toFixed(2));
 
             //Sum of subtotal
             var total = 0;
             $(".sub-total").each(function() {
-                total += parseFloat($(this).text());
+                total += parseFloat($(this).text().replace(/,/g, ''));
             });
-            $("#total").text(total.toFixed(2));
+            $("#total").text(fmt(total));
             $('input[name="total_cost"]').val(total.toFixed(2));
 
             calculateGrandTotal();
@@ -1242,7 +1240,7 @@
             var item = $('table.order-list tbody tr:last').index();
 
             var total_qty = parseFloat($('#total-qty').text());
-            var subtotal = parseFloat($('#total').text());
+            var subtotal = parseFloat($('#total').text().replace(/,/g, ''));
             var order_tax = parseFloat($('select[name="order_tax_rate"]').val());
             var order_discount = parseFloat($('input[name="order_discount"]').val());
             var shipping_cost = parseFloat($('input[name="shipping_cost"]').val());
@@ -1258,12 +1256,12 @@
 
             $('#item').text(item);
             $('input[name="item"]').val($('table.order-list tbody tr:last').index() + 1);
-            $('#subtotal').text(subtotal.toFixed(2));
-            $('#order_tax').text(order_tax.toFixed(2));
+            $('#subtotal').text(fmt(subtotal));
+            $('#order_tax').text(fmt(order_tax));
             $('input[name="order_tax"]').val(order_tax.toFixed(2));
-            $('#order_discount').text(order_discount.toFixed(2));
-            $('#shipping_cost').text(shipping_cost.toFixed(2));
-            $('#grand_total').text(grand_total.toFixed(2));
+            $('#order_discount').text(fmt(order_discount));
+            $('#shipping_cost').text(fmt(shipping_cost));
+            $('#grand_total').text(fmt(grand_total));
             $('input[name="grand_total"]').val(grand_total.toFixed(2));
         }
 

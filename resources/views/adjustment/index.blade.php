@@ -47,25 +47,13 @@
                             <td>{{ date('d-m-Y', strtotime($adjustment->created_at->toDateString())) . ' ' . $adjustment->created_at->toTimeString() }}
                             </td>
                             <td>{{ $adjustment->reference_no }}</td>
-                            <?php $warehouse = DB::table('warehouses')->find($adjustment->warehouse_id); ?>
-                            <td>{{ $warehouse->name }}</td>
+                            <td>{{ $warehouses[$adjustment->warehouse_id] ?? 'N/A' }}</td>
                             <td>
-                                <?php
-                                $product_adjustment_data = DB::table('product_adjustments')
-                                    ->where('adjustment_id', $adjustment->id)
-                                    ->get();
-                                foreach ($product_adjustment_data as $key => $product_adjustment) {
-                                    $product = DB::table('products')->find($product_adjustment->product_id);
-                                    if ($key) {
-                                        echo '<br>';
-                                    }
-                                    if ($product->is_variant) {
-                                        echo $product->name . '-' . $product_adjustment->code;
-                                    } else {
-                                        echo $product->name;
-                                    }
-                                }
-                                ?>
+                                @if (isset($product_adjustments[$adjustment->id]))
+                                    @foreach ($product_adjustments[$adjustment->id] as $index => $pro_adj)
+                                        {!! $index > 0 ? '<br>' : '' !!}{{ $pro_adj->is_variant ? $pro_adj->product_name . '-' . $pro_adj->adjustment_code : $pro_adj->product_name }}
+                                    @endforeach
+                                @endif
                             </td>
                             <td>{{ $adjustment->note }}</td>
                             <td>

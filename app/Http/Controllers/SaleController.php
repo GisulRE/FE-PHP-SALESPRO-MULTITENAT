@@ -209,59 +209,38 @@ class SaleController extends Controller
             }
         } else {
             $search = $request->input('search.value');
+            $cleanSearch = str_replace(',', '', $search);
+
+            $q = Sale::select('sales.*')
+                ->with('biller', 'customer', 'warehouse', 'user')
+                ->leftJoin('customers', function($join) {
+                    $join->on('sales.customer_id', '=', 'customers.id')
+                         ->where('customers.company_id', '=', auth()->user()->company_id);
+                })
+                ->leftJoin('billers', 'sales.biller_id', '=', 'billers.id')
+                ->whereDate('sales.date_sell', ">=", $start_date)
+                ->whereDate('sales.date_sell', "<=", $end_date);
+
             if (Auth::user()->role_id > 2) {
-                $sales = Sale::select('sales.*')
-                    ->with('biller', 'customer', 'warehouse', 'user')
-                    ->leftJoin('customers', function($join) {
-                        $join->on('sales.customer_id', '=', 'customers.id')
-                             ->where('customers.company_id', '=', auth()->user()->company_id);
-                    })
-                    //->join('customer_sales', 'sales.id', '=', 'customer_sales.sale_id')
-                    ->whereDate('sales.date_sell', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
-                    ->whereDate('date_sell', ">=", $start_date)
-                    ->whereDate('date_sell', "<=", $end_date)
-                    ->where('sales.user_id', Auth::id())
-                    ->orwhere([
-                        ['sales.reference_no', 'LIKE', "%{$search}%"],
-                        ['sales.user_id', Auth::id()],
-                    ])
-                    ->orwhere([
-                        ['customers.name', 'LIKE', "%{$search}%"],
-                        ['sales.user_id', Auth::id()],
-                    ])
-                    /*->orwhere([
-                        ['customer_sales.codigofijo', $search],
-                        ['sales.user_id', Auth::id()],
-                    ])
-                    ->orwhere([
-                        ['customer_sales.numero_medidor', 'LIKE', "%{$search}%"],
-                        ['sales.user_id', Auth::id()],
-                    ])*/
-                    ->offset($start)
-                    ->limit($limit)
-                    ->orderBy($order, $dir)->get();
-
-                $totalFiltered = $sales->count();
-            } else {
-                $sales = Sale::select('sales.*')
-                    ->with('biller', 'customer', 'warehouse', 'user')
-                    ->leftJoin('customers', function($join) {
-                        $join->on('sales.customer_id', '=', 'customers.id')
-                             ->where('customers.company_id', '=', auth()->user()->company_id);
-                    })
-                    ->leftJoin('billers', 'sales.biller_id', '=', 'billers.id')
-                    ->whereDate('sales.date_sell', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
-                    ->whereDate('date_sell', ">=", $start_date)
-                    ->whereDate('date_sell', "<=", $end_date)
-                    ->orwhere('sales.reference_no', 'LIKE', "%{$search}%")
-                    ->orwhere('customers.name', 'LIKE', "%{$search}%")
-                    ->orwhere('billers.name', 'LIKE', "%{$search}%")
-                    ->offset($start)
-                    ->limit($limit)
-                    ->orderBy($order, $dir)->get();
-
-                $totalFiltered = $sales->count();
+                $q->where('sales.user_id', Auth::id());
             }
+
+            $q->where(function($query) use ($search, $cleanSearch) {
+                $query->whereDate('sales.date_sell', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
+                      ->orWhere('sales.reference_no', 'LIKE', "%{$search}%")
+                      ->orWhere('customers.name', 'LIKE', "%{$search}%")
+                      ->orWhere('billers.name', 'LIKE', "%{$search}%")
+                      ->orWhere('sales.grand_total', 'LIKE', "%{$cleanSearch}%")
+                      ->orWhere('sales.paid_amount', 'LIKE', "%{$cleanSearch}%")
+                      ->orWhereRaw('(sales.grand_total - sales.paid_amount) LIKE ?', ["%{$cleanSearch}%"]);
+            });
+
+            $totalFiltered = $q->count();
+
+            $sales = $q->offset($start)
+                ->limit($limit)
+                ->orderBy($order, $dir)
+                ->get();
         }
         $data = array();
         if (!empty($sales)) {
@@ -516,39 +495,39 @@ class SaleController extends Controller
                 }
 
                 $nestedData['sale'] = array(
-                    '[ "' . date(config('date_format'), strtotime($sale->date_sell)) . '"',
-                    ' "' . $sale->reference_no . '"',
-                    ' "' . $sale_status . '"',
-                    ' "' . $biller->name . '"',
-                    ' "' . ($biller->company_name ?? '') . '"',
-                    ' "' . ($biller->email ?? '') . '"',
-                    ' "' . ($biller->phone_number ?? '') . '"',
-                    ' "' . ($biller->address ?? '') . '"',
-                    ' "' . ($biller->city ?? '') . '"',
-                    ' "' . $customer->name . '"',
-                    ' "' . ($customer->phone_number ?? '') . '"',
-                    ' "' . ($customer->address ?? '') . '"',
-                    ' "' . ($customer->city ?? '') . '"',
-                    ' "' . $sale->id . '"',
-                    ' "' . $sale->total_tax . '"',
-                    ' "' . $sale->total_discount . '"',
-                    ' "' . $sale->total_price . '"',
-                    ' "' . $sale->order_tax . '"',
-                    ' "' . $sale->order_tax_rate . '"',
-                    ' "' . $sale->order_discount . '"',
-                    ' "' . $sale->shipping_cost . '"',
-                    ' "' . $sale->grand_total . '"',
-                    ' "' . $sale->paid_amount . '"',
-                    ' "' . $sale->sale_note . '"',
-                    ' "' . $sale->staff_note . '"',
-                    ' "' . $sale->user->name . '"',
-                    ' "' . $sale->user->email . '"',
-                    ' "' . $warehouse->name . '"',
-                    ' "' . $coupon_code . '"',
-                    ' "' . $sale->coupon_discount . '"',
-                    ' "' . $sale->total_tips . '"',
-                    ' "' . ($venta_facturada ? ($venta_facturada->cuf ?? '') : '') . '"',
-                    '"' . ($venta_facturada ? ($venta_facturada->nro_factura ?? '') : '') . '"]',
+                    date(config('date_format'), strtotime($sale->date_sell)),
+                    $sale->reference_no,
+                    $sale_status,
+                    $biller->name,
+                    $biller->company_name ?? '',
+                    $biller->email ?? '',
+                    $biller->phone_number ?? '',
+                    $biller->address ?? '',
+                    $biller->city ?? '',
+                    $customer->name,
+                    $customer->phone_number ?? '',
+                    $customer->address ?? '',
+                    $customer->city ?? '',
+                    $sale->id,
+                    $sale->total_tax,
+                    $sale->total_discount,
+                    $sale->total_price,
+                    $sale->order_tax,
+                    $sale->order_tax_rate,
+                    $sale->order_discount,
+                    $sale->shipping_cost,
+                    $sale->grand_total,
+                    $sale->paid_amount,
+                    $sale->sale_note,
+                    $sale->staff_note,
+                    $sale->user->name,
+                    $sale->user->email,
+                    $warehouse->name,
+                    $coupon_code,
+                    $sale->coupon_discount,
+                    $sale->total_tips,
+                    $venta_facturada ? ($venta_facturada->cuf ?? '') : '',
+                    $venta_facturada ? ($venta_facturada->nro_factura ?? '') : ''
                 );                
                 $data[] = $nestedData;
             }

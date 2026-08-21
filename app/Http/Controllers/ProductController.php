@@ -217,25 +217,25 @@ class ProductController extends Controller
                     $tax_method = trans('file.Inclusive');
 
                 $nestedData['product'] = array(
-                    '[ "' . $product->type . '"',
-                    ' "' . $product->name . '"',
-                    ' "' . $product->code . '"',
-                    ' "' . $nestedData['brand'] . '"',
-                    ' "' . $nestedData['category'] . '"',
-                    ' "' . $nestedData['unit'] . '"',
-                    ' "' . $product->cost . '"',
-                    ' "' . $product->price . '"',
-                    ' "' . $tax . '"',
-                    ' "' . $tax_method . '"',
-                    ' "' . $product->alert_quantity . '"',
-                    ' "' . preg_replace('/\s+/S', " ", $product->product_details) . '"',
-                    ' "' . $product->id . '"',
-                    ' "' . $product->product_list . '"',
-                    ' "' . $product->qty_list . '"',
-                    ' "' . $product->price_list . '"',
-                    ' "' . $product->qty . '"',
-                    ' "' . $product->image . '"',
-                    ' "' . $product->commission_percentage . '"]'
+                    $product->type,
+                    $product->name,
+                    $product->code,
+                    $nestedData['brand'],
+                    $nestedData['category'],
+                    $nestedData['unit'],
+                    $product->cost,
+                    $product->price,
+                    $tax,
+                    $tax_method,
+                    $product->alert_quantity,
+                    preg_replace('/\s+/S', " ", $product->product_details),
+                    $product->id,
+                    $product->product_list,
+                    $product->qty_list,
+                    $product->price_list,
+                    $product->qty,
+                    $product->image,
+                    $product->commission_percentage
                 );
                 //$nestedData['imagedata'] = DNS1D::getBarcodePNG($product->code, $product->barcode_symbology);
                 $nestedData['courtesy'] = $product->courtesy == 'TRUE' ? 'Si' : 'No';

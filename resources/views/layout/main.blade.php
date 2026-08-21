@@ -49,6 +49,18 @@
 
     <!-- Custom stylesheet - for your changes-->
     <link rel="stylesheet" href="/public/css/custom-{{ $general_setting->theme }}" type="text/css" id="custom-style">
+    <link rel="stylesheet" href="/public/css/dark-mode.css" type="text/css" id="dark-mode-style">
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark-mode');
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.body.classList.add('dark-mode');
+                });
+            }
+        })();
+    </script>
     <script type="text/javascript" src="/public/printjs/print.min.js"></script>
     <style>
         .noselect {

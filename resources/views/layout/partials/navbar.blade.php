@@ -50,6 +50,11 @@
                     @endif
                     <li class="nav-item"><a id="btnFullscreen"><i class="dripicons-expand"></i></a></li>
                     <li class="nav-item">
+                        <a id="theme-toggle-btn" class="nav-link" href="#" title="Cambiar Tema (Modo Nocturno)">
+                            <i class="fa fa-moon-o" id="theme-toggle-icon"></i>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a rel="nofollow" data-target="#" href="#" data-toggle="dropdown" aria-haspopup="true"
                             aria-expanded="false" class="nav-link dropdown-item">
                             <i class="dripicons-bell"></i>
@@ -319,3 +324,37 @@
         });
     </script>
 @endif
+
+<script>
+    (function() {
+        function updateThemeIcon() {
+            var icon = document.getElementById('theme-toggle-icon');
+            if (!icon) return;
+            if (document.documentElement.classList.contains('dark-mode') || document.body.classList.contains('dark-mode')) {
+                icon.className = 'fa fa-sun-o';
+            } else {
+                icon.className = 'fa fa-moon-o';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateThemeIcon();
+
+            var toggleBtn = document.getElementById('theme-toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var isDark = document.body.classList.toggle('dark-mode');
+                    document.documentElement.classList.toggle('dark-mode', isDark);
+
+                    if (isDark) {
+                        localStorage.setItem('theme', 'dark');
+                    } else {
+                        localStorage.setItem('theme', 'light');
+                    }
+                    updateThemeIcon();
+                });
+            }
+        });
+    })();
+</script>
