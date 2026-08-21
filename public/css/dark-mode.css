@@ -39,19 +39,39 @@ body.dark-mode nav.side-navbar {
     border-right: 1px solid #334155 !important;
 }
 
-body.dark-mode nav.side-navbar a {
+body.dark-mode nav.side-navbar a,
+body.dark-mode nav.side-navbar li a {
     color: #cbd5e1 !important;
+    background-color: transparent !important;
 }
 
 body.dark-mode nav.side-navbar a:hover,
 body.dark-mode nav.side-navbar a:focus,
-body.dark-mode nav.side-navbar li.active > a {
+body.dark-mode nav.side-navbar a[aria-expanded="true"],
+body.dark-mode nav.side-navbar li.active > a,
+body.dark-mode nav.side-navbar li > a.active {
     background-color: #1e293b !important;
     color: #38bdf8 !important;
 }
 
+body.dark-mode nav.side-navbar ul {
+    background-color: #0f172a !important;
+}
+
 body.dark-mode nav.side-navbar ul ul {
     background-color: #0b1329 !important;
+}
+
+body.dark-mode nav.side-navbar ul ul a {
+    color: #94a3b8 !important;
+    background-color: #0b1329 !important;
+}
+
+body.dark-mode nav.side-navbar ul ul a:hover,
+body.dark-mode nav.side-navbar ul ul li.active > a,
+body.dark-mode nav.side-navbar ul ul a.active {
+    background-color: #1e293b !important;
+    color: #38bdf8 !important;
 }
 
 /* Cards & Panels */
