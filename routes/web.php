@@ -285,7 +285,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('adjustments/create', 'AdjustmentController@create')->name('qty_adjustment.create');
 	Route::get('qty_adjustment', 'AdjustmentController@index');
 	Route::get('qty_adjustment/create', 'AdjustmentController@create');
-	Route::resource('qty_adjustment', 'AdjustmentController');
+	Route::resource('qty_adjustment', 'AdjustmentController', ['except' => ['index', 'create']]);
 
 	Route::get('return-sale/getcustomergroup/{id}', 'ReturnController@getCustomerGroup')->name('return-sale.getcustomergroup');
 	Route::post('return-sale/sendmail', 'ReturnController@sendMail')->name('return-sale.sendmail');
