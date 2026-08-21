@@ -309,17 +309,23 @@
             purchaseDetails(purchase);
         });
 
-        $("#print-btn").on("click", function() {
+        $(document).on("click", "#print-btn", function() {
             var divToPrint = document.getElementById('purchase-details');
             var newWin = window.open('', 'Print-Window');
             newWin.document.open();
             newWin.document.write(
-                '<link rel="stylesheet" href="/public/vendor/bootstrap/css/bootstrap.min.css" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">' +
-                divToPrint.innerHTML + '</body>');
+                '<!DOCTYPE html><html><head><title>Imprimir Compra</title>' +
+                '<link rel="stylesheet" href="/public/vendor/bootstrap/css/bootstrap.min.css" type="text/css">' +
+                '<style type="text/css">@media print { .modal-dialog { max-width: 1000px;} .d-print-none { display: none !important; } } body { padding: 20px; }</style>' +
+                '</head><body>' +
+                divToPrint.innerHTML + '</body></html>'
+            );
             newWin.document.close();
+            newWin.focus();
             setTimeout(function() {
+                newWin.print();
                 newWin.close();
-            }, 10);
+            }, 500);
         });
 
         $(document).on("click", "table.purchase-list tbody .add-payment", function(event) {
