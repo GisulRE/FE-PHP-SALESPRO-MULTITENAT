@@ -314,9 +314,27 @@
             var newWin = window.open('', 'Print-Window');
             newWin.document.open();
             newWin.document.write(
-                '<!DOCTYPE html><html><head><title>Imprimir Compra</title>' +
+                '<!DOCTYPE html><html><head><title>Comprobante de Compra - Gisul</title>' +
                 '<link rel="stylesheet" href="/public/vendor/bootstrap/css/bootstrap.min.css" type="text/css">' +
-                '<style type="text/css">@media print { .modal-dialog { max-width: 1000px;} .d-print-none { display: none !important; } } body { padding: 20px; }</style>' +
+                '<style type="text/css">' +
+                '@media print { @page { size: A4; margin: 10mm 12mm 10mm 12mm; } } ' +
+                'body { font-family: "Segoe UI", Roboto, Arial, sans-serif; color: #1e293b; background: #ffffff; padding: 25px; font-size: 13px; line-height: 1.5; } ' +
+                '.d-print-none, .btn, .close { display: none !important; } ' +
+                '.container.mt-3.pb-2.border-bottom { border-bottom: 3px solid #0f172a !important; padding-bottom: 12px; margin-bottom: 20px; text-align: center; } ' +
+                '.modal-title { font-size: 26px !important; font-weight: 800 !important; color: #0f172a !important; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; } ' +
+                'i { font-size: 14px; color: #475569; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; } ' +
+                '.style-card-from, .style-card-to { background-color: #f8fafc !important; border: 1px solid #cbd5e1 !important; border-radius: 6px; padding: 12px 15px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                'table.product-purchase-list { width: 100% !important; border-collapse: collapse !important; margin-top: 15px; margin-bottom: 15px; } ' +
+                'table.product-purchase-list th { background-color: #0f172a !important; color: #ffffff !important; font-weight: 700 !important; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; padding: 10px 12px; border: 1px solid #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                'table.product-purchase-list td { padding: 8px 12px; border: 1px solid #cbd5e1; font-size: 12px; color: #334155; } ' +
+                'table.product-purchase-list tr:nth-child(even) td { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                'tr.table-secondary td { background-color: #e2e8f0 !important; font-weight: 700; color: #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                'tr.table-primary td { background-color: #0284c7 !important; color: #ffffff !important; font-weight: 700; font-size: 14px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                'tr.table-warning td { background-color: #fef08a !important; color: #854d0e !important; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                '.badge-success { background-color: #16a34a !important; color: #fff !important; padding: 4px 8px; border-radius: 4px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                '.badge-warning { background-color: #ca8a04 !important; color: #fff !important; padding: 4px 8px; border-radius: 4px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                '.badge-secondary { background-color: #475569 !important; color: #fff !important; padding: 4px 8px; border-radius: 4px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
+                '</style>' +
                 '</head><body>' +
                 divToPrint.innerHTML + '</body></html>'
             );
@@ -703,14 +721,35 @@
         }
 
         function purchaseDetails(purchase) {
-            var htmltext = '<strong>{{ trans('file.Date') }}: </strong>' + purchase[0] +
-                '<br><strong>{{ trans('file.reference') }}: </strong>' + purchase[1] +
-                '<br><strong>{{ trans('file.Purchase Status') }}: </strong>' + purchase[2] +
-                '<br><br><div class="row"><div class="col-md-6"><strong>{{ trans('file.From') }}:</strong><br>' + purchase[
-                    4] + '<br>' + purchase[5] + '<br>' + purchase[6] +
-                '</div><div class="col-md-6"><div class="float-right"><strong>{{ trans('file.To') }}:</strong><br>' +
-                purchase[7] + '<br>' + purchase[8] + '<br>' + purchase[9] + '<br>' + purchase[10] + '<br>' + purchase[11] +
-                '<br>' + purchase[12] + '</div></div></div>';
+            var statusBadge = (purchase[2] == 'Recibido' || purchase[2] == 'Recieved')
+                ? '<span class="badge badge-success" style="font-size: 13px;">' + purchase[2] + '</span>'
+                : '<span class="badge badge-warning" style="font-size: 13px;">' + purchase[2] + '</span>';
+
+            var htmltext = '<div class="row mb-3 mt-2">' +
+                '<div class="col-md-4"><strong>{{ trans('file.Date') }}: </strong>' + purchase[0] + '</div>' +
+                '<div class="col-md-4"><strong>{{ trans('file.reference') }}: </strong><span class="badge badge-secondary" style="font-size: 13px;">' + purchase[1] + '</span></div>' +
+                '<div class="col-md-4"><strong>{{ trans('file.Purchase Status') }}: </strong>' + statusBadge + '</div>' +
+                '</div>' +
+                '<div class="row mb-3">' +
+                '<div class="col-md-6">' +
+                '<div class="style-card-from" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px 15px;">' +
+                '<strong style="color:#0f172a; font-size:14px; text-transform:uppercase; border-bottom:1px solid #cbd5e1; display:block; padding-bottom:4px; margin-bottom:6px;">{{ trans('file.From') }} (Almacén):</strong>' +
+                '<div>' + purchase[4] + '</div>' +
+                '<div>' + purchase[5] + '</div>' +
+                '<div>' + purchase[6] + '</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="col-md-6">' +
+                '<div class="style-card-to" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px 15px;">' +
+                '<strong style="color:#0f172a; font-size:14px; text-transform:uppercase; border-bottom:1px solid #cbd5e1; display:block; padding-bottom:4px; margin-bottom:6px;">{{ trans('file.To') }} (Proveedor):</strong>' +
+                '<div><strong>' + purchase[7] + '</strong></div>' +
+                (purchase[8] ? '<div>' + purchase[8] + '</div>' : '') +
+                (purchase[9] ? '<div>Email: ' + purchase[9] + '</div>' : '') +
+                (purchase[10] ? '<div>Tel: ' + purchase[10] + '</div>' : '') +
+                (purchase[11] ? '<div>' + purchase[11] + '</div>' : '') +
+                '</div>' +
+                '</div>' +
+                '</div>';
 
             $.get('purchases/product_purchase/' + purchase[3], function(data) {
                 $(".product-purchase-list tbody").remove();
