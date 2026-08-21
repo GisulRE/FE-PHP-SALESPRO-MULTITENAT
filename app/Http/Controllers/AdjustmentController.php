@@ -36,7 +36,7 @@ class AdjustmentController extends Controller
             $warehouses = DB::table('warehouses')->pluck('name', 'id')->toArray();
             $product_adjustments = DB::table('product_adjustments')
                 ->leftJoin('products', 'product_adjustments.product_id', '=', 'products.id')
-                ->select('product_adjustments.adjustment_id', 'product_adjustments.code as adjustment_code', 'products.name as product_name', 'products.is_variant')
+                ->select('product_adjustments.adjustment_id', 'products.code as adjustment_code', 'products.name as product_name', 'products.is_variant')
                 ->get()
                 ->groupBy('adjustment_id');
 
