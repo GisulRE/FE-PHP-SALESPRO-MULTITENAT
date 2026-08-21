@@ -36,9 +36,10 @@ jobs:
             php artisan migrate --force
             
             echo "🧹 Limpiando y optimizando caché de Laravel..."
-            php artisan config:cache
-            php artisan route:cache
+            php artisan config:clear
+            php artisan route:clear
             php artisan view:clear
             php artisan cache:clear
+            php artisan config:cache
             
             echo "✅ ¡Despliegue completado con éxito!"
