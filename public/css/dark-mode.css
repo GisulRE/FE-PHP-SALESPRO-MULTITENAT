@@ -279,3 +279,28 @@ body.dark-mode .btn-default:hover,
 body.dark-mode .btn-secondary:hover {
     background-color: #475569 !important;
 }
+
+/* PrePOS Specific Dark Mode Overrides */
+body.dark-mode p,
+body.dark-mode .pos-section p {
+    color: #f8fafc !important;
+}
+
+body.dark-mode .pos-section,
+body.dark-mode section.pos-section,
+body.dark-mode .pos-section .card,
+body.dark-mode .pos-section div[class*='col-'] > div,
+body.dark-mode #employee_list,
+body.dark-mode .table-container {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+}
+
+body.dark-mode div[style*="background-color: #d8d8ff"],
+body.dark-mode div[style*="background-color:#d8d8ff"],
+body.dark-mode div[style*="background-color: #D8D8FF"],
+body.dark-mode div[style*="background-color: rgb(216, 216, 255)"] {
+    background-color: #1e3a8a !important;
+    color: #93c5fd !important;
+}
