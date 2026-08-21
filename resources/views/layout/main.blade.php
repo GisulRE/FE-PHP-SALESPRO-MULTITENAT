@@ -557,10 +557,8 @@
     </div>
     @yield('scripts')
     <script type="text/javascript">
-        if (localStorage.getItem('url') && localStorage.getItem('url') != location.href) {
-            localStorage.setItem('clicked', 1);
-            setPage(localStorage.getItem('url'));
-        }
+        localStorage.removeItem('clicked');
+        localStorage.removeItem('url');
 
         if ($(window).outerWidth() > 1199) {
             $('nav.side-navbar').removeClass('shrink');
@@ -742,18 +740,8 @@
 
         }
         $(document).ready(function() {
-
-            $('.stopReload').click(function(e) {
-                e.preventDefault();
-
-                let url = $(this).attr('href');
-                if (window.location.href != url) {
-                    localStorage.setItem('clicked', 1);
-
-                    setPage(url);
-
-                }
-            });
+            // Permitir navegación nativa tradicional en todos los enlaces del menú
+            $('.stopReload, .stopReload_out').off('click');
         });
     </script>
 </body>
