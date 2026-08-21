@@ -30,16 +30,18 @@ class Product_Warehouse extends Model
                     $builder->where($table . '.company_id', auth()->user()->company_id);
                 }
             });
+        }
 
-            static::creating(function ($model) {
+        static::creating(function ($model) {
+            if (Schema::hasColumn($model->getTable(), 'company_id')) {
                 if (auth()->check() && empty($model->company_id)) {
                     $model->company_id = auth()->user()->company_id;
                 }
-                if ($model->qty === null) {
-                    $model->qty = 0;
-                }
-            });
-        }
+            }
+            if ($model->qty === null || $model->qty === '') {
+                $model->qty = 0;
+            }
+        });
     }
 
     public function scopeFindProductWithVariant($query, $product_id, $variant_id, $warehouse_id)

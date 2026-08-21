@@ -194,7 +194,7 @@ class AdjustmentController extends Controller
                         $lims_product_warehouse_data = new Product_Warehouse();
                         $lims_product_warehouse_data->warehouse_id = $data['warehouse_id'];
                         $lims_product_warehouse_data->product_id = $lims_product_data->id;
-                        $lims_product_warehouse_data->qty += $qty[$key];
+                        $lims_product_warehouse_data->qty = $qty[$key];
                     }
                     $lims_product_data->qty += $qty[$key];
                 }
@@ -311,7 +311,7 @@ class AdjustmentController extends Controller
                         $lims_product_warehouse_data = new Product_Warehouse();
                         $lims_product_warehouse_data->warehouse_id = $data['warehouse_id'];
                         $lims_product_warehouse_data->product_id = $lims_product_data->id;
-                        $lims_product_warehouse_data->qty += $qty[$key];
+                        $lims_product_warehouse_data->qty = $qty[$key];
                     }
                     $lims_product_data->qty += $qty[$key];
                 }
