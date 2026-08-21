@@ -13,6 +13,10 @@
 */
 
 Auth::routes();
+Route::get('/logout', function () {
+    Auth::logout();
+    return redirect('/login');
+});
 //Route::post('login', 'Auth\LoginController@credentials');
 /** disabled route register */
 Route::get('/register', function () {
