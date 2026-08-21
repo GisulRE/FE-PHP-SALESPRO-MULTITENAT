@@ -48,10 +48,10 @@
                             </a>
                         </li>
                     @endif
-                    <li class="nav-item"><a id="btnFullscreen"><i class="dripicons-expand"></i></a></li>
+                    <li class="nav-item"><a id="btnFullscreen" title="Pantalla Completa"><i class="dripicons-expand"></i></a></li>
                     <li class="nav-item">
-                        <a id="theme-toggle-btn" class="nav-link" href="#" title="Cambiar Tema (Modo Nocturno)">
-                            <i class="fa fa-moon-o" id="theme-toggle-icon"></i>
+                        <a id="theme-toggle-btn" href="#" title="Modo Nocturno">
+                            <i class="dripicons-brightness-low" id="theme-toggle-icon"></i>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -331,9 +331,9 @@
             var icon = document.getElementById('theme-toggle-icon');
             if (!icon) return;
             if (document.documentElement.classList.contains('dark-mode') || document.body.classList.contains('dark-mode')) {
-                icon.className = 'fa fa-sun-o';
+                icon.className = 'dripicons-brightness-max';
             } else {
-                icon.className = 'fa fa-moon-o';
+                icon.className = 'dripicons-brightness-low';
             }
         }
 
