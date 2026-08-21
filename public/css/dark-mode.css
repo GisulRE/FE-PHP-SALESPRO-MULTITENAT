@@ -226,15 +226,45 @@ body.dark-mode .dropdown-menu {
 }
 
 body.dark-mode .dropdown-menu a,
-body.dark-mode .dropdown-menu .dropdown-item {
+body.dark-mode .dropdown-menu .dropdown-item,
+body.dark-mode .dropdown-menu li a,
+body.dark-mode .dropdown-menu.inner li a {
     color: #e2e8f0 !important;
+    background-color: transparent !important;
+    background: transparent !important;
 }
 
 body.dark-mode .dropdown-menu a:hover,
 body.dark-mode .dropdown-menu .dropdown-item:hover,
-body.dark-mode .dropdown-menu .dropdown-item:focus {
+body.dark-mode .dropdown-menu .dropdown-item:focus,
+body.dark-mode .dropdown-menu li a:hover,
+body.dark-mode .dropdown-menu.inner li a:hover {
     background-color: #334155 !important;
+    background: #334155 !important;
     color: #38bdf8 !important;
+}
+
+/* Selected / Active Item in Dropdowns */
+body.dark-mode .dropdown-menu li.selected a,
+body.dark-mode .dropdown-menu li.active a,
+body.dark-mode .dropdown-menu li.selected,
+body.dark-mode .dropdown-menu .dropdown-item.active,
+body.dark-mode .dropdown-menu .dropdown-item.selected,
+body.dark-mode .dropdown-menu.inner li.selected a,
+body.dark-mode .dropdown-menu.inner li.active a,
+body.dark-mode .bootstrap-select .dropdown-menu.inner li.selected a,
+body.dark-mode .bootstrap-select .dropdown-menu.inner li a.selected {
+    background-color: #0284c7 !important;
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+body.dark-mode .bs-searchbox input,
+body.dark-mode .bs-searchbox .form-control {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    border: 1px solid #38bdf8 !important;
 }
 
 /* Modals */
