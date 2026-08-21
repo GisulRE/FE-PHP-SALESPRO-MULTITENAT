@@ -248,6 +248,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('quotations/load-for-pos/{id}', 'QuotationController@loadForPos')->name('quotation.load-for-pos');
 	Route::resource('quotations', 'QuotationController');
 
+	Route::get('purchases/gen_invoice/{id}', 'PurchaseController@genInvoice')->name('purchases.invoice');
 	Route::post('purchases/purchase-data', 'PurchaseController@purchaseData');
 	Route::get('purchases/product_purchase/{id}', 'PurchaseController@productPurchaseData');
 	Route::get('purchases/lims_product_search', 'PurchaseController@limsProductSearch')->name('product_purchase.search');

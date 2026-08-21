@@ -59,6 +59,7 @@
                 <div class="container mt-3 pb-2 border-bottom">
                     <div class="row">
                         <div class="col-md-3">
+                            <input type="hidden" name="purchase_id">
                             <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i
                                     class="dripicons-print"></i> {{ trans('file.Print') }}</button>
                         </div>
@@ -310,55 +311,9 @@
         });
 
         $(document).on("click", "#print-btn", function() {
-            var divToPrint = document.getElementById('purchase-details');
-            var now = new Date();
-            var day = String(now.getDate()).padStart(2, '0');
-            var month = String(now.getMonth() + 1).padStart(2, '0');
-            var year = now.getFullYear();
-            var hours = String(now.getHours()).padStart(2, '0');
-            var minutes = String(now.getMinutes()).padStart(2, '0');
-            var printDateStr = day + '/' + month + '/' + year + ', ' + hours + ':' + minutes;
-
-            var newWin = window.open('', 'Print-Window');
-            newWin.document.open();
-            newWin.document.write(
-                '<!DOCTYPE html><html><head><title>Comprobante de Compra - Gisul</title>' +
-                '<link rel="stylesheet" href="/public/vendor/bootstrap/css/bootstrap.min.css" type="text/css">' +
-                '<style type="text/css">' +
-                '@page { size: letter portrait; margin: 8mm 10mm 8mm 10mm; } ' +
-                '* { box-sizing: border-box !important; } ' +
-                'html, body { width: 100% !important; font-family: Arial, Helvetica, sans-serif !important; color: #1e293b; background: #ffffff !important; margin: 0 !important; padding: 0 !important; font-size: 11px; line-height: 1.3; } ' +
-                '.d-print-none, .btn, .close { display: none !important; } ' +
-                '.modal, .modal-dialog, .modal-content, .modal-body, .container, .container-fluid { width: 100% !important; max-width: 100% !important; min-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; position: static !important; overflow: visible !important; display: block !important; } ' +
-                '.container.mt-3.pb-2.border-bottom { border-bottom: 2px solid #0f172a !important; padding-bottom: 6px !important; margin-bottom: 12px !important; text-align: center !important; } ' +
-                '.modal-title { font-size: 20px !important; font-weight: 800 !important; color: #0f172a !important; text-transform: uppercase; margin-bottom: 2px !important; } ' +
-                '.row { display: flex !important; flex-wrap: wrap !important; width: 100% !important; margin-left: 0 !important; margin-right: 0 !important; } ' +
-                '.col-md-6 { width: 50% !important; max-width: 50% !important; flex: 0 0 50% !important; padding: 0 8px !important; } ' +
-                '.col-md-4 { width: 33.33% !important; max-width: 33.33% !important; flex: 0 0 33.33% !important; padding: 0 8px !important; } ' +
-                '.col-md-12 { width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; padding: 0 8px !important; } ' +
-                '.style-card-from, .style-card-to { background-color: #f8fafc !important; border: 1px solid #cbd5e1 !important; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                'table.product-purchase-list { width: 100% !important; border-collapse: collapse !important; margin-top: 10px; margin-bottom: 10px; table-layout: auto !important; } ' +
-                'table.product-purchase-list th { background-color: #0f172a !important; color: #ffffff !important; font-weight: 700 !important; text-transform: uppercase; font-size: 10px; padding: 6px 8px; border: 1px solid #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                'table.product-purchase-list td { padding: 5px 8px; border: 1px solid #cbd5e1; font-size: 11px; color: #334155; } ' +
-                'table.product-purchase-list tr:nth-child(even) td { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                'tr.table-secondary td { background-color: #e2e8f0 !important; font-weight: 700; color: #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                'tr.table-primary td { background-color: #0284c7 !important; color: #ffffff !important; font-weight: 700; font-size: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                '.badge-success { background-color: #16a34a !important; color: #fff !important; padding: 2px 5px; border-radius: 3px; font-size: 10px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                '.badge-warning { background-color: #ca8a04 !important; color: #fff !important; padding: 2px 5px; border-radius: 3px; font-size: 10px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                '.badge-secondary { background-color: #475569 !important; color: #fff !important; padding: 2px 5px; border-radius: 3px; font-size: 10px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } ' +
-                '.print-footer-info { border-top: 1px solid #cbd5e1; margin-top: 12px; padding-top: 6px; font-size: 10px; color: #64748b; display: flex; justify-content: space-between; } ' +
-                '</style>' +
-                '</head><body>' +
-                divToPrint.innerHTML +
-                '<div class="print-footer-info"><span>Gisul POS - Sistema de Gestión</span><span>Fecha de Impresión: ' + printDateStr + '</span></div>' +
-                '</body></html>'
-            );
-            newWin.document.close();
-            newWin.focus();
-            setTimeout(function() {
-                newWin.print();
-                newWin.close();
-            }, 500);
+            var id = $('input[name="purchase_id"]').val();
+            window.open('purchases/gen_invoice/' + id, '_blank',
+                'location=yes,height=950,width=920,scrollbars=yes,status=yes');
         });
 
         $(document).on("click", "table.purchase-list tbody .add-payment", function(event) {
@@ -736,6 +691,7 @@
         }
 
         function purchaseDetails(purchase) {
+            $('input[name="purchase_id"]').val(purchase[3]);
             var statusBadge = (purchase[2] == 'Recibido' || purchase[2] == 'Recieved')
                 ? '<span class="badge badge-success" style="font-size: 13px;">' + purchase[2] + '</span>'
                 : '<span class="badge badge-warning" style="font-size: 13px;">' + purchase[2] + '</span>';

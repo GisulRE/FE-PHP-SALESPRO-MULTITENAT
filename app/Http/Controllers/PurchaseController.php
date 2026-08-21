@@ -6,6 +6,7 @@ use App\Account;
 use App\Payment;
 use App\PaymentWithCheque;
 use App\PaymentWithCreditCard;
+use App\GeneralSetting;
 use App\PosSetting;
 use App\Product;
 use App\Product_Warehouse;
@@ -19,10 +20,12 @@ use App\Unit;
 use App\User;
 use App\Warehouse;
 use Auth;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Log;
 use DB;
+use NumberToWords\NumberToWords;
 use Spatie\Permission\Models\Role;
 use Stripe\Stripe;
 
@@ -177,6 +180,9 @@ class PurchaseController extends Controller
                               <span class="sr-only">Toggle Dropdown</span>
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
+                                <li>
+                                    <a href="' . route('purchases.invoice', $purchase->id) . '" target="_blank" class="btn btn-link"><i class="fa fa-print"></i> ' . trans('file.Print') . '</a>
+                                </li>
                                 <li>
                                     <button type="button" class="btn btn-link view"><i class="fa fa-eye"></i> ' . trans('file.View') . '</button>
                                 </li>';
@@ -1359,5 +1365,33 @@ class PurchaseController extends Controller
         } else {
             return json_encode(false);
         }
+    }
+
+    public function genInvoice($id)
+    {
+        $lims_purchase_data = Purchase::find($id);
+        $lims_product_purchase_data = ProductPurchase::where('purchase_id', $id)->get();
+        $lims_supplier_data = Supplier::find($lims_purchase_data->supplier_id);
+        $lims_warehouse_data = Warehouse::find($lims_purchase_data->warehouse_id);
+        $general_setting = GeneralSetting::current();
+
+        $numberToWords = new NumberToWords();
+        if (\App::getLocale() == 'ar' || \App::getLocale() == 'hi' || \App::getLocale() == 'vi' || \App::getLocale() == 'en-gb') {
+            $numberTransformer = $numberToWords->getNumberTransformer('en');
+        } else {
+            $numberTransformer = $numberToWords->getNumberTransformer(\App::getLocale());
+        }
+        $numberInWords = $numberTransformer->toWords($lims_purchase_data->grand_total);
+        $cadenaCentavos = $this->obtenerParteDecimalLiteral($lims_purchase_data->grand_total);
+
+        $pdf = Pdf::loadView('purchase.invoice', compact('lims_purchase_data', 'lims_product_purchase_data', 'lims_supplier_data', 'lims_warehouse_data', 'general_setting', 'numberInWords', 'cadenaCentavos'));
+        $pdf->setPaper("a4", 'portrait');
+        return $pdf->stream("compra_" . $lims_purchase_data->reference_no . ".pdf", array("Attachment" => false));
+    }
+
+    function obtenerParteDecimalLiteral($numero) {
+        $parteEntera = floor($numero);
+        $centavos = round(($numero - $parteEntera) * 100);
+        return sprintf("%02d", $centavos).'/100';
     }
 }
