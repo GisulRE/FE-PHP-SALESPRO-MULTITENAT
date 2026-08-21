@@ -991,6 +991,9 @@ trait SiatTrait
     {
         $venta_id = $id;
         $pos_setting = PosSetting::latest()->first();
+        if (!Session::get('token_siat')) {
+            $this->getToken();
+        }
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
         $path = '/factura.venta/factura.individual.comisionista';
