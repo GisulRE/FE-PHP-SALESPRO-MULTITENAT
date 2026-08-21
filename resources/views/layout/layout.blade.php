@@ -75,17 +75,9 @@
                     error: error
                 });
 
-                // Si el servidor devuelve un error de red o 5xx,
-                // navegamos normalmente. 'clicked' debe mantenerse
-                // para que el guard de la página destino no redirija a home.
-                if (xhr.status === 0 || xhr.status >= 500) {
-                    localStorage.removeItem('url');
-                    window.location.href = url;
-                } else {
-                    localStorage.removeItem('clicked');
-                    localStorage.removeItem('url');
-                    alert('Hubo un error al cargar la página. (HTTP ' + xhr.status + ')');
-                }
+                // Si ocurre cualquier error AJAX, navegamos normalmente vía navegador
+                localStorage.removeItem('url');
+                window.location.href = url;
             }
         });
     }
