@@ -1177,7 +1177,7 @@ trait SiatTrait
         ]);
 
         try {
-            $response = Http::timeout(30)->withHeaders([
+            $response = Http::timeout(90)->withHeaders([
                 'Authorization' => $bearer,
             ])->post($url_completa, $data_body);
 
@@ -4474,7 +4474,7 @@ Descripción: " . $data_response['descripcion'];
             Log::info("Query params:", $query);
             Log::info("Token disponible: " . (!empty($token) ? 'SI' : 'NO'));
             
-            $response = Http::timeout(30)->withHeaders([
+            $response = Http::timeout(90)->withHeaders([
                 'Authorization' => $bearer,
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
