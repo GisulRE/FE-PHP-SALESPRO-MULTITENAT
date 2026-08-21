@@ -1,4 +1,4 @@
-@extends('layout.layout')
+@extends('layout.main')
 @section('content')
     @if ($errors->has('name'))
         <div class="alert alert-danger alert-dismissible text-center"><button type="button" class="close" data-dismiss="alert"

@@ -1,4 +1,4 @@
-@extends('layout.layout')
+@extends('layout.main')
 @section('content')
     @if (session()->has('message'))
         <div class="alert alert-success alert-dismissible text-center"><button type="button" class="close"
