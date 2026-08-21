@@ -74,7 +74,7 @@
                                                     <input type="hidden" name="warehouse_id_hidden"
                                                         value="{{ $lims_pos_setting_data->warehouse_id }}">
                                                 @endif
-                                                <select required name="warehouse_id" id="warehouse_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select warehouse...">
+                                                <select required name="warehouse_id" id="warehouse_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="{{ trans('file.Select warehouse...') }}">
                                                     @foreach($lims_warehouse_list as $warehouse)
                                                     <option value="{{$warehouse->id}}">{{$warehouse->name}}</option>
                                                     @endforeach
@@ -88,7 +88,7 @@
                                                     <input type="hidden" name="biller_id_hidden"
                                                         value="{{ $lims_pos_setting_data->biller_id }}">
                                                 @endif
-                                                <select required name="biller_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select Biller...">
+                                                <select required name="biller_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="{{ trans('file.Select Biller...') }}">
                                                     @foreach($lims_biller_list as $biller)
                                                     <option value="{{$biller->id}}">{{$biller->name . ' (' . $biller->company_name . ')'}}</option>
                                                     @endforeach

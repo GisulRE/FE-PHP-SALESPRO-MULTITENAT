@@ -24,7 +24,7 @@
                                                 <label>{{trans('file.From Warehouse')}} *</label>
                                                 <select required name="from_warehouse_id" class="selectpicker form-control"
                                                     data-live-search="true" data-live-search-style="begins"
-                                                    title="Select warehouse...">
+                                                    title="{{ trans('file.Select warehouse...') }}">
                                                     @foreach($user_warehouse_list as $warehouse)
                                                         <option value="{{$warehouse->id}}">{{$warehouse->name}}</option>
                                                     @endforeach
@@ -36,7 +36,7 @@
                                                 <label>{{trans('file.To Warehouse')}} *</label>
                                                 <select required name="to_warehouse_id" class="selectpicker form-control"
                                                     data-live-search="true" data-live-search-style="begins"
-                                                    title="Select warehouse...">
+                                                    title="{{ trans('file.Select warehouse...') }}">
                                                     @foreach($all_warehouse_list as $warehouse)
                                                         <option value="{{$warehouse->id}}">{{$warehouse->name}}</option>
                                                     @endforeach
@@ -76,7 +76,7 @@
                                                 <button type="button" class="btn btn-secondary btn-lg"><i
                                                         class="fa fa-barcode"></i></button>
                                                 <input type="text" name="product_code_name" id="lims_productcodeSearch"
-                                                    placeholder="Please type product code and select..."
+                                                    placeholder="{{ trans('file.Please type product code and select...') }}"
                                                     class="form-control" />
                                             </div>
                                         </div>

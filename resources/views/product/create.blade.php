@@ -82,7 +82,7 @@
                                         <div class="search-box input-group mb-3">
                                             <button class="btn btn-secondary"><i class="fa fa-barcode"></i></button>
                                             <input type="text" name="product_code_name" id="lims_productcodeSearch"
-                                                placeholder="Please type product code and select..."
+                                                placeholder="{{ trans('file.Please type product code and select...') }}"
                                                 class="form-control" />&nbsp;
                                             <input name="saveprice" type="checkbox" id="saveprice" value="false">&nbsp;
                                             <label class="mt-2">{{ trans('file.saveprice') }}</label>
@@ -111,7 +111,7 @@
                                             <button class="btn btn-secondary"><i class="fa fa-barcode"></i></button>
                                             <input type="text" name="product_code_name_insumo"
                                                 id="lims_productcodeSearchInsumo"
-                                                placeholder="Please type product code and select..." class="form-control" />
+                                                placeholder="{{ trans('file.Please type product code and select...') }}" class="form-control" />
                                         </div>
                                         <label>{{ trans('file.Insumo Products') }}</label>
                                         <div class="table-responsive">

@@ -714,6 +714,11 @@
             }
         });
 
+        if ($.fn.selectpicker) {
+            $.fn.selectpicker.Constructor.DEFAULTS.noneSelectedText = 'Seleccione una opción...';
+            $.fn.selectpicker.Constructor.DEFAULTS.noneResultsText = 'No se encontraron resultados {0}';
+        }
+
         $('.selectpicker').selectpicker({
             style: 'btn-link',
         });
