@@ -1265,7 +1265,12 @@
                           <div class="navbar-header">
                           
                           <ul class="nav-menu list-unstyled d-flex flex-md-row align-items-md-center">
-                            <li class="nav-item"><a id="btnFullscreen" title="Full Screen"><i class="dripicons-expand"></i></a></li> 
+                             <li class="nav-item"><a id="btnFullscreen" title="Full Screen"><i class="dripicons-expand"></i></a></li> 
+                             <li class="nav-item">
+                                 <a id="theme-toggle-btn" href="#" title="Modo Nocturno">
+                                     <i class="dripicons-brightness-low" id="theme-toggle-icon"></i>
+                                 </a>
+                             </li>
                             <?php 
                                 $general_setting_permission = DB::table('permissions')->where('name', 'general_setting')->first();
                                 $general_setting_permission_active = DB::table('role_has_permissions')->where([

@@ -1362,7 +1362,12 @@ $backup_database_permission_active = DB::table('role_has_permissions')
                                         class="dripicons-shopping-bag"></i><span>
                                         POS</span></a></li>
                         @endif
-                        <li class="nav-item"><a id="btnFullscreen"><i class="dripicons-expand"></i></a></li>
+                        <li class="nav-item"><a id="btnFullscreen" title="Pantalla Completa"><i class="dripicons-expand"></i></a></li>
+                        <li class="nav-item">
+                            <a id="theme-toggle-btn" href="#" title="Modo Nocturno">
+                                <i class="dripicons-brightness-low" id="theme-toggle-icon"></i>
+                            </a>
+                        </li>
                         @if ($alert_product > 0 || $alert_lote > 0 || $alert_cuis > 0)
                             <li class="nav-item">
                                 <a rel="nofollow" data-target="#" href="#" data-toggle="dropdown" aria-haspopup="true"
@@ -2136,6 +2141,39 @@ $lims_supplier_list = DB::table('suppliers')->where('is_active', true)->get();
             }
 
         }
+    </script>
+    <script>
+        (function() {
+            function updateThemeIcon() {
+                var icon = document.getElementById('theme-toggle-icon');
+                if (!icon) return;
+                if (document.documentElement.classList.contains('dark-mode') || document.body.classList.contains('dark-mode')) {
+                    icon.className = 'dripicons-brightness-max';
+                } else {
+                    icon.className = 'dripicons-brightness-low';
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                updateThemeIcon();
+
+                var toggleBtn = document.getElementById('theme-toggle-btn');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var isDark = document.body.classList.toggle('dark-mode');
+                        document.documentElement.classList.toggle('dark-mode', isDark);
+
+                        if (isDark) {
+                            localStorage.setItem('theme', 'dark');
+                        } else {
+                            localStorage.setItem('theme', 'light');
+                        }
+                        updateThemeIcon();
+                    });
+                }
+            });
+        })();
     </script>
 </body>
 
