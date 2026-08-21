@@ -281,7 +281,8 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('qty_adjustment/getproduct-data/{idwh}/{idpro}', 'AdjustmentController@getInfoProduct')->name('adjustment.getproduct-data');
 
 	Route::get('qty_adjustment/lims_product_search', 'AdjustmentController@limsProductSearch')->name('product_adjustment.search');
-	Route::post('qty_adjustment/deletebyselection', 'AdjustmentController@deleteBySelection');
+	Route::get('qty_adjustment', 'AdjustmentController@index')->name('qty_adjustment.index');
+	Route::get('qty_adjustment/create', 'AdjustmentController@create')->name('qty_adjustment.create');
 	Route::resource('qty_adjustment', 'AdjustmentController');
 
 	Route::get('return-sale/getcustomergroup/{id}', 'ReturnController@getCustomerGroup')->name('return-sale.getcustomergroup');
