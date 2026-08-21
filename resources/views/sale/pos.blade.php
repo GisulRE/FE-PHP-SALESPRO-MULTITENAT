@@ -2047,7 +2047,7 @@
                                             <li class="nav-item"><a id="btnFullscreen" title="Full Screen"><i
                                                         class="dripicons-expand"></i></a></li>
                                             <li class="nav-item">
-                                                <a id="theme-toggle-btn" href="#" title="Modo Nocturno">
+                                                <a id="theme-toggle-btn" href="javascript:void(0)" title="Modo Nocturno" style="cursor: pointer; padding: 0 8px; font-size: 18px; color: inherit;">
                                                     <i class="dripicons-brightness-low" id="theme-toggle-icon"></i>
                                                 </a>
                                             </li>
