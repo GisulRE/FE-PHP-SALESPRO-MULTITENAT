@@ -49,7 +49,7 @@
 
     <!-- Custom stylesheet - for your changes-->
     <link rel="stylesheet" href="/public/css/custom-{{ $general_setting->theme }}" type="text/css" id="custom-style">
-    <link rel="stylesheet" href="/public/css/dark-mode.css" type="text/css" id="dark-mode-style">
+    <link rel="stylesheet" href="/public/css/dark-mode.css?v={{ time() }}" type="text/css" id="dark-mode-style">
     <script>
         (function() {
             var theme = localStorage.getItem('theme');

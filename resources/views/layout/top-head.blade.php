@@ -42,7 +42,7 @@
     <link rel="stylesheet" href="/public/css/dropzone.css">
     <link rel="stylesheet" href="/public/css/style.css">
     <link rel="stylesheet" href="/public/printjs/print.min.css">
-    <link rel="stylesheet" href="/public/css/dark-mode.css">
+    <link rel="stylesheet" href="/public/css/dark-mode.css?v={{ time() }}">
 
     <script>
         (function() {

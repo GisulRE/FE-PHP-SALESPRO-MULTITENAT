@@ -34,13 +34,16 @@ body.dark-mode .navbar .menu-btn {
 }
 
 /* Side Navigation Bar */
-body.dark-mode nav.side-navbar {
+body.dark-mode nav.side-navbar,
+body.dark-mode .side-navbar {
     background-color: #0f172a !important;
     border-right: 1px solid #334155 !important;
 }
 
 body.dark-mode nav.side-navbar a,
-body.dark-mode .side-navbar li a {
+body.dark-mode .side-navbar a,
+body.dark-mode .side-navbar li a,
+body.dark-mode .side-navbar ul li a {
     color: #cbd5e1 !important;
     background-color: transparent !important;
     background: transparent !important;
@@ -49,33 +52,45 @@ body.dark-mode .side-navbar li a {
 body.dark-mode nav.side-navbar a:hover,
 body.dark-mode nav.side-navbar a:focus,
 body.dark-mode nav.side-navbar a[aria-expanded="true"],
+body.dark-mode .side-navbar a:hover,
+body.dark-mode .side-navbar a:focus,
+body.dark-mode .side-navbar a[aria-expanded="true"],
 body.dark-mode .side-navbar li a:focus,
 body.dark-mode .side-navbar li a:hover,
 body.dark-mode .side-navbar li.active > a,
 body.dark-mode .side-navbar li > a.active,
-body.dark-mode .side-navbar li a[aria-expanded="true"] {
+body.dark-mode .side-navbar li a[aria-expanded="true"],
+body.dark-mode ul.side-navbar li a[aria-expanded="true"] {
     background-color: #1e293b !important;
     background: #1e293b !important;
     color: #38bdf8 !important;
 }
 
-body.dark-mode nav.side-navbar ul {
+body.dark-mode nav.side-navbar ul,
+body.dark-mode .side-navbar ul {
     background-color: #0f172a !important;
 }
 
-body.dark-mode nav.side-navbar ul ul {
+body.dark-mode nav.side-navbar ul ul,
+body.dark-mode .side-navbar ul ul {
     background-color: #0b1329 !important;
 }
 
-body.dark-mode nav.side-navbar ul ul a {
+body.dark-mode nav.side-navbar ul ul a,
+body.dark-mode .side-navbar ul ul a {
     color: #94a3b8 !important;
     background-color: #0b1329 !important;
+    background: #0b1329 !important;
 }
 
 body.dark-mode nav.side-navbar ul ul a:hover,
 body.dark-mode nav.side-navbar ul ul li.active > a,
-body.dark-mode nav.side-navbar ul ul a.active {
+body.dark-mode nav.side-navbar ul ul a.active,
+body.dark-mode .side-navbar ul ul a:hover,
+body.dark-mode .side-navbar ul ul li.active > a,
+body.dark-mode .side-navbar ul ul a.active {
     background-color: #1e293b !important;
+    background: #1e293b !important;
     color: #38bdf8 !important;
 }
 
@@ -86,8 +101,12 @@ body.dark-mode .card-footer,
 body.dark-mode .box,
 body.dark-mode .panel,
 body.dark-mode .dashboard-counts .wrapper,
-body.dark-mode .count-title {
+body.dark-mode .dashboard-counts div.wrapper,
+body.dark-mode .dashboard-counts .count-title,
+body.dark-mode div.count-title,
+body.dark-mode section.dashboard-counts .wrapper {
     background-color: #1e293b !important;
+    background: #1e293b !important;
     color: #f8fafc !important;
     border: 1px solid #334155 !important;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;

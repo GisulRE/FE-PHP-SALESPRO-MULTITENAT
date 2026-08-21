@@ -63,7 +63,7 @@
         <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
         <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script><![endif]-->
 
-    <link rel="stylesheet" href="/public/css/dark-mode.css" type="text/css" id="dark-mode-style">
+    <link rel="stylesheet" href="/public/css/dark-mode.css?v={{ time() }}" type="text/css" id="dark-mode-style">
     <script>
         (function() {
             var theme = localStorage.getItem('theme');
