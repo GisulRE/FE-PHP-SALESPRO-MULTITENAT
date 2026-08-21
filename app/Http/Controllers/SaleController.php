@@ -797,6 +797,10 @@ class SaleController extends Controller
                 }
             }
 
+            // Extraer y limpiar campos auxiliares que no existen en la tabla sales
+            $presale_id_val = isset($data['presale_id']) ? $data['presale_id'] : '0';
+            unset($data['presale_id']);
+
             // Vincular con proforma si fue cargada desde el POS
             if (!empty($data['quotation_id_loaded']) && is_numeric($data['quotation_id_loaded']) && (int)$data['quotation_id_loaded'] > 0) {
                 $data['quotation_id'] = (int)$data['quotation_id_loaded'];
@@ -1056,7 +1060,6 @@ class SaleController extends Controller
             /** Update PreSale */
             if ($role->hasPermissionTo('presale-edit')) {
                 // Sanitizar presale_id: solo procesar si es un entero válido > 0
-                $presale_id_val = isset($data['presale_id']) ? $data['presale_id'] : '0';
                 if (is_numeric($presale_id_val) && (int)$presale_id_val > 0 && $lims_sale_data->sale_status == '1') {
                     $lims_presale_data = PreSale::find((int)$presale_id_val);
                     if ($lims_presale_data && ($lims_presale_data->tips != null && $lims_presale_data->tips > 0)) {
