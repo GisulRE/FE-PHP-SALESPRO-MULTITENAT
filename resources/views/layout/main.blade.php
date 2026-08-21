@@ -747,6 +747,31 @@
         $(document).ready(function() {
             // Permitir navegación nativa tradicional en todos los enlaces del menú
             $('.stopReload, .stopReload_out').off('click');
+
+            // Mantener abierto el menú padre y seleccionada la opción activa
+            var currentPath = window.location.pathname.replace(/\/$/, '');
+            $('nav.side-navbar a').each(function() {
+                var href = $(this).attr('href');
+                if (href && href !== '#' && href.indexOf('javascript') === -1) {
+                    try {
+                        var linkPath = new URL(href, window.location.origin).pathname.replace(/\/$/, '');
+                        if (linkPath === currentPath) {
+                            $(this).addClass('active');
+                            $(this).closest('li').addClass('active');
+
+                            var parentUl = $(this).closest('ul.collapse');
+                            if (parentUl.length) {
+                                parentUl.addClass('show').addClass('in');
+                                var parentId = parentUl.attr('id');
+                                var parentA = $('a[href="#' + parentId + '"]');
+                                parentA.attr('aria-expanded', 'true');
+                                parentA.removeClass('collapsed');
+                                parentA.closest('li').addClass('active');
+                            }
+                        }
+                    } catch(e) {}
+                }
+            });
         });
     </script>
 </body>

@@ -84,14 +84,21 @@ body.dark-mode .side-navbar ul ul a {
 }
 
 body.dark-mode nav.side-navbar ul ul a:hover,
-body.dark-mode nav.side-navbar ul ul li.active > a,
-body.dark-mode nav.side-navbar ul ul a.active,
-body.dark-mode .side-navbar ul ul a:hover,
-body.dark-mode .side-navbar ul ul li.active > a,
-body.dark-mode .side-navbar ul ul a.active {
+body.dark-mode .side-navbar ul ul a:hover {
     background-color: #1e293b !important;
     background: #1e293b !important;
     color: #38bdf8 !important;
+}
+
+body.dark-mode nav.side-navbar ul ul li.active > a,
+body.dark-mode nav.side-navbar ul ul a.active,
+body.dark-mode .side-navbar ul ul li.active > a,
+body.dark-mode .side-navbar ul ul a.active {
+    background-color: #0284c7 !important;
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    border-radius: 4px !important;
 }
 
 /* Cards & Panels */
