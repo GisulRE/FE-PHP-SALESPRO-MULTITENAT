@@ -27,7 +27,8 @@ jobs:
             
             echo "📥 Obteniendo cambios de GitHub..."
             git config --global --add safe.directory ${{ secrets.VPS_TARGET_DIR }}
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             
             echo "📦 Instalando dependencias de Composer..."
             composer install --no-dev --optimize-autoloader --no-interaction
