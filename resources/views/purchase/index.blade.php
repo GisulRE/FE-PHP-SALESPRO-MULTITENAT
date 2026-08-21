@@ -736,16 +736,16 @@
                 '</div>' +
                 '<div class="row mb-3">' +
                 '<div class="col-md-6">' +
-                '<div class="style-card-from" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px 15px;">' +
-                '<strong style="color:#0f172a; font-size:14px; text-transform:uppercase; border-bottom:1px solid #cbd5e1; display:block; padding-bottom:4px; margin-bottom:6px;">{{ trans('file.From') }} (Almacén):</strong>' +
+                '<div class="style-card-from style-card-box">' +
+                '<strong class="style-card-title">{{ trans('file.From') }} (Almacén):</strong>' +
                 '<div>' + purchase[4] + '</div>' +
                 '<div>' + purchase[5] + '</div>' +
                 '<div>' + purchase[6] + '</div>' +
                 '</div>' +
                 '</div>' +
                 '<div class="col-md-6">' +
-                '<div class="style-card-to" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px 15px;">' +
-                '<strong style="color:#0f172a; font-size:14px; text-transform:uppercase; border-bottom:1px solid #cbd5e1; display:block; padding-bottom:4px; margin-bottom:6px;">{{ trans('file.To') }} (Proveedor):</strong>' +
+                '<div class="style-card-to style-card-box">' +
+                '<strong class="style-card-title">{{ trans('file.To') }} (Proveedor):</strong>' +
                 '<div><strong>' + purchase[7] + '</strong></div>' +
                 (purchase[8] ? '<div>' + purchase[8] + '</div>' : '') +
                 (purchase[9] ? '<div>Email: ' + purchase[9] + '</div>' : '') +

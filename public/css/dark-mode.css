@@ -365,3 +365,38 @@ body.dark-mode div[style*="background-color: rgb(216, 216, 255)"] {
     background-color: #1e3a8a !important;
     color: #93c5fd !important;
 }
+
+/* Purchase Details Modal Cards */
+.style-card-box {
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 12px 15px;
+    color: #0f172a;
+}
+
+.style-card-title {
+    color: #0f172a;
+    font-size: 14px;
+    text-transform: uppercase;
+    border-bottom: 1px solid #cbd5e1;
+    display: block;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+}
+
+body.dark-mode .style-card-box,
+body.dark-mode div.style-card-box,
+body.dark-mode div.style-card-from,
+body.dark-mode div.style-card-to {
+    background-color: #1e293b !important;
+    background: #1e293b !important;
+    color: #f8fafc !important;
+    border: 1px solid #334155 !important;
+}
+
+body.dark-mode .style-card-title,
+body.dark-mode strong.style-card-title {
+    color: #38bdf8 !important;
+    border-bottom: 1px solid #334155 !important;
+}
