@@ -35,6 +35,9 @@ class Product_Warehouse extends Model
                 if (auth()->check() && empty($model->company_id)) {
                     $model->company_id = auth()->user()->company_id;
                 }
+                if ($model->qty === null) {
+                    $model->qty = 0;
+                }
             });
         }
     }

@@ -472,8 +472,8 @@ class PurchaseController extends Controller
                 $lims_product_data->cost = $net_unit_cost[$i];
                 $lims_product_data->save();
                 //add quantity to warehouse
-                if ($lims_product_warehouse_data) { //aclarar
-                    // $lims_product_warehouse_data->qty = $lims_product_warehouse_data->qty + $quantity;
+                if ($lims_product_warehouse_data) {
+                    $lims_product_warehouse_data->qty += $quantity;
                 } else {
                     $lims_product_warehouse_data = new Product_Warehouse();
                     $lims_product_warehouse_data->product_id = $id;
@@ -481,7 +481,7 @@ class PurchaseController extends Controller
                     if ($lims_product_data->is_variant) {
                         $lims_product_warehouse_data->variant_id = $lims_product_variant_data->variant_id;
                     }
-
+                    $lims_product_warehouse_data->qty = $quantity;
                 }
 
                 $lims_product_warehouse_data->save();
@@ -677,6 +677,7 @@ class PurchaseController extends Controller
                         $lims_product_warehouse_data = new Product_Warehouse();
                         $lims_product_warehouse_data->product_id = $product['id'];
                         $lims_product_warehouse_data->warehouse_id = $data['warehouse_id'];
+                        $lims_product_warehouse_data->qty = $quantity;
                         $lims_product_warehouse_data->save();
                     }
                     $product_lote = new ProductLote();
@@ -856,7 +857,7 @@ class PurchaseController extends Controller
                 //$lims_product_data->qty += $new_recieved_value;
                 $lims_product_data->cost = $net_unit_cost[$key];
                 if ($lims_product_warehouse_data) {
-                    //$lims_product_warehouse_data->qty += $new_recieved_value;
+                    $lims_product_warehouse_data->qty += $new_recieved_value;
                     $lims_product_warehouse_data->save();
 
                 } else {
@@ -867,7 +868,7 @@ class PurchaseController extends Controller
                     }
 
                     $lims_product_warehouse_data->warehouse_id = $data['warehouse_id'];
-                    //$lims_product_warehouse_data->qty = $new_recieved_value;
+                    $lims_product_warehouse_data->qty = $new_recieved_value;
                     $lims_product_warehouse_data->save();
                 }
                 $lims_product_data->save();
@@ -976,7 +977,7 @@ class PurchaseController extends Controller
                 ])->first();
             }
             if ($lims_product_warehouse_data) {
-                //$lims_product_warehouse_data->qty += $old_recieved_value;
+                $lims_product_warehouse_data->qty += $old_recieved_value;
                 $lims_product_warehouse_data->save();
             } else {
                 $lims_product_warehouse_data = new Product_Warehouse();
@@ -986,7 +987,7 @@ class PurchaseController extends Controller
                 }
 
                 $lims_product_warehouse_data->warehouse_id = $item->warehouse_id;
-                //$lims_product_warehouse_data->qty = $old_recieved_value;
+                $lims_product_warehouse_data->qty = $old_recieved_value;
                 $lims_product_warehouse_data->save();
             }
 
