@@ -127,6 +127,7 @@
                                 @if (in_array('sales-add', $permissions))
                                     @if (!in_array('pos', $blocked_modules))
                                         <li><a href="{{ route('sale.pos') }}">POS</a></li>
+                                        <li><a href="{{ route('sale.pos-v2') }}">POS v2 (Nuevo)</a></li>
                                     @endif
                                     <li id="sale-import-menu"><a
                                             href="{{ url('sales/sale_by_csv') }}">{{ trans('file.Import Sale By CSV') }}</a>

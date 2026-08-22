@@ -2997,6 +2997,135 @@ class SaleController extends Controller
         }
     }
 
+    public function posSaleV2()
+    {
+        $role = Role::find(Auth::user()->role_id);
+        if ($role->hasPermissionTo('sales-add')) {
+            $permissions = Role::findByName($role->name)->permissions;
+            foreach ($permissions as $permission) {
+                $all_permission[] = $permission->name;
+            }
+
+            if (empty($all_permission)) {
+                $all_permission[] = 'dummy text';
+            }
+
+            $lims_pos_setting_data = PosSetting::latest()->first();
+            $user = Auth::user();
+            $sessionBillerId = session('pos_biller_id');
+
+            if ($user->role_id > 2 && $user->biller_id) {
+                $selectedBillerId = (int) $user->biller_id;
+            } else {
+                $selectedBillerId = $sessionBillerId ?: ($user->biller_id ?: optional($lims_pos_setting_data)->biller_id);
+            }
+
+            $biller_data = Biller::select('id', 'account_id', 'warehouse_id', 'customer_id')
+                ->where('is_active', true)
+                ->find($selectedBillerId);
+
+            if (!$biller_data) {
+                $biller_data = Biller::select('id', 'account_id', 'warehouse_id', 'customer_id')
+                    ->where('is_active', true)
+                    ->first();
+            }
+
+            $lims_account_data = null;
+            if ($biller_data && $biller_data->account_id) {
+                $lims_account_data = Account::select('id', 'name', 'account_no')->find($biller_data->account_id);
+            }
+
+            if (session()->has('cashier_id')) {
+                if (session()->has('cashier_id')) {
+                    $lims_warehouse_list = Warehouse::where([
+                        ['is_active', true],
+                        ['id', $biller_data->warehouse_id],
+                    ])->get();
+
+                    $lims_customer_list = Customer::where([
+                        ['is_active', true],
+                        ['id', $biller_data->customer_id],
+                    ])->get();
+                } else {
+                    $lims_warehouse_list = Warehouse::where('is_active', true)->get();
+                    $lims_customer_list = Customer::where('is_active', true)->get();
+                }
+
+                $lims_customer_group_all = CustomerGroup::where('is_active', true)->get();
+                $lims_tax_list = Tax::where('is_active', true)->get();
+
+                if (Auth::user()->role_id > 2 && Auth::user()->biller_id) {
+                    $lims_biller_list = Biller::where([
+                        ['is_active', true],
+                        ['id', Auth::user()->biller_id],
+                    ])->get();
+                } else {
+                    $lims_biller_list = Biller::where('is_active', true)->get();
+                }
+
+                $lims_brand_list = Brand::where('is_active', true)->get();
+
+                $lims_category_list = Category::where('is_active', true)
+                    ->where(function ($query) {
+                        $query->whereNull('parent_id')
+                            ->orWhere('parent_id', 0);
+                    })
+                    ->get();
+
+                $lims_methodpay_list = PaymentMethodSIAT::all();
+
+                $lims_coupon_list = Coupon::where('is_active', true)->get();
+
+                $flag = 0;
+                $account_data = Account::all();
+                $lista_documentos = DocumentoIdentidadSIAT::where('status', 'ACTIVO')->get();
+                $lista_metodo_pago = PaymentMethodSIAT::where('status', 'ACTIVO')->get();
+
+                $customer_data = Customer::where('id', $biller_data->customer_id)->first();
+
+                $lims_sucursal_all = SucursalSIAT::all();
+                $lims_warehouse_selects = Warehouse::where('is_active', true)->get();
+
+                $recent_sale = Sale::where('sale_status', 1)->where('warehouse_id', $biller_data->warehouse_id)->orderBy('id', 'desc')->take(10)->get();
+                $recent_draft = Sale::where('sale_status', 3)->where('warehouse_id', $biller_data->warehouse_id)->orderBy('id', 'desc')->take(10)->get();
+
+                $lims_product_list = Product::where([
+                    ['is_active', true],
+                    ['type', '!=', 'insumo'],
+                ])->get();
+
+                $product_number = count($lims_product_list);
+
+                $siatConfigured = false;
+                $siatAuthenticated = false;
+
+                try {
+                    $siatConfig = SiatConfig::first();
+                    if ($siatConfig && !empty($siatConfig->api_url) && !empty($siatConfig->api_key)) {
+                        $siatConfigured = true;
+                    }
+
+                    if (session()->has('token_siat') && !empty(session('token_siat'))) {
+                        $siatAuthenticated = true;
+                    }
+                } catch (\Exception $e) {
+                }
+
+                $hasSiat = $siatConfigured && $siatAuthenticated;
+                return view('sale.pos_v2', compact('all_permission', 'lims_customer_group_all', 'lims_warehouse_list', 'lims_product_list', 'product_number', 'lims_tax_list', 'lims_biller_list', 'lims_customer_list', 'lims_pos_setting_data', 'lims_brand_list', 'lims_category_list', 'recent_sale', 'recent_draft', 'lims_coupon_list', 'flag', 'lims_methodpay_list', 'biller_data', 'account_data', 'lista_documentos', 'lista_metodo_pago', 'customer_data', 'lims_sucursal_all', 'lims_warehouse_selects', 'hasSiat'));
+            } else {
+                if (Auth::user()->role_id > 2 && Auth::user()->biller) {
+                    $lims_biller_list[] = Auth::user()->biller;
+                } else {
+                    $lims_biller_list = Biller::where('is_active', true)->get();
+                }
+                return view('sale.cashier_open', compact('lims_biller_list', 'lims_account_data', 'biller_data'));
+            }
+        } else {
+            return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
+    }
+
     public function getProductByFilter($category_id, $brand_id)
     {
         $data = [];
