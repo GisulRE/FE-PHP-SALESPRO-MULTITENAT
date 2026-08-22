@@ -11,6 +11,7 @@
                     <div class="card-body">
                         <p class="italic"><small>{{trans('file.The field labels marked with * are required input fields')}}.</small></p>
                         {!! Form::open(['route' => 'cashier.store', 'method' => 'post', 'id' => 'cashier-form']) !!}
+                        <input type="hidden" name="redirect_route" value="{{ session('redirect_pos_route', (request()->is('*pos-v2*') || str_contains(url()->previous(), 'pos-v2') ? 'sale.pos-v2' : 'sale.pos')) }}">
                         <div class="row">
                             <div class="col-md-12">
                                 <div class="row">

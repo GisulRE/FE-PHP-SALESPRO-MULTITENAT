@@ -36,10 +36,13 @@ class CashierController extends Controller
         // Mantener el facturador seleccionado para que /pos o /pos-v2 valide y cargue la caja correcta.
         session(['pos_biller_id' => (int) $data['biller_id']]);
 
-        $targetRoute = session('redirect_pos_route', 'sale.pos');
+        $redirectRoute = $request->input('redirect_route', session('redirect_pos_route'));
         session()->forget('redirect_pos_route');
 
-        if ($targetRoute === 'sale.pos-v2') {
+        $prevUrl = url()->previous();
+        $referer = $request->header('referer', '');
+
+        if ($redirectRoute === 'sale.pos-v2' || str_contains($prevUrl, 'pos-v2') || str_contains($referer, 'pos-v2')) {
             return redirect()->route('sale.pos-v2');
         }
         return redirect()->route('sale.pos');
