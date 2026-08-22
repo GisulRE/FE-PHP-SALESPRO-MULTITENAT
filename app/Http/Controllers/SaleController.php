@@ -1143,7 +1143,7 @@ class SaleController extends Controller
                     return $default_account ? $default_account->id : null;
                 };
                 
-                if ($data['monto_tarjeta'] != null) {
+                if (!empty($data['monto_tarjeta'])) {
                     $paying_method = 'Tarjeta_Credito_Debito';
                     $account_id = $getAccountId('account_id_tarjeta', $data['paid_by_id'] ?? 2);
 
@@ -1172,10 +1172,10 @@ class SaleController extends Controller
                         $data_card->customer_stripe_id = $customer_id;
                     }
                     $data_card->charge_id = uniqid();
-                    $data_card->number_card = $data['number_card'];
+                    $data_card->number_card = $data['number_card'] ?? '';
                     $data_card->save();
                 }
-                if ($data['monto_cheque'] != null) {
+                if (!empty($data['monto_cheque'])) {
                     $paying_method = 'Cheque';
                     $account_id = $getAccountId('account_id_cheque', $data['paid_by_id'] ?? 3);
 
@@ -1195,10 +1195,10 @@ class SaleController extends Controller
                     $data_last_payment = Payment::latest()->first();
                     $data_cheque = new PaymentWithCheque();
                     $data_cheque->payment_id = $data_last_payment->id;
-                    $data_cheque->cheque_no = $data['cheque_no'];
+                    $data_cheque->cheque_no = $data['cheque_no'] ?? '';
                     $data_cheque->save();
                 }
-                if ($data['monto_vale'] != null) {
+                if (!empty($data['monto_vale'])) {
                     $paying_method = 'Vale';
                     $account_id = $getAccountId('account_id_vale', $data['paid_by_id'] ?? 5);
 
@@ -1215,7 +1215,7 @@ class SaleController extends Controller
                     $pago_vale->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_vale'];
                     $pago_vale->save();
                 }
-                if ($data['monto_otros'] != null) {
+                if (!empty($data['monto_otros'])) {
                     $paying_method = 'Otros';
                     $account_id = $getAccountId('account_id_otros', $data['paid_by_id'] ?? 12);
 
@@ -1232,7 +1232,7 @@ class SaleController extends Controller
                     $pago_otros->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_otros'];
                     $pago_otros->save();
                 }
-                if ($data['monto_pago_posterior'] != null) {
+                if (!empty($data['monto_pago_posterior'])) {
                     $paying_method = 'Pago_Posterior';
                     $account_id = $getAccountId('account_id_pagoposterior', $data['paid_by_id'] ?? 8);
 
@@ -1249,7 +1249,7 @@ class SaleController extends Controller
                     $pago_posterior->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_pago_posterior'];
                     $pago_posterior->save();
                 }
-                if ($data['monto_transferencia_bancaria'] != null) {
+                if (!empty($data['monto_transferencia_bancaria'])) {
                     $paying_method = 'Transferencia_Bancaria';
                     $account_id = $getAccountId('account_id_transferenciabancaria', $data['paid_by_id'] ?? 9);
 
@@ -1266,7 +1266,7 @@ class SaleController extends Controller
                     $pago_tranferencia_bancaria->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_transferencia_bancaria'];
                     $pago_tranferencia_bancaria->save();
                 }
-                if ($data['monto_deposito'] != null) {
+                if (!empty($data['monto_deposito'])) {
                     // Determinar QR vs Depósito: primero por tipo_pago_btn (enviado desde el botón POS),
                     // luego por paid_by_id como fallback (IDs 6 y 11 = QR simple; 7 = Depósito)
                     $tipo_btn = $data['tipo_pago_btn'] ?? '';
@@ -1294,7 +1294,7 @@ class SaleController extends Controller
                     $pago_deposito->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_deposito'];
                     $pago_deposito->save();
                 }
-                if ($data['monto_swift'] != null) {
+                if (!empty($data['monto_swift'])) {
                     $paying_method = 'Swift';
                     $account_id = $getAccountId('account_id_swift', $data['paid_by_id'] ?? 10);
 
@@ -1311,7 +1311,7 @@ class SaleController extends Controller
                     $pago_swift->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_swift'];
                     $pago_swift->save();
                 }
-                if ($data['monto_canal_pago'] != null) {
+                if (!empty($data['monto_canal_pago'])) {
                     $paying_method = 'Canal_Pago';
                     $account_id = $getAccountId('account_id_deposito', $data['paid_by_id'] ?? 7);
 
@@ -1328,7 +1328,7 @@ class SaleController extends Controller
                     $pago_swift->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_canal_pago'];
                     $pago_swift->save();
                 }
-                if ($data['monto_billetera'] != null) {
+                if (!empty($data['monto_billetera'])) {
                     $paying_method = 'Billetera_Movil';
                     $account_id = $getAccountId('account_id_deposito', $data['paid_by_id'] ?? 7);
 
@@ -1345,7 +1345,7 @@ class SaleController extends Controller
                     $pago_swift->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_billetera'];
                     $pago_swift->save();
                 }
-                if ($data['monto_pago_online'] != null) {
+                if (!empty($data['monto_pago_online'])) {
                     $paying_method = 'Pago_Online';
                     $account_id = $getAccountId('account_id_deposito', $data['paid_by_id'] ?? 7);
 
@@ -1362,7 +1362,7 @@ class SaleController extends Controller
                     $pago_swift->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_pago_online'];
                     $pago_swift->save();
                 }
-                if ($data['monto_debito_automatico'] != null) {
+                if (!empty($data['monto_debito_automatico'])) {
                     $paying_method = 'Debito_Automatico';
                     $account_id = $getAccountId('account_id_deposito', $data['paid_by_id'] ?? 7);
 
@@ -1379,7 +1379,7 @@ class SaleController extends Controller
                     $pago_d_automatico->payment_note = $paying_method . ', monto aplicado  de: ' . $data['monto_debito_automatico'];
                     $pago_d_automatico->save();
                 }
-                if ($data['balance_gift_card'] > 0) {
+                if (!empty($data['balance_gift_card']) && $data['balance_gift_card'] > 0) {
                     $paying_method = 'Tarjeta_Regalo';
                     $account_id = $getAccountId('account_id_giftcard', $data['paid_by_id'] ?? 4);
 
@@ -1397,17 +1397,21 @@ class SaleController extends Controller
                     $pago_gift_card->save();
 
                     //reducimos el balance de la gift card usada
-                    $update_gift_card = GiftCard::find($data['tarjeta_regalo_hidden_id']);
-                    $update_gift_card->expense += $data['balance_gift_card'];
-                    $update_gift_card->save();
+                    if (!empty($data['tarjeta_regalo_hidden_id'])) {
+                        $update_gift_card = GiftCard::find($data['tarjeta_regalo_hidden_id']);
+                        if ($update_gift_card) {
+                            $update_gift_card->expense += $data['balance_gift_card'];
+                            $update_gift_card->save();
 
-                    $data_last_payment = Payment::latest()->first();
-                    $data_gift_card = new PaymentWithGiftCard();
-                    $data_gift_card->payment_id = $data_last_payment->id;
-                    $data_gift_card->gift_card_id = $data['tarjeta_regalo_hidden_id'];
-                    $data_gift_card->save();
+                            $data_last_payment = Payment::latest()->first();
+                            $data_gift_card = new PaymentWithGiftCard();
+                            $data_gift_card->payment_id = $data_last_payment->id;
+                            $data_gift_card->gift_card_id = $data['tarjeta_regalo_hidden_id'];
+                            $data_gift_card->save();
+                        }
+                    }
                 }
-                if ($data['monto_efectivo'] != null) {
+                if (!empty($data['monto_efectivo'])) {
                     $paying_method = 'Efectivo';
                     $account_id = $getAccountId('account_id', 1);
 
@@ -1419,9 +1423,9 @@ class SaleController extends Controller
                     $pago_efectivo->payment_reference = $data['payment_reference'];
 
                     $pago_efectivo->amount = $data['monto_efectivo'];
-                    $pago_efectivo->change = $data['monto_cambio'];
+                    $pago_efectivo->change = $data['monto_cambio'] ?? 0;
                     $pago_efectivo->paying_method = $paying_method;
-                    $pago_efectivo->payment_note = $paying_method . ', monto entregado  de: ' . $data['monto_efectivo'] . ', Cambio: ' . $data['monto_cambio'];
+                    $pago_efectivo->payment_note = $paying_method . ', monto entregado  de: ' . $data['monto_efectivo'] . ', Cambio: ' . ($data['monto_cambio'] ?? 0);
                     $pago_efectivo->save();
                 }
             }

@@ -1566,6 +1566,23 @@
                                 <input type="hidden" name="montoLey1886_hidden" value="0">
                                 <input type="hidden" name="montoTasaDignidad_hidden" value="0">
                                 <input type="hidden" name="paid_amount">
+                                <input type="hidden" name="paid_by_id">
+                                <input type="hidden" name="tipo_pago_btn" value="efectivo">
+                                <input type="hidden" name="monto_efectivo">
+                                <input type="hidden" name="monto_tarjeta">
+                                <input type="hidden" name="monto_cheque">
+                                <input type="hidden" name="monto_vale">
+                                <input type="hidden" name="monto_otros">
+                                <input type="hidden" name="monto_pago_posterior">
+                                <input type="hidden" name="monto_transferencia_bancaria">
+                                <input type="hidden" name="monto_deposito">
+                                <input type="hidden" name="monto_swift">
+                                <input type="hidden" name="monto_cambio" value="0">
+                                <input type="hidden" name="monto_canal_pago">
+                                <input type="hidden" name="monto_billetera">
+                                <input type="hidden" name="monto_pago_online">
+                                <input type="hidden" name="monto_debito_automatico">
+                                <input type="hidden" name="balance_gift_card" value="0">
 
                                 <div class="row">
                                     <!-- COLUMNA IZQUIERDA: DATOS DE FACTURACIÓN SIAT & NOTA DE VENTA -->
@@ -7689,6 +7706,43 @@
 
                 var methodVal = $('#paid_by_id_select_v2').val();
                 $('input[name="paid_by_id"]').val(methodVal);
+
+                // Reset all monto_* hidden inputs
+                $('input[name="monto_efectivo"]').val('');
+                $('input[name="monto_tarjeta"]').val('');
+                $('input[name="monto_cheque"]').val('');
+                $('input[name="monto_vale"]').val('');
+                $('input[name="monto_otros"]').val('');
+                $('input[name="monto_pago_posterior"]').val('');
+                $('input[name="monto_transferencia_bancaria"]').val('');
+                $('input[name="monto_deposito"]').val('');
+                $('input[name="monto_swift"]').val('');
+                $('input[name="monto_canal_pago"]').val('');
+                $('input[name="monto_billetera"]').val('');
+                $('input[name="monto_pago_online"]').val('');
+                $('input[name="monto_debito_automatico"]').val('');
+
+                var changeAmt = payingAmt - grandTotal;
+                if (changeAmt < 0) changeAmt = 0;
+                $('input[name="monto_cambio"]').val(changeAmt.toFixed(2));
+
+                // Map payment amount according to selected method
+                if (methodVal == '1' || methodVal == 'Efectivo') {
+                    $('input[name="monto_efectivo"]').val(payingAmt.toFixed(2));
+                    $('input[name="tipo_pago_btn"]').val('efectivo');
+                } else if (methodVal == '2' || methodVal == 'Tarjeta') {
+                    $('input[name="monto_tarjeta"]').val(payingAmt.toFixed(2));
+                    $('input[name="tipo_pago_btn"]').val('tarjeta');
+                } else if (methodVal == '6' || methodVal == '11' || methodVal == 'QR') {
+                    $('input[name="monto_deposito"]').val(payingAmt.toFixed(2));
+                    $('input[name="tipo_pago_btn"]').val('qr');
+                } else if (methodVal == '7' || methodVal == 'Deposito') {
+                    $('input[name="monto_deposito"]').val(payingAmt.toFixed(2));
+                    $('input[name="tipo_pago_btn"]').val('deposito');
+                } else {
+                    $('input[name="monto_efectivo"]').val(payingAmt.toFixed(2));
+                    $('input[name="tipo_pago_btn"]').val('efectivo');
+                }
 
                 if ($('#submit-btn').length) {
                     $('#submit-btn').click();
