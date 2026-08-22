@@ -1701,10 +1701,9 @@ class SaleController extends Controller
                                 return redirect()->to('pos')->with('message', $respuesta['mensaje']);
                             }
                         } else {
-                            $this->destroy($lims_sale_data->id);
-                            $obj_cliente->delete();
-                            $message .= " Venta Eliminada, Intente de Nuevo";
-                            return redirect()->to('pos')->with('message', $message)->with('message_error', $respuesta['mensaje']);
+                            DB::commit();
+                            $message .= " Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error SIAT') . ")";
+                            return redirect('sales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
                         }
                     } else {
                         // Procedemos a llamar la funcion, para generar la factura
@@ -1747,10 +1746,9 @@ class SaleController extends Controller
                                 return redirect()->to('pos')->with('message', $respuesta['mensaje']);
                             }
                         } else {
-                            $this->destroy($lims_sale_data->id);
-                            $obj_cliente->delete();
-                            $message .= " Venta Eliminada, Intente de Nuevo";
-                            return redirect()->to('pos')->with('message', $message)->with('message_error', $respuesta['mensaje']);
+                            DB::commit();
+                            $message .= " Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error SIAT') . ")";
+                            return redirect('sales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
                         }
                     }
                 }
