@@ -33,8 +33,15 @@ class CashierController extends Controller
         $data['start_date'] = date('Y-m-d H:i:s');
         $data['is_active'] = true;
         $lims_cashier_data = Cashier::create($data);
-        // Mantener el facturador seleccionado para que /pos valide y cargue la caja correcta.
+        // Mantener el facturador seleccionado para que /pos o /pos-v2 valide y cargue la caja correcta.
         session(['pos_biller_id' => (int) $data['biller_id']]);
+
+        $targetRoute = session('redirect_pos_route', 'sale.pos');
+        session()->forget('redirect_pos_route');
+
+        if ($targetRoute === 'sale.pos-v2') {
+            return redirect()->route('sale.pos-v2');
+        }
         return redirect()->route('sale.pos');
         //return redirect('adjustment_account')->with('message', 'Dato Ingresado con éxito');
     }

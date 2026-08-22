@@ -3119,6 +3119,7 @@ class SaleController extends Controller
                 } else {
                     $lims_biller_list = Biller::where('is_active', true)->get();
                 }
+                session(['redirect_pos_route' => 'sale.pos-v2']);
                 return view('sale.cashier_open', compact('lims_biller_list', 'lims_account_data', 'biller_data'));
             }
         } else {
