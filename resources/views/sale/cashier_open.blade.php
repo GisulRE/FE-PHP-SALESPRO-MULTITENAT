@@ -45,10 +45,10 @@
                                 
                             </div>
                         </div>
-                        {!! Form::close() !!}
-                        <div class="form-group">
-                            <input id="btn_save" value="{{trans('file.submit')}}" class="btn btn-primary" onclick="validarForm();">
-                        </div>
+                        <div class="form-group mt-3">
+                             <button type="submit" id="btn_save" class="btn btn-primary" onclick="return validarForm();">{{trans('file.submit')}}</button>
+                         </div>
+                         {!! Form::close() !!}
                     </div>
                 </div>
             </div>
@@ -148,7 +148,7 @@ function oldMonto(){
 
     $.ajax({
         type:'GET',
-        url:'cashier/amountold/' + id,
+        url: '{{ url("cashier/amountold") }}/' + id,
         success:function(data){
             var amountOld = 0;
             if(data && data.amount_end !== undefined && data.amount_end !== null){
@@ -168,46 +168,12 @@ function oldMonto(){
 }
 
 function validarForm(){ 
-    var btn = document.getElementById("btn_save");
     var id = $('select[name=biller_id]').val();
-    var amount = document.getElementById("amount_id").value;
-    
     if(!id) {
         alert('Por favor seleccione un Facturador');
         return false;
     }
-
-    if (btn) btn.disabled = true;
-
-    $.ajax({
-        type: 'GET',
-        url: '{{ url("cashier/verified") }}/' + id,
-        success: function(data){
-            if(data && data['cashier'] != null){
-                if(data['cashier'].amount_end == amount){
-                    if (btn) btn.disabled = false;
-                    document.getElementById("cashier-form").submit();
-                } else {
-                    if (confirm('Monto no coincide con caja seleccionada. ¿Desea Hacer Ajuste?')){
-                        if (data['account']) {
-                            $('input[name="account_id"]').val(data['account'].id);
-                            $('input[name="name_account"]').val(data['account'].name + "["+data['account'].account_no+"]");
-                            $('#ajustement-modal').modal('show');
-                        }
-                        if (btn) btn.disabled = false;
-                    } else {
-                        document.getElementById("cashier-form").submit();
-                    }
-                }
-            } else {
-                document.getElementById("cashier-form").submit();
-            }
-        },
-        error: function(){
-            if (btn) btn.disabled = false;
-            document.getElementById("cashier-form").submit();
-        }
-    });
+    return true;
 }
 
     function openDialogNew(){
