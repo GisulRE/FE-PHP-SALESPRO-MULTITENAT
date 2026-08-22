@@ -168,38 +168,47 @@ function oldMonto(){
 }
 
 function validarForm(){ 
+    var btn = document.getElementById("btn_save");
     var id = $('select[name=biller_id]').val();
     var amount = document.getElementById("amount_id").value;
-    console.log("amount: " + amount);
+    
+    if(!id) {
+        alert('Por favor seleccione un Facturador');
+        return false;
+    }
+
+    if (btn) btn.disabled = true;
+
     $.ajax({
-        type:'GET',
-        url:'cashier/verified/' + id,
-        success:function(data){
-            console.log(data);
-            if(data['cashier'] != null){
+        type: 'GET',
+        url: '{{ url("cashier/verified") }}/' + id,
+        success: function(data){
+            if(data && data['cashier'] != null){
                 if(data['cashier'].amount_end == amount){
-                    btn.disabled = false;
+                    if (btn) btn.disabled = false;
                     document.getElementById("cashier-form").submit();
-                }else{
-                    console.log("Montos no igual al de cuenta");
-                    btn.disabled = true;
-                    confirm = confirm('Monto no coincide con caja seleccionada. ¿Desea Hacer Ajuste?');
-                    if(confirm == true){
-                        //openDialogNew();
-                        $('input[name="account_id"]').val(data['account'].id);
-                        $('input[name="name_account"]').val(data['account'].name + "["+data['account'].account_no+"]");
-                        $('#ajustement-modal').modal();
-                    }else{
-                        alert('Los datos no han sido actualizados');
-                        btn.disabled = true;
-                        return false;
+                } else {
+                    if (confirm('Monto no coincide con caja seleccionada. ¿Desea Hacer Ajuste?')){
+                        if (data['account']) {
+                            $('input[name="account_id"]').val(data['account'].id);
+                            $('input[name="name_account"]').val(data['account'].name + "["+data['account'].account_no+"]");
+                            $('#ajustement-modal').modal('show');
+                        }
+                        if (btn) btn.disabled = false;
+                    } else {
+                        document.getElementById("cashier-form").submit();
                     }
                 }
-            }else{
+            } else {
                 document.getElementById("cashier-form").submit();
             }
+        },
+        error: function(){
+            if (btn) btn.disabled = false;
+            document.getElementById("cashier-form").submit();
         }
     });
+}
 
     function openDialogNew(){
         var url = "accounts/list"
