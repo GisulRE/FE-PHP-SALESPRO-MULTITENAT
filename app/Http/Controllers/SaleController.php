@@ -1662,9 +1662,8 @@ class SaleController extends Controller
                 $obj_cliente->codigo_punto_venta = $data_p_venta->codigo_punto_venta;
                 $obj_cliente->save();
 
-                // En modo AJAX: guardamos la venta y datos del cliente, pero no generamos el DFe aún.
-                // El frontend llama al endpoint finalize-ajax para generar el DFe.
-                if ($is_ajax) {
+                // En modo AJAX pero SIN factura SIAT: retornamos gen_invoice de Nota de Venta
+                if ($is_ajax && empty($data['bandera_factura_hidden'])) {
                     $update_p_venta->save();
                     DB::commit();
                     $print_url = url('sales/gen_invoice/' . $lims_sale_data->id);
@@ -1694,12 +1693,18 @@ class SaleController extends Controller
                         if ($respuesta['status']) {
                             $update_p_venta->save();
                             DB::commit();
-                            $data['pos'] = $lims_pos_setting_data->print;
-                            if ($data['pos']) {
-                                return redirect('sales/imprimir_factura/' . $lims_sale_data->id)->with('message', $respuesta['mensaje']);
-                            } else {
-                                return redirect()->to('pos')->with('message', $respuesta['mensaje']);
+                            $print_url = url('sales/imprimir_factura/' . $lims_sale_data->id);
+                            if ($is_ajax) {
+                                $print_html = '<iframe src="' . $print_url . '" style="width:100%; height:500px; border:none;"></iframe>';
+                                return response()->json([
+                                    'status'     => true,
+                                    'sale_id'    => $lims_sale_data->id,
+                                    'print_url'  => $print_url,
+                                    'print_html' => $print_html,
+                                    'message'    => $respuesta['mensaje']
+                                ]);
                             }
+                            return redirect($print_url)->with('message', $respuesta['mensaje']);
                         } else {
                             DB::commit();
                             $message .= " Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error SIAT') . ")";
@@ -1738,13 +1743,19 @@ class SaleController extends Controller
                             }
                             $update_p_venta->save();
                             DB::commit();
-                            // fin dFe correlativo factura
-                            $data['pos'] = $lims_pos_setting_data->print;
-                            if ($data['pos']) {
-                                return redirect('sales/imprimir_factura/' . $lims_sale_data->id)->with('message', $respuesta['mensaje']);
-                            } else {
-                                return redirect()->to('pos')->with('message', $respuesta['mensaje']);
+
+                            $print_url = url('sales/imprimir_factura/' . $lims_sale_data->id);
+                            if ($is_ajax) {
+                                $print_html = '<iframe src="' . $print_url . '" style="width:100%; height:500px; border:none;"></iframe>';
+                                return response()->json([
+                                    'status'     => true,
+                                    'sale_id'    => $lims_sale_data->id,
+                                    'print_url'  => $print_url,
+                                    'print_html' => $print_html,
+                                    'message'    => $respuesta['mensaje']
+                                ]);
                             }
+                            return redirect($print_url)->with('message', $respuesta['mensaje']);
                         } else {
                             DB::commit();
                             $message .= " Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error SIAT') . ")";
