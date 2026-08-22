@@ -1607,7 +1607,8 @@
                                                 <div class="col-md-7 form-group">
                                                     <label class="small font-weight-bold text-muted mb-1">NIT / CI:</label>
                                                     <div class="input-group input-group-sm">
-                                                        <input type="text" name="nit_ci_input" id="nit_ci_input_v2" class="form-control bg-dark text-white border-secondary" placeholder="Ingrese NIT o CI">
+                                                        <input type="text" name="sales_valor_documento" id="sales_valor_documento_v2" class="form-control bg-dark text-white border-secondary" placeholder="Ingrese NIT o CI">
+                                                        <input type="hidden" name="sales_nit_ci" id="sales_nit_ci_v2">
                                                         <div class="input-group-append">
                                                             <span class="input-group-text bg-success text-white border-secondary" id="nit-status-badge-v2" style="display:none;"><i class="fa fa-check"></i> Válido</span>
                                                         </div>
@@ -1618,13 +1619,13 @@
                                             <!-- Razón Social -->
                                             <div class="form-group mb-3">
                                                 <label class="small font-weight-bold text-muted mb-1">Razón Social / Nombre:</label>
-                                                <input type="text" name="razon_social_input" id="razon_social_input_v2" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Nombre o Razón Social">
+                                                <input type="text" name="sales_razon_social" id="sales_razon_social_v2" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Nombre o Razón Social">
                                             </div>
 
                                             <!-- Correo Electrónico -->
                                             <div class="form-group mb-2">
                                                 <label class="small font-weight-bold text-muted mb-1">Correo Electrónico (PDF / XML SIAT):</label>
-                                                <input type="email" name="email_input" id="email_input_v2" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="cliente@ejemplo.com">
+                                                <input type="email" name="sales_email" id="sales_email_v2" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="cliente@ejemplo.com">
                                             </div>
 
                                             <!-- Alerta Naranja Excepción NIT -->
@@ -1744,6 +1745,7 @@
                                 <button type="button" class="btn btn-secondary px-4" data-dismiss="modal">
                                     <i class="fa fa-times"></i> Cancelar [Esc]
                                 </button>
+                                <button id="submit-btn" type="submit" style="display:none;"></button>
                                 <button type="button" class="btn btn-success btn-lg font-weight-bold px-5" id="confirm-pos-v2-btn" style="font-size: 1.15rem; border-radius: 8px;">
                                     <i class="fa fa-check-circle mr-2"></i> <span id="confirm-btn-text-v2">Confirmar & Emitir Factura SIAT [Enter]</span>
                                 </button>
@@ -7670,11 +7672,28 @@
             });
 
             // 7. Primary Action Button Click (Enter)
-            $('#confirm-pos-v2-btn').on('click', function() {
+            $('#confirm-pos-v2-btn').on('click', function(e) {
+                e.preventDefault();
+                var grandTotal = parseFloat($('#grand-total').text()) || 0;
+                $('input[name="paid_amount"]').val(grandTotal.toFixed(2));
+
+                var payingAmt = parseFloat($('#paying_amount_v2').val()) || 0;
+                if (payingAmt === 0) {
+                    payingAmt = grandTotal;
+                    $('#paying_amount_v2').val(grandTotal.toFixed(2));
+                }
+                $('input[name="paying_amount"]').val(payingAmt.toFixed(2));
+
+                var docVal = $('#sales_valor_documento_v2').val();
+                $('input[name="sales_nit_ci"]').val(docVal);
+
+                var methodVal = $('#paid_by_id_select_v2').val();
+                $('input[name="paid_by_id"]').val(methodVal);
+
                 if ($('#submit-btn').length) {
                     $('#submit-btn').click();
-                } else if ($('#cashier-form').length) {
-                    $('#cashier-form').submit();
+                } else {
+                    $('.payment-form').submit();
                 }
             });
 
