@@ -3034,83 +3034,89 @@ class SaleController extends Controller
             if ($biller_data && $biller_data->account_id) {
                 $lims_account_data = Account::select('id', 'name', 'account_no')->find($biller_data->account_id);
             }
+            if (!$lims_account_data) {
+                $lims_account_data = Account::select('id', 'name', 'account_no')->where('is_default', true)->first();
+            }
 
-            if (session()->has('cashier_id')) {
-                if (session()->has('cashier_id')) {
-                    $lims_warehouse_list = Warehouse::where([
-                        ['is_active', true],
-                        ['id', $biller_data->warehouse_id],
-                    ])->get();
-
-                    $lims_customer_list = Customer::where([
-                        ['is_active', true],
-                        ['id', $biller_data->customer_id],
-                    ])->get();
-                } else {
-                    $lims_warehouse_list = Warehouse::where('is_active', true)->get();
-                    $lims_customer_list = Customer::where('is_active', true)->get();
+            $account_data = $lims_account_data->name . " [" . $lims_account_data->account_no . "]";
+            $lims_cashier_data = Cashier::select('id', 'end_date')->where([['account_id', $biller_data->account_id], ['is_active', true]])->first();
+            if ($lims_cashier_data != null && $lims_cashier_data->end_date == null) {
+                $lims_customer_group_all = CustomerGroup::select('id', 'name')->where('is_active', true)->get();
+                $lims_warehouse_list = Warehouse::select('id', 'name')->where('is_active', true)->get();
+                $lims_warehouse_selects = array();
+                if (Auth::user()->biller_id) {
+                    $warehouse_current_biller = Warehouse::find($biller_data->warehouse_id);
+                    $lims_warehouse_filter = Biller_Warehouses::where('biller_id', $biller_data->id)->get();
+                    foreach ($lims_warehouse_filter as $warehouse_select) {
+                        if ($warehouse_current_biller->id != $warehouse_select->warehouse_id)
+                            $lims_warehouse_selects[] = $warehouse_select->warehouse;
+                    }
+                    $lims_warehouse_selects[] = $warehouse_current_biller;
                 }
-
-                $lims_customer_group_all = CustomerGroup::where('is_active', true)->get();
+                $lims_biller_list = Biller::select('id', 'name', 'company_name')->where('is_active', true)->get();
                 $lims_tax_list = Tax::where('is_active', true)->get();
-
-                if (Auth::user()->role_id > 2 && Auth::user()->biller_id) {
-                    $lims_biller_list = Biller::where([
-                        ['is_active', true],
-                        ['id', Auth::user()->biller_id],
-                    ])->get();
-                } else {
-                    $lims_biller_list = Biller::where('is_active', true)->get();
-                }
-
-                $lims_brand_list = Brand::where('is_active', true)->get();
-
-                $lims_category_list = Category::where('is_active', true)
-                    ->where(function ($query) {
-                        $query->whereNull('parent_id')
-                            ->orWhere('parent_id', 0);
-                    })
+                $lims_customer_list = Customer::select('id', 'name', 'phone_number', 'is_credit', 'credit', 'deposit', 'expense')
+                    ->where('is_active', true)
                     ->get();
+                $lims_methodpay_list = MethodPayment::select('id', 'name')->where('cbx', true)->get();
+                $lims_product_list = Product::select('id', 'name', 'code', 'image')->ActiveFeatured()->where('type', '!=', 'insumo')->whereNull('is_variant')->orderBy('id', 'asc')->get();
+                foreach ($lims_product_list as $key => $product) {
+                    $images = explode(",", $product->image);
+                    $product->base_image = $images[0];
+                    if ($product->type == 'insumo') {
+                        unset($lims_product_list[$key]);
+                    }
+                }
+                $lims_product_list_with_variant = Product::select('id', 'name', 'code', 'image')->ActiveFeatured()->whereNotNull('is_variant')->get();
 
-                $lims_methodpay_list = PaymentMethodSIAT::all();
-
-                $lims_coupon_list = Coupon::where('is_active', true)->get();
-
-                $flag = 0;
-                $account_data = Account::all();
-                $lista_documentos = DocumentoIdentidadSIAT::where('status', 'ACTIVO')->get();
-                $lista_metodo_pago = PaymentMethodSIAT::where('status', 'ACTIVO')->get();
-
-                $customer_data = Customer::where('id', $biller_data->customer_id)->first();
-
-                $lims_sucursal_all = SucursalSIAT::all();
-                $lims_warehouse_selects = Warehouse::where('is_active', true)->get();
-
-                $recent_sale = Sale::where('sale_status', 1)->where('warehouse_id', $biller_data->warehouse_id)->orderBy('id', 'desc')->take(10)->get();
-                $recent_draft = Sale::where('sale_status', 3)->where('warehouse_id', $biller_data->warehouse_id)->orderBy('id', 'desc')->take(10)->get();
-
-                $lims_product_list = Product::where([
-                    ['is_active', true],
-                    ['type', '!=', 'insumo'],
-                ])->get();
+                foreach ($lims_product_list_with_variant as $product) {
+                    $images = explode(",", $product->image);
+                    $product->base_image = $images[0];
+                    $lims_product_variant_data = $product->variant()->orderBy('position')->get();
+                    $main_name = $product->name;
+                    $temp_arr = [];
+                    foreach ($lims_product_variant_data as $key => $variant) {
+                        $product->name = $main_name . ' [' . $variant->name . ']';
+                        $product->code = $variant->pivot['item_code'];
+                        $lims_product_list[] = clone ($product);
+                    }
+                }
 
                 $product_number = count($lims_product_list);
-
-                $siatConfigured = false;
-                $siatAuthenticated = false;
-
-                try {
-                    $siatConfig = SiatConfig::first();
-                    if ($siatConfig && !empty($siatConfig->api_url) && !empty($siatConfig->api_key)) {
-                        $siatConfigured = true;
-                    }
-
-                    if (session()->has('token_siat') && !empty(session('token_siat'))) {
-                        $siatAuthenticated = true;
-                    }
-                } catch (\Exception $e) {
+                $lims_brand_list = Brand::select('id', 'title', 'image')->where('is_active', true)->get();
+                if ($lims_pos_setting_data->user_category) {
+                    $lims_category_list = Category::select('categories.id', 'categories.name', 'categories.image')
+                        ->join('user_category', 'categories.id', '=', 'user_category.category_id')
+                        ->where('user_category.user_id', '=', Auth::user()->id)
+                        ->where('categories.is_active', '=', true)->get();
+                } else {
+                    $lims_category_list = Category::select('id', 'name', 'image')->where('is_active', true)->get();
                 }
+                if (Auth::user()->role_id > 2) {
+                    $recent_sale = Sale::select('id', 'reference_no', 'grand_total', 'customer_id', 'created_at')->where([
+                        ['sale_status', 1],
+                        ['user_id', Auth::id()],
+                    ])->orderBy('id', 'desc')->take(20)->get();
+                    $recent_draft = Sale::where([
+                        ['sale_status', 3],
+                        ['user_id', Auth::id()],
+                    ])->orderBy('id', 'desc')->take(20)->get();
+                } else {
+                    $recent_sale = Sale::select('id', 'reference_no', 'grand_total', 'customer_id', 'created_at')
+                        ->where('sale_status', 1)->orderBy('id', 'desc')->take(20)->get();
+                    $recent_draft = Sale::where('sale_status', 3)->orderBy('id', 'desc')->take(20)->get();
+                }
+                $lims_coupon_list = Coupon::where('is_active', true)->get();
+                $flag = 0;
 
+                $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
+                $lista_metodo_pago = SiatParametricaVario::where('tipo_clasificador', 'tipoMetodoPago')->orderBy('codigo_clasificador', 'ASC')->get();
+                $customer_data = Customer::select("id", "name")->find($lims_pos_setting_data->customer_id);
+                $lims_sucursal_all = SiatSucursal::where('estado', 1)->get();
+                $siatConfigured = !empty(trim((string) ($lims_pos_setting_data->user_siat ?? '')))
+                    && !empty(trim((string) ($lims_pos_setting_data->pass_siat ?? '')))
+                    && !empty(trim((string) ($lims_pos_setting_data->url_siat ?? '')));
+                $siatAuthenticated = (bool) session('auth_siat', false) && !empty(session('token_siat'));
                 $hasSiat = $siatConfigured && $siatAuthenticated;
                 return view('sale.pos_v2', compact('all_permission', 'lims_customer_group_all', 'lims_warehouse_list', 'lims_product_list', 'product_number', 'lims_tax_list', 'lims_biller_list', 'lims_customer_list', 'lims_pos_setting_data', 'lims_brand_list', 'lims_category_list', 'recent_sale', 'recent_draft', 'lims_coupon_list', 'flag', 'lims_methodpay_list', 'biller_data', 'account_data', 'lista_documentos', 'lista_metodo_pago', 'customer_data', 'lims_sucursal_all', 'lims_warehouse_selects', 'hasSiat'));
             } else {
