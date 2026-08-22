@@ -1543,350 +1543,209 @@
                         @include('layout.partials.spinner-ajax')
                         @include('layout.partials.spinner-contingencia-ajax')
                         <div class="modal-content" style="max-height: 90vh; height: auto; display: flex;">
-                            <div class="modal-header bg-light " style="padding: 0.75rem 1rem;">
-                                <h6 id="exampleModalLabel" class="modal-title font-weight-bold" style="font-size: 0.95rem;">
-                                    @if (session()->has('token_siat'))
-                                        <i class="fa fa-file-invoice"></i> Facturar Venta
-                                    @else
-                                        <i class="fa fa-check-circle"></i> Finalizar Venta
-                                    @endif
-                                </h6>
-                                <div style="display:none;">
-                                    @if (session()->has('token_siat'))
-                                        <input id="toggle-event" type="checkbox" data-toggle="toggle"
-                                            data-on="Si" data-off="No" data-onstyle="primary"
-                                            data-offstyle="secondary">
-                                    @endif
+                            <div class="modal-header bg-dark text-white border-secondary" style="padding: 0.75rem 1.25rem;">
+                                <h5 id="exampleModalLabel" class="modal-title font-weight-bold text-info" style="font-size: 1.1rem;">
+                                    <i class="fa fa-cash-register"></i> <span id="pos-v2-modal-title">Cobro de Venta & Facturación SIAT</span>
+                                </h5>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge badge-success px-2 py-1 mr-3"><i class="fa fa-circle"></i> SIAT Online</span>
+                                    <button type="button" data-dismiss="modal" aria-label="Close" class="close text-white">
+                                        <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                                    </button>
                                 </div>
-                                @if (session()->has('token_siat'))
-                                <div id="btn_modeOnline" class="d-flex align-items-center mr-3" style="display:none;">
-                                    <div class="mode-toggle-container">
-                                        <small id="text_modo_pos" class="mode-label">Modo: Online</small>
-                                        <input id="toggle-event-mode" type="checkbox" data-toggle="toggle"
-                                            data-on="Online" data-off="Offline" data-onstyle="success"
-                                            data-offstyle="danger" data-size="sm" data-width="72">
-                                    </div>
-                                </div>
-                                @endif
-                                <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
-                                </button>
                             </div>
-                            <div class="modal-body" style="padding: 1rem; overflow-y: auto; overflow-x: hidden; font-size: 0.875rem; flex: 1 1 auto; min-height: 0; max-height:75vh;">
-
-                                {{-- se mostrará si solo si, tiene credenciales siat --}}
-                                <input type="hidden" name="facturacion_id_hidden"
-                                    value="{{ $lims_pos_setting_data->facturacion_id }}">
-                                <input type="hidden" name="codigo_emision_hidden"
-                                    value="{{ $lims_pos_setting_data->codigo_emision }}">
+                            <div class="modal-body bg-dark text-white" style="padding: 1.25rem; overflow-y: auto; max-height:78vh;">
+                                <!-- Hidden inputs for backend integration -->
+                                <input type="hidden" name="facturacion_id_hidden" value="{{ $lims_pos_setting_data->facturacion_id }}">
+                                <input type="hidden" name="codigo_emision_hidden" value="{{ $lims_pos_setting_data->codigo_emision }}">
                                 <input type="hidden" name="ajax_sale_id" value="">
-                                <input type="hidden" name="bandera_factura_hidden">
-                                <input type="hidden" name="bandera_vigencia_cufd_hidden">
-                                <input type="hidden" name="bandera_codigo_excepcion_hidden">
+                                <input type="hidden" name="bandera_factura_hidden" value="1">
+                                <input type="hidden" name="bandera_vigencia_cufd_hidden" value="1">
+                                <input type="hidden" name="bandera_codigo_excepcion_hidden" value="0">
                                 <input type="hidden" name="bandera_codigo_documento_sector_hidden" value="1">
                                 <input type="hidden" name="montoLey1886_hidden" value="0">
                                 <input type="hidden" name="montoTasaDignidad_hidden" value="0">
-                                <div id="ventana_nav" class="mb-3">
-                                    <ul class="nav nav-tabs nav-justified" id="myTab" role="tablist" style="border-bottom: 2px solid #dee2e6;">
-                                        <li class="nav-item">
-                                            <a class="nav-link active" data-toggle="tab" href="#primerTab" role="tab">
-                                                <i class="fa fa-money-bill"></i> Monto
-                                            </a>
-                                        </li>
-                                        @if (session()->has('token_siat'))
-                                        <li class="nav-item">
-                                            <a id="tab_preview" class="nav-link disabled" data-toggle="tab" href="#segundoTab" role="tab">
-                                                <i class="fa fa-eye"></i> Imprimible
-                                            </a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a id="tab_billing" class="nav-link disabled" data-toggle="tab" href="#tercerTab" role="tab">
-                                                <i class="fa fa-file-alt"></i> Datos Facturación
-                                            </a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a id="tab_final" class="nav-link disabled" data-toggle="tab" href="#cuartoTab" role="tab">
-                                                <i class="fa fa-print"></i> Impresión
-                                            </a>
-                                        </li>
-                                        @endif
-                                    </ul>
-                                </div>
+                                <input type="hidden" name="paid_amount">
 
-                                <div class="tab-content" style="padding: 1rem 0;">
-                                    {{-- formulario de la primera parte --}}
-                                    <div class="tab-pane fade show active" id="primerTab" role="tabpanel">
-                                        <div class="row">
-                                            <div class="col-md-8">
-                                                <div class="row">
-                                                    <div class="col-md-6 mt-1">
-                                                        <label>{{ trans('file.Paying Amount') }} *</label>
-                                                        <input type="text" name="paid_amount"
-                                                            class="form-control numkey" step="any">
-                                                    </div>
-                                                    <div class="col-md-6 mt-1">
-                                                        <label>{{ trans('file.Recieved Amount') }} *</label>
-                                                        <input type="text" name="paying_amount"
-                                                            class="form-control numkey" required step="any">
-                                                    </div>
-                                                    <div class="col-md-3 mt-1">
-                                                        <label>{{ trans('file.Change') }} : </label>
-                                                        <p id="change" class="ml-2">0.00</p>
-                                                    </div>
-                                                    <div class="col-md-3 mt-1">
-                                                        <label>{{ trans('file.Tc') }} : </label>
-                                                        <p id="tc" class="ml-2">
-                                                            {{ $lims_pos_setting_data->t_c }}</p>
-                                                    </div>
-                                                    <div class="col-md-6 mt-1">
-                                                        <label>{{ trans('file.Recieved Amount') }} USD*</label>
-                                                        <input type="text" name="paying_amount_us"
-                                                            class="form-control numkey" step="any">
-                                                    </div>
-                                                    <div class="col-md-6 mt-1" style="display:none">
-                                                        <label>{{ trans('file.Date') }}</label>
-                                                        <input type="hidden" id="date_format" name="date_seller"
-                                                            class="form-control">
-                                                    </div>
-                                                    {{-- listaMetodoDePagos --}}
-                                                    <div class="col-md-6 mt-1">
-                                                        <input type="hidden" name="paid_by_id">
-                                                        <input type="hidden" name="tipo_pago_btn">
-                                                        <input type="hidden" name="monto_efectivo">
-                                                        <input type="hidden" name="monto_tarjeta">
-                                                        <input type="hidden" name="monto_cheque">
-                                                        <input type="hidden" name="monto_vale">
-                                                        <input type="hidden" name="monto_otros">
-                                                        <input type="hidden" name="monto_pago_posterior">
-                                                        <input type="hidden" name="monto_transferencia_bancaria">
-                                                        <input type="hidden" name="monto_deposito">
-                                                        <input type="hidden" name="monto_swift">
-                                                        <input type="hidden" name="monto_cambio">
-                                                        <input type="hidden" name="monto_canal_pago">
-                                                        <input type="hidden" name="monto_billetera">
-                                                        <input type="hidden" name="monto_pago_online">
-                                                        <input type="hidden" name="monto_debito_automatico">
-                                                        <label>{{ trans('file.Paid By') }}</label>
-                                                        @if (session()->has('token_siat'))
-                                                            <select name="paid_by_id_select"
-                                                                class="form-control selectpicker payment-select" data-live-search="true"
-                                                                data-live-search-style="contains"
-                                                                id="paid_by_id_select_select">
-                                                                @foreach ($lista_metodo_pago as $method)
-                                                                    <option value="{{ $method->codigo_clasificador }}"
-                                                                        data-descripcion="{{ $method->descripcion }}">
-                                                                        {{ $method->codigo_clasificador . ' - ' . $method->descripcion }}
-                                                                    </option>
-                                                                @endforeach
-                                                            </select>
-                                                        @else
-                                                            <select name="paid_by_id_select"
-                                                                class="form-control selectpicker payment-select" data-live-search="true"
-                                                                data-live-search-style="contains"
-                                                                id="paid_by_id_select_select" disabled>
-                                                                @foreach ($lims_methodpay_list as $method)
-                                                                    <option value="{{ $method->id }}">
-                                                                        {{ $method->name }}
-                                                                    </option>
-                                                                @endforeach
-                                                            </select>
-                                                        @endif
-                                                    </div>
-                                                    <div class="col-md-12 mt-2" id="multiple-pay-selector" style="display: none;">
-                                                        <label>Seleccionar hasta 3 formas de pago</label>
-                                                        <div class="row">
-                                                            <div class="col-md-4 mt-1">
-                                                                <select id="multi_pay_method_1" class="form-control selectpicker payment-select multi-pay-method" data-live-search="true" data-live-search-style="contains" title="Forma 1"></select>
-                                                            </div>
-                                                            <div class="col-md-4 mt-1">
-                                                                <select id="multi_pay_method_2" class="form-control selectpicker payment-select multi-pay-method" data-live-search="true" data-live-search-style="contains" title="Forma 2"></select>
-                                                            </div>
-                                                            <div class="col-md-4 mt-1">
-                                                                <select id="multi_pay_method_3" class="form-control selectpicker payment-select multi-pay-method" data-live-search="true" data-live-search-style="contains" title="Forma 3"></select>
-                                                            </div>
-                                                        </div>
-                                                        <small class="text-muted">La primera forma seleccionada se usará como método principal.</small>
-                                                    </div>
-
-                                                    @include('sale.partials-sale-datos-metodopago')
-                                                    {{-- insertando inputs para gift --}}
-                                                    @include('sale.partials-mp-giftcard')
-                                                    {{-- insertando inputs para gift --}}
-                                                    <div class="form-group col-md-6" id="MP_tarjeta">
-                                                        <label>Nro. Tarjeta crédito/débito</label>
-                                                        <div class="input-group" id="tarjeta_de_credito_debito">
-                                                            <div class="input-group-prepend">
-                                                                <span class="input-group-text badge-card"></span>
-                                                            </div>
-                                                            <input type="text" id="number_card" name="number_card"
-                                                                maxlength="19" autocomplete="off" class="form-control">
-                                                        </div>
-                                                    </div>
-                                                    <div class="form-group col-md-12" id="MP_cheque">
-                                                        <label>{{ trans('file.Cheque Number') }} *</label>
-                                                        <input type="text" name="cheque_no" class="form-control"
-                                                            onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">
-                                                    </div>
-                                                    <div class="form-group col-md-12 qrsimple" style="display: none;">
-                                                        <p class="text-center"><i
-                                                                class="dripicons-clock text-primary"></i> Se cerrara en
-                                                            <span id="timer">10:00</span> minutos
-                                                        </p>
-                                                        <div class="text-center mb-3">
-                                                            <img class="qrsimple-img"
-                                                                src="/public/images/29497618_1212833785513817_2887668216967394137_n.jpg"
-                                                                alt="qrsimple">
-                                                        </div>
-                                                        <p class="mb-0 text-center">No cierre esta ventana o cambie el tipo
-                                                            de pago, <strong>esperando escaneo...</strong></p>
-                                                    </div>
-                                                    <div class="col-md-6 form-group" id="fact_manual"
-                                                        style="display: none">
-                                                        <label>Nro. Factura (Facturación Manual)</label>
-                                                        <input type="number" class="form-control" name="invoice_no"
-                                                            value="0" />
-                                                    </div>
-                                                    <div class="col-md-12 mt-2">
-                                                        <label class="mb-1">Lista de pagos</label>
-                                                        <div class="payment-list-wrapper" id="html_montos_metodos_de_pago">
-                                                            {{-- se insertarán los input --}}
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-6 mt-2">
-                                                        <label>Total pagado por métodos</label>
-                                                        <input type="text" id="monto_total_pagado" class="form-control payment-list-input" value="0.00" readonly>
-                                                    </div>
-                                                    {{-- <div class="form-group col-md-12">
-                                                        <label>{{ trans('file.Payment Note') }}</label>
-                                                        <textarea id="payment_note" rows="1" class="form-control" name="payment_note"></textarea>
-                                                    </div> --}}
-                                                </div>
-                                                <div class="row">
-                                                    <div class="col-md-6 form-group">
-                                                        <label>{{ trans('file.Sale Note') }}</label>
-                                                        <textarea rows="1" class="form-control" name="sale_note"></textarea>
-                                                    </div>
-                                                    <!--<div class="col-md-6 form-group">
-                                                                                            <label>{{ trans('file.Staff Note') }}</label>
-                                                                                            <textarea rows="1" class="form-control" name="staff_note"></textarea>
-                                                                                        </div>-->
-                                                </div>
-                                                <div class="mt-3">
-                                                    <button class="btn btn-secondary btn-sm"
-                                                        id="segundoTabContinue" 
-                                                        @if (!session()->has('token_siat')) style="display:none;" @endif>
-                                                        Facturar
-                                                    </button>
+                                <div class="row">
+                                    <!-- COLUMNA IZQUIERDA: DATOS DE FACTURACIÓN SIAT & NOTA DE VENTA -->
+                                    <div class="col-md-6 border-right border-secondary pr-md-4">
+                                        <!-- Switch SIAT [ON / OFF] -->
+                                        <div class="p-3 mb-3 rounded bg-secondary-dark border border-secondary" style="background: #1e293b;">
+                                            <div class="d-flex align-items-center justify-content-between">
+                                                <span class="font-weight-bold text-info"><i class="fa fa-file-invoice"></i> Modalidad de Emisión:</span>
+                                                <div class="custom-control custom-switch">
+                                                    <input type="checkbox" class="custom-control-input" id="siat-mode-switch" checked>
+                                                    <label class="custom-control-label font-weight-bold text-success" for="siat-mode-switch" id="siat-mode-text">Facturación Electrónica SIAT</label>
                                                 </div>
                                             </div>
-                                            <div class="col-md-2 qc" data-initial="1">
-                                                <h6 style="font-size: 0.875rem;"><strong>{{ trans('file.Quick Cash') }}</strong></h6>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="0.5" type="button">0.50 Ctv</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" data-amount="1"
-                                                    type="button">1</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" data-amount="2"
-                                                    type="button">2</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" data-amount="5"
-                                                    type="button">5</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="10" type="button">10</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="20" type="button">20</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="50" type="button">50</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="100" type="button">100</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="200" type="button">200</button>
-                                                <button class="btn btn-block btn-danger btn-sm qc-btn sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" data-amount="0"
-                                                    type="button">{{ trans('file.Clear') }}</button>
+                                        </div>
+
+                                        <!-- Contenedor Campos Fiscales SIAT -->
+                                        <div id="siat-fields-container" class="p-3 rounded border border-secondary mb-3" style="background: #0f172a;">
+                                            <!-- Desplegable Caso Especial SIAT -->
+                                            <div class="form-group mb-3">
+                                                <label class="small font-weight-bold text-warning mb-1">Caso Especial SIAT:</label>
+                                                <select id="siat-special-case-select" class="form-control form-control-sm bg-dark text-white border-secondary">
+                                                    <option value="normal">Normal (CI / NIT Standard)</option>
+                                                    <option value="ventas_menores">🛒 Ventas Menores del Día (NIT 99001)</option>
+                                                    <option value="extranjero">✈️ Extranjero (Pasaporte / CEX)</option>
+                                                    <option value="excepcion">⚠️ NIT con Excepción SIAT</option>
+                                                </select>
                                             </div>
-                                            <div class="col-md-2 qc" data-initial="1">
-                                                <h6 style="font-size: 0.875rem;"><strong>{{ trans('file.Quick Cash') }} USD.</strong></h6>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn-us sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="20" type="button">20</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn-us sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="50" type="button">50</button>
-                                                <button class="btn btn-block btn-primary btn-sm qc-btn-us sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="100" type="button">100</button>
-                                                <button class="btn btn-block btn-danger btn-sm qc-btn-us sound-btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                                    data-amount="0" type="button">{{ trans('file.Clear') }}</button>
+
+                                            <!-- Tipo Documento & NIT / CI -->
+                                            <div class="form-row">
+                                                <div class="col-md-5 form-group">
+                                                    <label class="small font-weight-bold text-muted mb-1">Tipo Documento:</label>
+                                                    <select name="documento_id_select" id="documento_id_select_v2" class="form-control form-control-sm bg-dark text-white border-secondary">
+                                                        @foreach($lista_documentos as $doc)
+                                                            <option value="{{ $doc->codigo_clasificador }}">{{ $doc->descripcion }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-7 form-group">
+                                                    <label class="small font-weight-bold text-muted mb-1">NIT / CI:</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" name="nit_ci_input" id="nit_ci_input_v2" class="form-control bg-dark text-white border-secondary" placeholder="Ingrese NIT o CI">
+                                                        <div class="input-group-append">
+                                                            <span class="input-group-text bg-success text-white border-secondary" id="nit-status-badge-v2" style="display:none;"><i class="fa fa-check"></i> Válido</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Razón Social -->
+                                            <div class="form-group mb-3">
+                                                <label class="small font-weight-bold text-muted mb-1">Razón Social / Nombre:</label>
+                                                <input type="text" name="razon_social_input" id="razon_social_input_v2" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Nombre o Razón Social">
+                                            </div>
+
+                                            <!-- Correo Electrónico -->
+                                            <div class="form-group mb-2">
+                                                <label class="small font-weight-bold text-muted mb-1">Correo Electrónico (PDF / XML SIAT):</label>
+                                                <input type="email" name="email_input" id="email_input_v2" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="cliente@ejemplo.com">
+                                            </div>
+
+                                            <!-- Alerta Naranja Excepción NIT -->
+                                            <div id="excepcion-nit-alert-v2" class="alert alert-warning p-2 mt-2 mb-0 small" style="display:none;">
+                                                <div class="custom-control custom-checkbox">
+                                                    <input type="checkbox" class="custom-control-input" id="excepcion-nit-check-v2" name="bandera_codigo_excepcion_check">
+                                                    <label class="custom-control-label font-weight-bold text-dark" for="excepcion-nit-check-v2">
+                                                        [✔] Activar Excepción de NIT SIN (Código 1)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Cliente Seleccionado -->
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold text-muted mb-1">Cliente Asociado a la Venta:</label>
+                                            <select name="customer_id" id="customer_id_v2" class="form-control form-control-sm bg-dark text-white border-secondary">
+                                                @foreach($lims_customer_list as $customer)
+                                                    <option value="{{ $customer->id }}">{{ $customer->name }} ({{ $customer->phone_number }})</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- COLUMNA DERECHA: PAGO & VUELTO GIGANTE -->
+                                    <div class="col-md-6 pl-md-4">
+                                        <div class="p-3 rounded border border-secondary mb-3" style="background: #0f172a;">
+                                            <!-- Selector Modo Cobro (Único vs Múltiple) -->
+                                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary">
+                                                <span class="font-weight-bold text-info"><i class="fa fa-money-bill-wave"></i> Método de Cobro:</span>
+                                                <div>
+                                                    <div class="custom-control custom-radio custom-control-inline">
+                                                        <input type="radio" id="pay-mode-single-v2" name="pay_mode_type_v2" class="custom-control-input" value="single" checked>
+                                                        <label class="custom-control-label small font-weight-bold" for="pay-mode-single-v2">Único</label>
+                                                    </div>
+                                                    <div class="custom-control custom-radio custom-control-inline">
+                                                        <input type="radio" id="pay-mode-split-v2" name="pay_mode_type_v2" class="custom-control-input" value="split">
+                                                        <label class="custom-control-label small font-weight-bold" for="pay-mode-split-v2">Pago Múltiple</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- PANEL PAGO ÚNICO -->
+                                            <div id="single-pay-panel-v2">
+                                                <div class="form-group mb-2">
+                                                    <label class="small font-weight-bold text-muted mb-1">Forma de Pago:</label>
+                                                    <select name="paid_by_id_select" id="paid_by_id_select_v2" class="form-control form-control-sm bg-dark text-white border-secondary">
+                                                        @foreach ($lista_metodo_pago as $method)
+                                                            <option value="{{ $method->codigo_clasificador }}" data-descripcion="{{ $method->descripcion }}">
+                                                                {{ $method->codigo_clasificador . ' - ' . $method->descripcion }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+
+                                                <!-- Quick Cash Buttons -->
+                                                <div class="quick-cash-row d-flex flex-wrap gap-1 mb-3 mt-2">
+                                                    <button type="button" class="btn btn-outline-info btn-sm quick-cash-btn-v2" data-amount="10">$10</button>
+                                                    <button type="button" class="btn btn-outline-info btn-sm quick-cash-btn-v2" data-amount="20">$20</button>
+                                                    <button type="button" class="btn btn-outline-info btn-sm quick-cash-btn-v2" data-amount="50">$50</button>
+                                                    <button type="button" class="btn btn-outline-info btn-sm quick-cash-btn-v2" data-amount="100">$100</button>
+                                                    <button type="button" class="btn btn-outline-success btn-sm quick-cash-btn-v2" data-amount="exact">Importe Exacto</button>
+                                                </div>
+
+                                                <!-- Monto Recibido -->
+                                                <div class="form-group mb-3">
+                                                    <label class="small font-weight-bold text-muted mb-1">Monto Recibido (Bs.):</label>
+                                                    <input type="number" step="any" name="paying_amount" id="paying_amount_v2" class="form-control form-control-lg bg-dark text-warning font-weight-bold text-right border-secondary" placeholder="0.00" style="font-size: 1.5rem;">
+                                                </div>
+
+                                                <!-- RECUADRO GIGANTE DE CAMBIO / VUELTO -->
+                                                <div class="giant-change-box" id="giant-change-box-v2">
+                                                    <div class="giant-change-title" id="giant-change-title-v2">CAMBIO / VUELTO</div>
+                                                    <div class="giant-change-amount" id="giant-change-val-v2">Bs. 0.00</div>
+                                                </div>
+                                            </div>
+
+                                            <!-- PANEL PAGO MÚLTIPLE (FILAS COMBINADAS) -->
+                                            <div id="split-pay-panel-v2" style="display:none;">
+                                                <table class="table table-sm text-white border-secondary mb-2" id="split-pay-table-v2">
+                                                    <thead>
+                                                        <tr class="text-muted small">
+                                                            <th>Método</th>
+                                                            <th>Monto (Bs.)</th>
+                                                            <th>Ref / Gift Card</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td>💵 Efectivo</td>
+                                                            <td><input type="number" step="any" class="form-control form-control-sm bg-dark text-white border-secondary split-amount-input" value="0.00"></td>
+                                                            <td>-</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>📱 Pago QR</td>
+                                                            <td><input type="number" step="any" class="form-control form-control-sm bg-dark text-white border-secondary split-amount-input" value="0.00"></td>
+                                                            <td><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Nro Transacción"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>🎁 Gift Card</td>
+                                                            <td><input type="number" step="any" class="form-control form-control-sm bg-dark text-white border-secondary split-amount-input" value="0.00"></td>
+                                                            <td><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Código Gift Card"></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                                <div class="mt-2 text-center" id="split-status-badge-v2">
+                                                    <span class="badge badge-success p-2 w-100 font-weight-bold">✔ Total Cubierto (Saldo Bs. 0.00)</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                    {{-- formulario de la segunda parte: IMPRIMIBLE (preview) --}}
-                                    @if (session()->has('token_siat'))
-                                        <div class="tab-pane fade" id="segundoTab" role="tabpanel">
-                                            <div class="row">
-                                                <div class="col-md-12">
-                                                    {{-- contenedor donde se inyectará el HTML imprimible devuelto por AJAX --}}
-                                                    <div id="print_preview_container" style="max-height:60vh; overflow-y:auto; overflow-x:hidden; padding: 0 1rem;">
-                                                        <style>
-                                                            #print_preview_container img, #print_preview_container object, #print_preview_container embed { max-width:100%; height:auto; }
-                                                            #print_preview_container table { width:100% !important; table-layout:auto; word-break:break-word; }
-                                                        </style>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {{-- formulario de la tercera parte: DATOS FACTURACIÓN --}}
-                                        <div class="tab-pane fade" id="tercerTab" role="tabpanel">
-                                            <div class="row">
-                                                <div class="col-md-12">
-                                                    {{-- datos a facturar --}}
-                                                    @include('sale.partials-sale-modal')
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {{-- formulario de la cuarta parte: IMPRESIÓN FINAL --}}
-                                        <div class="tab-pane fade" id="cuartoTab" role="tabpanel">
-                                            <div class="row">
-                                                <div class="col-md-12">
-                                                    <div id="final_print_container" class="mb-4" style="min-height: 650px; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
-                                                        <p id="final_print_message" class="text-center font-weight-bold" style="font-size: 1.1rem; color: #28a745;">
-                                                            <i class="fa fa-check-circle"></i> Listo para facturar.
-                                                        </p>
-                                                        <a id="final_print_link" href="#" target="_blank" class="btn btn-primary" style="display:none">Abrir Factura</a>
-                                                    </div>
-                                                    
-                                                    <!-- Sección WhatsApp en el panel final -->
-                                                    <div class="card border-success shadow-sm">
-                                                        <div class="card-header bg-success text-white">
-                                                            <h6 class="mb-0" style="font-size: 0.875rem;"><i class="fa fa-whatsapp"></i> Enviar Factura por WhatsApp</h6>
-                                                        </div>
-                                                        <div class="card-body">
-                                                            <div class="form-group mb-3">
-                                                                <label for="final_whatsapp_phone" class="font-weight-bold" style="font-size: 0.875rem;">Número de teléfono</label>
-                                                                <div class="input-group">
-                                                                    <div class="input-group-prepend">
-                                                                        <span class="input-group-text"><i class="fa fa-phone"></i></span>
-                                                                    </div>
-                                                                    <input type="tel" class="form-control form-control-sm" id="final_whatsapp_phone" 
-                                                                        placeholder="Ej: 59176543210" 
-                                                                        pattern="[0-9]+"
-                                                                        title="Ingrese solo números, formato internacional sin + ni espacios">
-                                                                </div>
-                                                                <small class="form-text text-muted">
-                                                                    <i class="fa fa-info-circle"></i> Formato internacional sin + ni espacios (Ej: 59176543210)
-                                                                </small>
-                                                            </div>
-                                                            <button type="button" class="btn btn-success btn-block btn-sm" id="send-final-whatsapp-btn">
-                                                                <i class="fa fa-whatsapp"></i> Enviar Factura por WhatsApp
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endif
                                 </div>
                             </div>
-                            <div class="modal-footer bg-light" style="padding: 0.75rem 1rem;">
-                                <button id="submit-btn" type="submit" class="btn btn-primary btn-sm px-3">
-                                    <i class="fa fa-check"></i> Confirmar Venta
+
+                            <!-- PIE DEL MODAL (BOTÓN PRINCIPAL DE ACCIÓN) -->
+                            <div class="modal-footer bg-dark border-secondary d-flex justify-content-between" style="padding: 1rem 1.25rem;">
+                                <button type="button" class="btn btn-secondary px-4" data-dismiss="modal">
+                                    <i class="fa fa-times"></i> Cancelar [Esc]
+                                </button>
+                                <button type="button" class="btn btn-success btn-lg font-weight-bold px-5" id="confirm-pos-v2-btn" style="font-size: 1.15rem; border-radius: 8px;">
+                                    <i class="fa fa-check-circle mr-2"></i> <span id="confirm-btn-text-v2">Confirmar & Emitir Factura SIAT [Enter]</span>
                                 </button>
                             </div>
                         </div>
@@ -7709,13 +7568,120 @@
         </div>
     </div>
 
-    <!-- POS v2 Keyboard Hotkeys Listener Script -->
+    <!-- POS v2 2-Column Dashboard & Keyboard Hotkeys Handler -->
     <script type="text/javascript">
         $(document).ready(function() {
+            // 1. SIAT Mode Switch [ON / OFF]
+            $('#siat-mode-switch').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#siat-mode-text').text('Facturación Electrónica SIAT').removeClass('text-muted').addClass('text-success');
+                    $('#pos-v2-modal-title').text('Cobro de Venta & Facturación SIAT');
+                    $('#siat-fields-container').css('opacity', '1').find('input, select').prop('disabled', false);
+                    $('#confirm-btn-text-v2').text('Confirmar & Emitir Factura SIAT [Enter]');
+                    $('input[name="bandera_factura_hidden"]').val('1');
+                } else {
+                    $('#siat-mode-text').text('Nota de Venta / Recibo (Sin Factura)').removeClass('text-success').addClass('text-muted');
+                    $('#pos-v2-modal-title').text('Cobro - Nota de Venta / Recibo Interno');
+                    $('#siat-fields-container').css('opacity', '0.45').find('input, select').prop('disabled', true);
+                    $('#confirm-btn-text-v2').text('Grabar Nota de Venta e Imprimir Ticket [Enter]');
+                    $('input[name="bandera_factura_hidden"]').val('0');
+                }
+            });
+
+            // 2. Selector Caso Especial SIAT
+            $('#siat-special-case-select').on('change', function() {
+                var val = $(this).val();
+                if (val === 'ventas_menores') {
+                    $('#documento_id_select_v2').val('5');
+                    $('#nit_ci_input_v2').val('99001').prop('readonly', true);
+                    $('#razon_social_input_v2').val('VENTAS MENORES').prop('readonly', true);
+                    $('#excepcion-nit-alert-v2').hide();
+                } else if (val === 'extranjero') {
+                    $('#documento_id_select_v2').val('3');
+                    $('#nit_ci_input_v2').val('').prop('readonly', false).attr('placeholder', 'Número de Pasaporte / CEX');
+                    $('#razon_social_input_v2').val('').prop('readonly', false);
+                    $('#excepcion-nit-alert-v2').hide();
+                } else if (val === 'excepcion') {
+                    $('#nit_ci_input_v2').prop('readonly', false);
+                    $('#razon_social_input_v2').prop('readonly', false);
+                    $('#excepcion-nit-alert-v2').show();
+                    $('#excepcion-nit-check-v2').prop('checked', true);
+                    $('input[name="bandera_codigo_excepcion_hidden"]').val('1');
+                } else {
+                    $('#nit_ci_input_v2').prop('readonly', false).attr('placeholder', 'Ingrese NIT o CI');
+                    $('#razon_social_input_v2').prop('readonly', false);
+                    $('#excepcion-nit-alert-v2').hide();
+                    $('input[name="bandera_codigo_excepcion_hidden"]').val('0');
+                }
+            });
+
+            // 3. Radio Pago Único vs Pago Múltiple
+            $('input[name="pay_mode_type_v2"]').on('change', function() {
+                if ($(this).val() === 'split') {
+                    $('#single-pay-panel-v2').hide();
+                    $('#split-pay-panel-v2').show();
+                } else {
+                    $('#single-pay-panel-v2').show();
+                    $('#split-pay-panel-v2').hide();
+                }
+            });
+
+            // 4. Quick Cash Buttons ($10, $20, $50, $100, Importe Exacto)
+            $('.quick-cash-btn-v2').on('click', function() {
+                var amt = $(this).data('amount');
+                var grandTotal = parseFloat($('#grand-total').text()) || 0;
+                if (amt === 'exact') {
+                    $('#paying_amount_v2').val(grandTotal.toFixed(2)).trigger('input');
+                } else {
+                    $('#paying_amount_v2').val(parseFloat(amt).toFixed(2)).trigger('input');
+                }
+            });
+
+            // 5. Giant Change / Due Calculation
+            $('#paying_amount_v2').on('input keyup change', function() {
+                var grandTotal = parseFloat($('#grand-total').text()) || 0;
+                var paid = parseFloat($(this).val()) || 0;
+                var diff = paid - grandTotal;
+
+                if (diff >= 0) {
+                    $('#giant-change-title-v2').text('CAMBIO / VUELTO').css('color', '#6ee7b7');
+                    $('#giant-change-val-v2').text('Bs. ' + diff.toFixed(2)).css('color', '#34d399');
+                    $('#giant-change-box-v2').css({
+                        'background': '#022c22',
+                        'border-color': '#10b981'
+                    });
+                } else {
+                    $('#giant-change-title-v2').text('PENDIENTE DE PAGO').css('color', '#fca5a5');
+                    $('#giant-change-val-v2').text('Bs. ' + Math.abs(diff).toFixed(2)).css('color', '#f87171');
+                    $('#giant-change-box-v2').css({
+                        'background': '#450a0a',
+                        'border-color': '#ef4444'
+                    });
+                }
+            });
+
+            // 6. Sync Paying Amount on Modal Show
+            $('#add-payment').on('shown.bs.modal', function() {
+                var grandTotal = parseFloat($('#grand-total').text()) || 0;
+                $('input[name="paid_amount"]').val(grandTotal.toFixed(2));
+                if (!$('#paying_amount_v2').val() || parseFloat($('#paying_amount_v2').val()) === 0) {
+                    $('#paying_amount_v2').val(grandTotal.toFixed(2)).trigger('input');
+                }
+            });
+
+            // 7. Primary Action Button Click (Enter)
+            $('#confirm-pos-v2-btn').on('click', function() {
+                if ($('#submit-btn').length) {
+                    $('#submit-btn').click();
+                } else if ($('#cashier-form').length) {
+                    $('#cashier-form').submit();
+                }
+            });
+
+            // 8. Global Keyboard Hotkeys
             $(document).on('keydown', function(e) {
-                // Ignore hotkeys when typing inside inputs, selects or textareas
                 if ($(e.target).is('input, select, textarea')) {
-                    if (e.keyCode === 27) { // Esc inside input closes active modal or removes focus
+                    if (e.keyCode === 27) {
                         $(e.target).blur();
                     }
                     return;
