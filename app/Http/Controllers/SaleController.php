@@ -1461,28 +1461,36 @@ class SaleController extends Controller
                 return response()->json(['status' => true, 'sale_id' => $lims_sale_data->id, 'print_html' => $print_html, 'message' => $message]);
             }
 
-            if ($data['bandera_factura_hidden'] && $data['sale_status'] != 4) {
+            if (!empty($data['bandera_factura_hidden']) && ($data['sale_status'] ?? 0) != 4) {
 
-                if ($data['sales_tipo_documento_hidden'] != 1) {
+                $sales_tipo_doc = $data['sales_tipo_documento_hidden'] ?? ($data['documento_id_select'] ?? 1);
+                $sales_caso_esp = $data['sales_caso_especial_hidden'] ?? 1;
+                $sales_val_doc = $data['sales_valor_documento'] ?? ($data['sales_nit_ci'] ?? '0');
+                $sales_razon = $data['sales_razon_social'] ?? 'SN';
+                $sales_mail = $data['sales_email'] ?? '';
+                $sales_excepcion = $data['bandera_codigo_excepcion_hidden'] ?? 0;
+                $sales_doc_sector = $data['bandera_codigo_documento_sector_hidden'] ?? 1;
+
+                if ($sales_tipo_doc != 1) {
                     $text_complemento_documento = null;
                 } else {
-                    $text_complemento_documento = $data['sales_complemento_documento'];
+                    $text_complemento_documento = $data['sales_complemento_documento'] ?? null;
                 }
 
                 // Tabla CustomerNIT
-                if ($data['sales_caso_especial_hidden'] == 1) { // Válido solo cuando no exista casos especial
-                    $nit_data = CustomerNit::where('tipo_documento', $data['sales_tipo_documento_hidden'])
-                        ->where('valor_documento', $data['sales_valor_documento'])->first();
+                if ($sales_caso_esp == 1) { // Válido solo cuando no exista casos especial
+                    $nit_data = CustomerNit::where('tipo_documento', $sales_tipo_doc)
+                        ->where('valor_documento', $sales_val_doc)->first();
 
                     $fecha_hora_actual = new Carbon();
                     if ($nit_data != null) {
                         // Existe alguna coincidencia en la base de datos
-                        $nit_data = DB::table('customer_nit')
-                            ->where('tipo_documento', $data['sales_tipo_documento_hidden'])
-                            ->where('valor_documento', $data['sales_valor_documento'])
+                        DB::table('customer_nit')
+                            ->where('tipo_documento', $sales_tipo_doc)
+                            ->where('valor_documento', $sales_val_doc)
                             ->update([
-                                'razon_social' => $data['sales_razon_social'],
-                                'email' => $data['sales_email'],
+                                'razon_social' => $sales_razon,
+                                'email' => $sales_mail,
                                 'complemento_documento' => $text_complemento_documento,
                                 'updated_at' => $fecha_hora_actual,
                             ]);
@@ -1490,11 +1498,11 @@ class SaleController extends Controller
 
                         DB::table('customer_nit')->insert(
                             [
-                                'tipo_documento' => $data['sales_tipo_documento_hidden'],
-                                'valor_documento' => $data['sales_valor_documento'],
+                                'tipo_documento' => $sales_tipo_doc,
+                                'valor_documento' => $sales_val_doc,
                                 'complemento_documento' => $text_complemento_documento,
-                                'razon_social' => $data['sales_razon_social'],
-                                'email' => $data['sales_email'],
+                                'razon_social' => $sales_razon,
+                                'email' => $sales_mail,
                                 'created_at' => $fecha_hora_actual,
                                 'updated_at' => $fecha_hora_actual,
                             ]
@@ -1506,23 +1514,23 @@ class SaleController extends Controller
                 $obj_cliente = new CustomerSale();
                 $obj_cliente->sale_id = $lims_sale_data->id;
                 $obj_cliente->customer_id = $data['customer_id'];
-                $obj_cliente->razon_social = $data['sales_razon_social'];
-                $obj_cliente->email = $data['sales_email'];
-                if ($data['codigo_fijo'] != null || $data['codigo_fijo'] != '')
+                $obj_cliente->razon_social = $sales_razon;
+                $obj_cliente->email = $sales_mail;
+                if (!empty($data['codigo_fijo']))
                     $obj_cliente->codigofijo = $data['codigo_fijo'];
                 else
                     $obj_cliente->codigofijo = $data['customer_id'];
 
-                $obj_cliente->tipo_documento = $data['sales_tipo_documento_hidden'];
-                $obj_cliente->valor_documento = $data['sales_valor_documento'];
+                $obj_cliente->tipo_documento = $sales_tipo_doc;
+                $obj_cliente->valor_documento = $sales_val_doc;
                 $obj_cliente->complemento_documento = $text_complemento_documento;
-                $obj_cliente->codigo_excepcion = $data['bandera_codigo_excepcion_hidden'];
-                $obj_cliente->codigo_documento_sector = $data['bandera_codigo_documento_sector_hidden'];
-                $obj_cliente->glosa_periodo_facturado = $data['glosa_periodo_facturado'];
-                $obj_cliente->usuario = Auth::user()->name;
+                $obj_cliente->codigo_excepcion = $sales_excepcion;
+                $obj_cliente->codigo_documento_sector = $sales_doc_sector;
+                $obj_cliente->glosa_periodo_facturado = $data['glosa_periodo_facturado'] ?? null;
+                $obj_cliente->usuario = Auth::user()->name ?? 'POS';
 
                 // En caso de tarjeta de crédito/débito se procede enmascarar.
-                if ($data['number_card'] != null) {
+                if (!empty($data['number_card'])) {
                     $nro_tarjeta = Str::of($data['number_card'])->replaceMatches('/[^A-Za-z0-9]++/', '');
                     $primeros_cuatro = Str::substr($nro_tarjeta, 0, 4);
                     $relleno = "00000000";
@@ -1637,8 +1645,8 @@ class SaleController extends Controller
                     }
                 }
 
-                $obj_cliente->tipo_caso_especial = $data['sales_caso_especial_hidden'];
-                $obj_cliente->tipo_metodo_pago = $data['paid_by_id'];
+                $obj_cliente->tipo_caso_especial = $sales_caso_esp;
+                $obj_cliente->tipo_metodo_pago = $data['paid_by_id'] ?? 1;
                 if ($data['codigo_emision_hidden'] == 1) {
                     // Emisión ONLINE
                     $obj_cliente->estado_factura = "CONTINGENCIA";

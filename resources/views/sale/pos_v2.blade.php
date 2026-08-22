@@ -1583,6 +1583,16 @@
                                 <input type="hidden" name="monto_pago_online">
                                 <input type="hidden" name="monto_debito_automatico">
                                 <input type="hidden" name="balance_gift_card" value="0">
+                                <input type="hidden" name="sales_tipo_documento_hidden" id="sales_tipo_documento_hidden_v2" value="1">
+                                <input type="hidden" name="sales_caso_especial_hidden" id="sales_caso_especial_hidden_v2" value="1">
+                                <input type="hidden" name="sales_complemento_documento" id="sales_complemento_documento_v2" value="">
+                                <input type="hidden" name="codigo_fijo" value="">
+                                <input type="hidden" name="glosa_periodo_facturado" value="">
+                                <input type="hidden" name="number_card" value="">
+                                <input type="hidden" name="cheque_no" value="">
+                                <input type="hidden" name="invoice_no" value="0">
+                                <input type="hidden" name="nro_factura_manual" value="">
+                                <input type="hidden" name="fecha_manual" value="">
 
                                 <div class="row">
                                     <!-- COLUMNA IZQUIERDA: DATOS DE FACTURACIÓN SIAT & NOTA DE VENTA -->
@@ -7703,6 +7713,20 @@
 
                 var docVal = $('#sales_valor_documento_v2').val();
                 $('input[name="sales_nit_ci"]').val(docVal);
+
+                var docType = $('#documento_id_select_v2').val() || '1';
+                $('input[name="sales_tipo_documento_hidden"]').val(docType);
+
+                var specialCase = $('#siat-special-case-select').val();
+                if (specialCase === 'ventas_menores') {
+                    $('input[name="sales_caso_especial_hidden"]').val('2');
+                } else if (specialCase === 'extranjero') {
+                    $('input[name="sales_caso_especial_hidden"]').val('3');
+                } else if (specialCase === 'excepcion') {
+                    $('input[name="sales_caso_especial_hidden"]').val('4');
+                } else {
+                    $('input[name="sales_caso_especial_hidden"]').val('1');
+                }
 
                 var methodVal = $('#paid_by_id_select_v2').val();
                 $('input[name="paid_by_id"]').val(methodVal);
