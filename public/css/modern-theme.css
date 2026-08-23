@@ -299,3 +299,25 @@ body.dark-mode .badge-warning {
     background-color: #78350f !important;
     color: #fde68a !important;
 }
+
+/* POS Category & Brand Cards */
+.category-card-box:hover,
+.brand-card-box:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12) !important;
+    border-color: #0284c7 !important;
+}
+
+body.dark-mode .category-card-box,
+body.dark-mode .brand-card-box {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode .category-card-box:hover,
+body.dark-mode .brand-card-box:hover {
+    background-color: #162032 !important;
+    border-color: #38bdf8 !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+}

@@ -2164,16 +2164,26 @@
                                     </span>
                                 </div>
                             </div>
-                            <div class="row ml-2 mt-3">
+                            <div class="row mx-1 mt-3">
                                 @foreach ($lims_category_list as $category)
-                                    <div class="col-md-3 category-img text-center"
-                                        data-category="{{ $category->id }}">
-                                        @if ($category->image)
-                                            <img src="{{ url('images/category', $category->image) }}" />
-                                        @else
-                                            <img src="{{ url('images/product/zummXD2dvAtI.png') }}" />
-                                        @endif
-                                        <p class="text-center">{{ $category->name }}</p>
+                                    <div class="col-6 col-md-3 p-1">
+                                        <div class="category-img category-card-box text-center p-2"
+                                            data-category="{{ $category->id }}"
+                                            style="cursor: pointer; border-radius: 12px; border: 1px solid #cbd5e1; background-color: #ffffff; transition: all 0.2s ease; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 95px;">
+                                            @if ($category->image)
+                                                <img src="{{ url('images/category', $category->image) }}"
+                                                    style="max-height: 50px; max-width: 100%; object-fit: contain; margin-bottom: 6px;"
+                                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                                <div class="category-icon-fallback" style="display: none; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%); color: #ffffff; align-items: center; justify-content: center; margin-bottom: 6px;">
+                                                    <i class="fa fa-th-large fa-lg"></i>
+                                                </div>
+                                            @else
+                                                <div class="category-icon-fallback" style="display: flex; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%); color: #ffffff; align-items: center; justify-content: center; margin-bottom: 6px;">
+                                                    <i class="fa fa-th-large fa-lg"></i>
+                                                </div>
+                                            @endif
+                                            <p class="text-center font-weight-bold mb-0 text-truncate w-100" style="font-size: 0.82rem; line-height: 1.2;" title="{{ $category->name }}">{{ $category->name }}</p>
+                                        </div>
                                     </div>
                                 @endforeach
                             </div>
@@ -2187,19 +2197,27 @@
                                     </span>
                                 </div>
                             </div>
-                            <div class="row ml-2 mt-3">
+                            <div class="row mx-1 mt-3">
                                 @foreach ($lims_brand_list as $brand)
-                                    @if ($brand->image)
-                                        <div class="col-md-3 brand-img text-center" data-brand="{{ $brand->id }}">
-                                            <img src="{{ url('images/brand', $brand->image) }}" />
-                                            <p class="text-center">{{ $brand->title }}</p>
+                                    <div class="col-6 col-md-3 p-1">
+                                        <div class="brand-img brand-card-box text-center p-2"
+                                            data-brand="{{ $brand->id }}"
+                                            style="cursor: pointer; border-radius: 12px; border: 1px solid #cbd5e1; background-color: #ffffff; transition: all 0.2s ease; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 95px;">
+                                            @if ($brand->image)
+                                                <img src="{{ url('images/brand', $brand->image) }}"
+                                                    style="max-height: 50px; max-width: 100%; object-fit: contain; margin-bottom: 6px;"
+                                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                                <div class="brand-icon-fallback" style="display: none; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #ffffff; align-items: center; justify-content: center; margin-bottom: 6px;">
+                                                    <i class="fa fa-tag fa-lg"></i>
+                                                </div>
+                                            @else
+                                                <div class="brand-icon-fallback" style="display: flex; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #ffffff; align-items: center; justify-content: center; margin-bottom: 6px;">
+                                                    <i class="fa fa-tag fa-lg"></i>
+                                                </div>
+                                            @endif
+                                            <p class="text-center font-weight-bold mb-0 text-truncate w-100" style="font-size: 0.82rem; line-height: 1.2;" title="{{ $brand->title }}">{{ $brand->title }}</p>
                                         </div>
-                                    @else
-                                        <div class="col-md-3 brand-img" data-brand="{{ $brand->id }}">
-                                            <img src="{{ url('images/product/zummXD2dvAtI.png') }}" />
-                                            <p class="text-center">{{ $brand->title }}</p>
-                                        </div>
-                                    @endif
+                                    </div>
                                 @endforeach
                             </div>
                         </div>
