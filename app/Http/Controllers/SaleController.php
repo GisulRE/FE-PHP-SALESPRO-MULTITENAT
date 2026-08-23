@@ -1094,11 +1094,14 @@ class SaleController extends Controller
                 }
             }
 
-            /** Marcar Proforma como Completada (quotation_status = 2) */
+            /** Marcar Proforma como Completada (quotation_status = 2) y guardar ID de la venta vinculada */
             if (!empty($lims_sale_data->quotation_id) && $lims_sale_data->sale_status == '1') {
                 $lims_quotation_data = Quotation::find($lims_sale_data->quotation_id);
                 if ($lims_quotation_data && $lims_quotation_data->quotation_status == 1) {
                     $lims_quotation_data->quotation_status = 2; // Enviada/Completada
+                    if (Schema::hasColumn('quotations', 'sale_id')) {
+                        $lims_quotation_data->sale_id = $lims_sale_data->id;
+                    }
                     $lims_quotation_data->save();
                     $message = $message . ' | Proforma ' . $lims_quotation_data->reference_no . ' marcada como completada';
                 }

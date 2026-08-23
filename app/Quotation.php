@@ -13,7 +13,7 @@ class Quotation extends Model
         "reference_no", "user_id", "biller_id", "supplier_id", "customer_id", "warehouse_id", 
         "item", "total_qty", "total_discount", "total_tax", "total_price", "order_tax_rate", 
         "order_tax", "order_discount", "shipping_cost", "grand_total", "quotation_status",
-        "document", "note", "valid_date", "company_id"
+        "document", "note", "valid_date", "company_id", "sale_id"
     ];
 
     public function biller()
