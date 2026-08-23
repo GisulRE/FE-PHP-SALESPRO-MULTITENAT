@@ -2372,91 +2372,99 @@
                 <!-- add customer modal -->
                 <div id="addCustomer" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
                     aria-hidden="true" class="modal fade text-left">
-                    <div role="document" class="modal-dialog">
+                    <div role="document" class="modal-dialog modal-lg">
                         <div class="modal-content">
                             <form id="frmAddCustomer" method="POST">
-                                <div class="modal-header">
-                                    <h5 id="exampleModalLabel" class="modal-title">
-                                        {{ trans('file.Add Customer') }}</h5>
-                                    <button type="button" data-dismiss="modal" aria-label="Close"
-                                        class="close"><span aria-hidden="true"><i
-                                                class="dripicons-cross"></i></span></button>
+                                <div class="modal-header bg-primary text-white py-3">
+                                    <h5 id="exampleModalLabel" class="modal-title font-weight-bold text-white">
+                                        <i class="fa fa-user-plus mr-2"></i> {{ trans('file.Add Customer') }} Rápido
+                                    </h5>
+                                    <button type="button" data-dismiss="modal" aria-label="Close" class="close text-white">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
                                 </div>
-                                <div class="modal-body">
-                                    <p class="italic">
+                                <div class="modal-body p-4">
+                                    <p class="text-muted mb-3" style="font-size: 0.85rem;">
                                         <small>{{ trans('file.The field labels marked with * are required input fields') }}.</small>
                                     </p>
-                                    <div class="form-group">
-                                        <label>{{ trans('file.Customer Group') }} *</strong> </label>
-                                        <select required class="form-control selectpicker" name="customer_group_id">
-                                            @foreach ($lims_customer_group_all as $customer_group)
-                                                <option value="{{ $customer_group->id }}">
-                                                    {{ $customer_group->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>{{ trans('file.name') }} *</strong> </label>
-                                        <input type="text" name="name" required class="form-control">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>{{ trans('file.Phone Number') }}</label>
-                                        <input type="text" name="phone_number" class="form-control">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Fecha Nacimiento (Opcional)</label>
-                                        <input type="date" name="date_birh" class="form-control">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>{{ trans('file.Address') }}</label>
-                                        <input type="text" name="address" class="form-control">
-                                    </div>
+
                                     {{-- Formularios para tipoDocumento + Razón social --}}
                                     @include('sale.partials-sale-tipo-documento')
                                     {{-- Formularios para tipoDocumento + Razón social --}}
-                                    <div class="form-group">
-                                        <label>{{ trans('file.Email') }}</label>
-                                        <input type="email" name="email" placeholder="example@example.com"
-                                            class="form-control">
+
+                                    <div class="row">
+                                        <div class="form-group col-md-6">
+                                            <label class="font-weight-bold">{{ trans('file.name') }} / Razón Social *</label>
+                                            <input type="text" name="name" required class="form-control" placeholder="Nombre completo o Razón Social">
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            <label class="font-weight-bold">{{ trans('file.Customer Group') }} *</label>
+                                            <select required class="form-control selectpicker" name="customer_group_id">
+                                                @foreach ($lims_customer_group_all as $customer_group)
+                                                    <option value="{{ $customer_group->id }}">
+                                                        {{ $customer_group->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            <label class="font-weight-bold">{{ trans('file.Phone Number') }} / WhatsApp</label>
+                                            <input type="text" name="phone_number" class="form-control" placeholder="70000000">
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            <label class="font-weight-bold">{{ trans('file.Email') }}</label>
+                                            <input type="email" name="email" placeholder="example@example.com" class="form-control">
+                                        </div>
                                     </div>
-                                    @if (in_array('pos_customer_advanced', $all_permission))
-                                        <div class="row">
-                                            <div class="form-group col">
-                                                <label>{{ trans('file.City') }}</label>
-                                                <input type="text" name="city" class="form-control">
+
+                                    <div class="mt-2 pt-2 border-top">
+                                        <a class="btn btn-sm btn-link text-decoration-none p-0 mb-3" data-toggle="collapse" href="#extraCustomerInfo_pos" role="button" aria-expanded="false" aria-controls="extraCustomerInfo_pos" style="font-weight: 600;">
+                                            <i class="fa fa-sliders"></i> Más Datos Opcionales (Dirección, Fecha Nacimiento, Medidor...) <i class="fa fa-chevron-down ml-1"></i>
+                                        </a>
+
+                                        <div class="collapse" id="extraCustomerInfo_pos">
+                                            <div class="row">
+                                                <div class="form-group col-md-6">
+                                                    <label>{{ trans('file.Address') }}</label>
+                                                    <input type="text" name="address" class="form-control" placeholder="Dirección del cliente">
+                                                </div>
+                                                <div class="form-group col-md-6">
+                                                    <label>Fecha Nacimiento (Opcional)</label>
+                                                    <input type="date" name="date_birh" class="form-control">
+                                                </div>
+
+                                                @if (in_array('pos_customer_advanced', $all_permission))
+                                                    <div class="form-group col-md-6">
+                                                        <label>{{ trans('file.City') }}</label>
+                                                        <input type="text" name="city" class="form-control" placeholder="Ciudad">
+                                                    </div>
+                                                    <div class="form-group col-md-6">
+                                                        <label>Sucursal (Opcional)</label>
+                                                        <select class="form-control selectpicker" name="sucursal_id">
+                                                            @foreach ($lims_sucursal_all as $sucursal)
+                                                                <option value="{{ $sucursal->sucursal }}">
+                                                                    {{ $sucursal->sucursal }} - {{ $sucursal->nombre }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    <div class="form-group col-md-6">
+                                                        <label>Código Fijo (Opcional)</label>
+                                                        <input type="text" name="codigofijo" class="form-control" placeholder="Código fijo de suministro">
+                                                    </div>
+                                                    <div class="form-group col-md-6">
+                                                        <label>Nro. Medidor (Opcional)</label>
+                                                        <input type="text" name="nro_medidor" class="form-control" placeholder="Nro. de medidor">
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
-                                        <div class="row">
-                                            <div class="form-group col">
-                                                <label>Codigo Fijo (Opcional)</label>
-                                                <input type="text" name="codigofijo" class="form-control"
-                                                    placeholder="codigo fijo para servicios basicos">
-                                            </div>
-                                            <div class="form-group col">
-                                                <label>Nro. Medidor (Opcional)</label>
-                                                <input type="text" name="nro_medidor" class="form-control"
-                                                    placeholder="nro. medidor para servicios basicos">
-                                            </div>
-                                        </div>
-                                        <div class="row">
-                                            <div class="form-group col">
-                                                <label>Sucursal (Opcional)</strong> </label>
-                                                <select required class="form-control selectpicker" name="sucursal_id">
-                                                    @foreach ($lims_sucursal_all as $sucursal)
-                                                        <option value="{{ $sucursal->sucursal }}">
-                                                            {{ $sucursal->sucursal }} -
-                                                            {{ $sucursal->nombre }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                            </div>
-                                        </div>
-                                    @endif
-                                    <div class="form-group">
+                                    </div>
+
+                                    <div class="form-group mt-3 mb-0 text-right">
                                         <input type="hidden" name="pos" value="1">
-                                        <input id="btnSaveCustomer" type="button"
-                                            value="{{ trans('file.submit') }}" class="btn btn-primary">
+                                        <button type="button" class="btn btn-secondary mr-2" data-dismiss="modal">Cancelar</button>
+                                        <input id="btnSaveCustomer" type="button" value="{{ trans('file.submit') }}" class="btn btn-primary px-4 font-weight-bold">
                                     </div>
                                 </div>
                             </form>
