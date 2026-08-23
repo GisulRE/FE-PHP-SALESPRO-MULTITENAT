@@ -79,6 +79,77 @@ class AdjustmentController extends Controller
         return $product_data;
     }
 
+    public function searchProducts(Request $request)
+    {
+        try {
+            $term = trim($request->get('q', ''));
+            $warehouseId = $request->get('warehouse_id');
+            $page = (int)$request->get('page', 1);
+            $limit = (int)$request->get('limit', 25);
+            if ($limit > 100) {
+                $limit = 100;
+            }
+            $query = Product::where('is_active', true);
+            if (!empty($term)) {
+                $query->where(function ($q) use ($term) {
+                    $q->where('name', 'LIKE', '%' . $term . '%')
+                      ->orWhere('code', 'LIKE', '%' . $term . '%');
+                });
+            }
+            $total = $query->count();
+            $offset = ($page - 1) * $limit;
+            $products = $query->select('id', 'name', 'code', 'is_variant')
+                ->orderBy('name')
+                ->skip($offset)
+                ->take($limit)
+                ->get();
+            $results = [];
+            foreach ($products as $product) {
+                $qty = 0;
+                if (!empty($warehouseId) && $warehouseId != '0') {
+                    $pw = Product_Warehouse::where('product_id', $product->id)
+                        ->where('warehouse_id', $warehouseId)
+                        ->first();
+                    if ($pw) {
+                        $qty = $pw->qty;
+                    }
+                }
+                $code = $product->code;
+                if ($product->is_variant) {
+                    $pv = ProductVariant::where('product_id', $product->id)->first();
+                    if ($pv && !empty($pv->item_code)) {
+                        $code = $pv->item_code;
+                    }
+                }
+                $label = $code . ' (' . $product->name . ')';
+                $results[] = [
+                    'id' => $product->id,
+                    'code' => $code,
+                    'name' => $product->name,
+                    'qty' => $qty,
+                    'label' => $label,
+                    'value' => $label,
+                    'productCode' => $code
+                ];
+            }
+            return response()->json([
+                'results' => $results,
+                'total' => $total,
+                'page' => $page,
+                'has_more' => ($offset + count($results)) < $total
+            ]);
+        } catch (\Exception $e) {
+            Log::error('[searchProducts Error] ' . $e->getMessage());
+            return response()->json([
+                'error' => $e->getMessage(),
+                'results' => [],
+                'total' => 0,
+                'page' => 1,
+                'has_more' => false
+            ], 500);
+        }
+    }
+
 
     public function getInfoProduct($id_warehouse, $product_code)
     {

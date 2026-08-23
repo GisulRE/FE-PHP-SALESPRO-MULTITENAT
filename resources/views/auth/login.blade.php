@@ -141,6 +141,9 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                 <div class="copyrights text-center">
                     <p>{{ trans('file.Developed By') }} <a href="http://www.gisul.com.bo/" class="external">Gisul
                             S.R.L.</a></p>
+                    <div class="mt-2">
+                        <span class="badge badge-secondary p-2">v2.5.0-20260822</span>
+                    </div>
                 </div>
             </div>
         </div>

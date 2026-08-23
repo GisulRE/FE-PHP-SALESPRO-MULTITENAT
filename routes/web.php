@@ -283,6 +283,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('qty_adjustment/getproduct-data/{idwh}/{idpro}', 'AdjustmentController@getInfoProduct')->name('adjustment.getproduct-data');
 
 	Route::get('qty_adjustment/lims_product_search', 'AdjustmentController@limsProductSearch')->name('product_adjustment.search');
+	Route::get('qty_adjustment/search_products', 'AdjustmentController@searchProducts')->name('adjustment.search_products');
 	Route::get('adjustments', 'AdjustmentController@index')->name('qty_adjustment.index');
 	Route::get('adjustments/create', 'AdjustmentController@create')->name('qty_adjustment.create');
 	Route::get('qty_adjustment', 'AdjustmentController@index');

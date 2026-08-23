@@ -153,133 +153,140 @@
     <script type="text/javascript">
         $("ul#product").siblings('a').attr('aria-expanded', 'true');
         $("ul#product").addClass("show");
-        // array data depend on warehouse
-        var lims_product_array = [];
-        var product_code = [];
-        var product_name = [];
-        var product_qty = [];
 
-        var exist_code = [];
-        var exist_qty = [];
-
-        var rownumber = $('table.order-list tbody tr:last').index();
-
-        for (rowindex = 0; rowindex <= rownumber; rowindex++) {
-            exist_code.push($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(2)')
-                .text());
-            var quantity = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val());
-            exist_qty.push(quantity);
-        }
+        var rowindex;
 
         $('.selectpicker').selectpicker({
             style: 'btn-link',
         });
-        //assigning value
+        // assigning value
         $('select[name="warehouse_id"]').val($('input[name="warehouse_id_hidden"]').val());
         $('.selectpicker').selectpicker('refresh');
         calculateTotal();
 
-        $('#lims_productcodeSearch').on('input', function() {
-            var warehouse_id = $('#warehouse_id').val();
-            temp_data = $('#lims_productcodeSearch').val();
+        $(document).ready(function() {
+            $('#lims_productcodeSearch').on('input', function() {
+                var warehouse_id = $('#warehouse_id').val();
+                var temp_data = $('#lims_productcodeSearch').val();
 
-            if (!warehouse_id) {
-                $('#lims_productcodeSearch').val(temp_data.substring(0, temp_data.length - 1));
-                swal('Advertencia!', "Por favor seleccione un almacen.", "warning");
-            }
-        });
-
-        var id = $('#warehouse_id').val();
-        $.get('../getproduct/' + id, function(data) {
-            lims_product_array = [];
-            product_code = data[0];
-            product_name = data[1];
-            product_qty = data[2];
-            $.each(product_code, function(index) {
-                if (exist_code.includes(product_code[index])) {
-                    pos = exist_code.indexOf(product_code[index]);
-                    product_qty[index] = product_qty[index] + exist_qty[pos];
+                if (!warehouse_id) {
+                    $('#lims_productcodeSearch').val(temp_data.substring(0, temp_data.length - 1));
+                    swal('Advertencia!', "Por favor seleccione un almacén.", "warning");
                 }
-                lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')');
             });
-        });
 
-        var lims_productcodeSearch = $('#lims_productcodeSearch');
+            var lims_productcodeSearch = $('#lims_productcodeSearch');
 
-        lims_productcodeSearch.autocomplete({
-            source: function(request, response) {
-                var matcher = new RegExp(".?" + $.ui.autocomplete.escapeRegex(request.term), "i");
-                response($.grep(lims_product_array, function(item) {
-                    return matcher.test(item);
-                }));
-            },
-            response: function(event, ui) {
-                if (ui.content.length == 1) {
-                    var data = ui.content[0].value;
-                    $(this).autocomplete("close");
-                    productSearch(data);
-                };
-            },
-            select: function(event, ui) {
-                var data = ui.item.value;
-                productSearch(data);
-            }
-        });
-
-        $('select[name="warehouse_id"]').on('change', function() {
-            var id = $('#warehouse_id').val();
-            $.get('../getproduct/' + id, function(data) {
-                lims_product_array = [];
-                product_code = data[0];
-                product_name = data[1];
-                product_qty = data[2];
-                $.each(product_code, function(index) {
-                    lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')');
-                });
-            });
-        });
-
-        $("#myTable").on('input', '.qty', function() {
-            rowindex = $(this).closest('tr').index();
-            checkQuantity($(this).val(), true);
-        });
-
-        $("table.order-list tbody").on("click", ".ibtnDel", function(event) {
-            rowindex = $(this).closest('tr').index();
-            $(this).closest("tr").remove();
-            calculateTotal();
-        });
-
-        $(window).keydown(function(e) {
-            if (e.which == 13) {
-                var $targ = $(e.target);
-                if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
-                    var focusNext = false;
-                    $(this).find(":input:visible:not([disabled],[readonly]), a").each(function() {
-                        if (this === e.target) {
-                            focusNext = true;
-                        } else if (focusNext) {
-                            $(this).focus();
-                            return false;
+            lims_productcodeSearch.autocomplete({
+                minLength: 1,
+                source: function(request, response) {
+                    var whId = $('#warehouse_id').val() || 0;
+                    $.ajax({
+                        url: '{{ url("qty_adjustment/search_products") }}',
+                        dataType: 'json',
+                        data: {
+                            q: request.term,
+                            warehouse_id: whId,
+                            page: 1,
+                            limit: 25
+                        },
+                        success: function(data) {
+                            var items = data.results || [];
+                            response($.map(items, function(item) {
+                                return {
+                                    label: item.code + ' (' + item.name + ') - Stock: ' + item.qty,
+                                    value: item.code + ' (' + item.name + ')',
+                                    productCode: item.code
+                                };
+                            }));
                         }
                     });
+                },
+                response: function(event, ui) {
+                    if (ui.content && ui.content.length == 1) {
+                        var data = ui.content[0].productCode || ui.content[0].value;
+                        $(this).autocomplete("close");
+                        productSearch(data);
+                    }
+                },
+                select: function(event, ui) {
+                    var data = ui.item.productCode || ui.item.value;
+                    productSearch(data);
                     return false;
                 }
-            }
-        });
+            });
 
-        $('#adjustment-form').on('submit', function(e) {
-            var rownumber = $('table.order-list tbody tr:last').index();
-            if (rownumber < 0) {
-                swal('Error!', "Por favor ingrese un producto en la tabla.", "error");
+            $("#myTable").on('input', '.qty', function() {
+                rowindex = $(this).closest('tr').index();
+                checkQuantity($(this).val());
+            });
+
+            $("table.order-list tbody").on("click", ".ibtnDel", function(event) {
+                rowindex = $(this).closest('tr').index();
+                $(this).closest("tr").remove();
+                calculateTotal();
+            });
+
+            $(window).keydown(function(e) {
+                if (e.which == 13) {
+                    var $targ = $(e.target);
+                    if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                        var focusNext = false;
+                        $(this).find(":input:visible:not([disabled],[readonly]), a").each(function() {
+                            if (this === e.target) {
+                                focusNext = true;
+                            } else if (focusNext) {
+                                $(this).focus();
+                                return false;
+                            }
+                        });
+                        return false;
+                    }
+                }
+            });
+
+            $('#adjustment-form').on('submit', function(e) {
+                var rownumber = $('table.order-list tbody tr:last').index();
+                if (rownumber < 0) {
+                    swal('Error!', "Por favor ingrese un producto en la tabla.", "error");
+                    e.preventDefault();
+                }
+            });
+
+            $('#adjustment-form').on("submit", function(e) {
                 e.preventDefault();
-            }
+                var formData = new FormData($(this)[0]);
+                $.ajax({
+                    type: 'POST',
+                    url: $(this).attr('action'),
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        $('#loader').show();
+                        setTimeout(() => {
+                            $('#loader').hide();
+                            setPage("{{ route('qty_adjustment.index') }}");
+                        }, 1000);
+                    },
+                    error: function(response) {
+                        if (response.responseJSON && response.responseJSON.errors) {
+                            if (response.responseJSON.errors.name) {
+                                $("#name-error").text(response.responseJSON.errors.name);
+                            }
+                            if (response.responseJSON.errors.code) {
+                                $("#code-error").text(response.responseJSON.errors.code);
+                            }
+                        }
+                    }
+                });
+            });
         });
 
         function productSearch(data) {
             $.ajax({
                 type: 'GET',
-                url: '../lims_product_search',
+                url: '{{ url("qty_adjustment/lims_product_search") }}',
                 data: {
                     data: data
                 },
@@ -288,10 +295,8 @@
                     $(".product-code").each(function(i) {
                         if ($(this).val() == data[1]) {
                             rowindex = i;
-                            var qty = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex +
-                                1) + ') .qty').val()) + 1;
-                            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(
-                                qty);
+                            var qty = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val()) + 1;
+                            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(qty);
                             checkQuantity(qty);
                             flag = 0;
                         }
@@ -306,20 +311,14 @@
                         else
                             cols += '<td>' + data[1] + '</td>';
 
-                        cols +=
-                            '<td><input type="number" class="form-control qty" name="qty[]" value="1" required step="any" onfocus="this.focus();this.select()"/></td>';
-                        cols +=
-                            '<td class="action"><select name="action[]" class="form-control act-val"><option value="-">{{ trans('file.Subtraction') }}</option><option value="+">{{ trans('file.Addition') }}</option></select></td>';
-                        cols +=
-                            '<td><button type="button" class="ibtnDel btn btn-md btn-danger">{{ trans('file.delete') }}</button></td>';
+                        cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" required step="any" onfocus="this.focus();this.select()"/></td>';
+                        cols += '<td class="action"><select name="action[]" class="form-control act-val" onchange="updateAction()"><option value="-">{{ trans('file.Subtraction') }}</option><option value="+">{{ trans('file.Addition') }}</option></select></td>';
+                        cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger">{{ trans('file.delete') }}</button></td>';
                         if (data[4] != null)
-                            cols += '<input type="hidden" class="product-code" name="product_code[]" value="' +
-                            data[4] + '"/>';
+                            cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data[4] + '"/>';
                         else
-                            cols += '<input type="hidden" class="product-code" name="product_code[]" value="' +
-                            data[1] + '"/>';
-                        cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[
-                            2] + '"/>';
+                            cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data[1] + '"/>';
+                        cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[2] + '"/>';
 
                         newRow.append(cols);
                         $("table.order-list tbody").append(newRow);
@@ -331,33 +330,27 @@
             });
         }
 
+        function updateAction() {
+            var qty = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val()) || 1;
+            checkQuantity(qty);
+        }
+
         function checkQuantity(qty) {
-            var row_product_code = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(2)')
-                .text();
+            var row_product_code = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(2)').text();
             var action = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.act-val').val();
             var warehouse_id = $('#warehouse_id').val();
-            $.get('../getproduct-data/' + warehouse_id + '/' + row_product_code, function(res) {
-                console.log(res);
+            $.get('{{ url("qty_adjustment/getproduct-data") }}/' + warehouse_id + '/' + row_product_code, function(res) {
                 if (res.status === true) {
                     if ((qty > parseFloat(res.qty)) && (action == '-')) {
                         swal('Advertencia!', "Cantidad excede el stock disponible.", "warning");
-                        var row_qty = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')')
-                            .find(
-                                '.qty')
-                            .val();
-                        row_qty = row_qty.substring(0, row_qty.length - 1);
-                        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty')
-                            .val(
-                                row_qty);
+                        var row_qty = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val();
+                        row_qty = String(row_qty).substring(0, String(row_qty).length - 1);
+                        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(row_qty);
                     } else {
-                        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty')
-                            .val(
-                                qty);
+                        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(qty);
                     }
                 } else {
-                    swal('Error!',
-                        "Stock no disponible producto no existente en almacen, contacte con administrador",
-                        "error");
+                    swal('Error!', "Stock no disponible producto no existente en almacén, contacte con administrador", "error");
                 }
                 calculateTotal();
             });
@@ -366,7 +359,6 @@
         function calculateTotal() {
             var total_qty = 0;
             $(".qty").each(function() {
-
                 if ($(this).val() == '') {
                     total_qty += 0;
                 } else {
@@ -377,42 +369,5 @@
             $('input[name="total_qty"]').val(total_qty);
             $('input[name="item"]').val($('table.order-list tbody tr:last').index() + 1);
         }
-
-        $('#adjustment-form').on("submit", function(e) {
-            e.preventDefault();
-            var formData = new FormData($(this)[0]);
-            $.ajax({
-                type: 'POST',
-                url: $(this).attr('action'),
-                data: formData,
-                processData: false, // Evita el procesamiento de datos
-                contentType: false,
-                success: function(response) {
-
-                    $('#loader').show();
-
-                    setTimeout(() => {
-
-                        $('#loader').hide();
-
-                        setPage("{{ route('qty_adjustment.index') }}")
-
-                    }, 1000);
-
-                },
-                error: function(response) {
-                    if (response.responseJSON.errors.name) {
-                        $("#name-error").text(response
-                            .responseJSON.errors
-                            .name);
-                    } else if (response.responseJSON.errors
-                        .code) {
-                        $("#code-error").text(response
-                            .responseJSON.errors
-                            .code);
-                    }
-                },
-            });
-        });
     </script>
 @endsection
