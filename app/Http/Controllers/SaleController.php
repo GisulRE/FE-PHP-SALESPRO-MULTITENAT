@@ -151,10 +151,17 @@ class SaleController extends Controller
 
     public function saleData(Request $request)
     {
-        $start_date = date('Y-m-d', strtotime(' -7 day'));
-        $end_date = date('Y-m-d');
-        $end_date_temp = $end_date;
-        $end_date = $end_date . " 23:59:59";
+        $start_date = $request->input('start_date');
+        $end_date = $request->input('end_date');
+
+        if (empty($start_date) || $start_date === 'undefined' || $start_date === 'null') {
+            $start_date = '2000-01-01';
+        }
+        if (empty($end_date) || $end_date === 'undefined' || $end_date === 'null') {
+            $end_date = date('Y-m-d');
+        }
+        $end_date_full = $end_date . " 23:59:59";
+
         $columns = array(
             1 => 'created_at',
             2 => 'reference_no',
@@ -162,22 +169,21 @@ class SaleController extends Controller
             8 => 'paid_amount',
         );
 
-        if (!is_null($request->start_date) && !empty($request->start_date) && !is_null($request->end_date) || !empty($request->end_date)) {
-            $start_date = $request->start_date;
-            $end_date = $request->end_date;
-            $end_date_temp = $end_date;
-            $end_date = $end_date . " 23:59:59";
+        $role = Role::find(Auth::user()->role_id);
+        $has_all_permission = ($role && $role->hasPermissionTo('sales-index-all')) || Auth::user()->role_id <= 2;
+
+        $baseQuery = Sale::query();
+        if (!$has_all_permission) {
+            $baseQuery->where('sales.user_id', Auth::id());
         }
 
-        if (Auth::user()->role_id > 2) {
-            $totalData = Sale::where('user_id', Auth::id())
-                ->whereDate('date_sell', ">=", $start_date)
-                ->whereDate('date_sell', "<=", $end_date)
-                ->count();
-        } else {
-            $totalData = Sale::whereDate('date_sell', ">=", $start_date)
-                ->whereDate('date_sell', "<=", $end_date)->count();
-        }
+        $baseQuery->where(function($q) use ($start_date, $end_date_full) {
+            $q->whereBetween('sales.date_sell', [$start_date, $end_date_full])
+              ->orWhereBetween('sales.created_at', [$start_date, $end_date_full])
+              ->orWhereNull('sales.date_sell');
+        });
+
+        $totalData = (clone $baseQuery)->count();
 
         $totalFiltered = $totalData;
         if ($request->input('length') != -1) {
@@ -186,44 +192,26 @@ class SaleController extends Controller
             $limit = $totalData;
         }
 
-        $start = $request->input('start');
-        $order = 'sales.' . $columns[$request->input('order.0.column')];
-        $dir = $request->input('order.0.dir');
+        $start = $request->input('start', 0);
+        $order = 'sales.' . ($columns[$request->input('order.0.column')] ?? 'created_at');
+        $dir = $request->input('order.0.dir', 'desc');
 
         if (empty($request->input('search.value'))) {
-            if (Auth::user()->role_id > 2) {
-                $sales = Sale::with('biller', 'customer', 'warehouse', 'user')->offset($start)
-                    ->where('user_id', Auth::id())
-                    ->whereDate('date_sell', ">=", $start_date)
-                    ->whereDate('date_sell', "<=", $end_date)
-                    ->limit($limit)
-                    ->orderBy($order, $dir)
-                    ->get();
-            } else {
-                $sales = Sale::with('biller', 'customer', 'warehouse', 'user')->offset($start)
-                    ->limit($limit)
-                    ->whereDate('date_sell', ">=", $start_date)
-                    ->whereDate('date_sell', "<=", $end_date)
-                    ->orderBy($order, $dir)
-                    ->get();
-            }
+            $sales = (clone $baseQuery)
+                ->with('biller', 'customer', 'warehouse', 'user')
+                ->offset($start)
+                ->limit($limit)
+                ->orderBy($order, $dir)
+                ->get();
         } else {
             $search = $request->input('search.value');
             $cleanSearch = str_replace(',', '', $search);
 
-            $q = Sale::select('sales.*')
+            $q = (clone $baseQuery)
+                ->select('sales.*')
                 ->with('biller', 'customer', 'warehouse', 'user')
-                ->leftJoin('customers', function($join) {
-                    $join->on('sales.customer_id', '=', 'customers.id')
-                         ->where('customers.company_id', '=', auth()->user()->company_id);
-                })
-                ->leftJoin('billers', 'sales.biller_id', '=', 'billers.id')
-                ->whereDate('sales.date_sell', ">=", $start_date)
-                ->whereDate('sales.date_sell', "<=", $end_date);
-
-            if (Auth::user()->role_id > 2) {
-                $q->where('sales.user_id', Auth::id());
-            }
+                ->leftJoin('customers', 'sales.customer_id', '=', 'customers.id')
+                ->leftJoin('billers', 'sales.biller_id', '=', 'billers.id');
 
             $q->where(function($query) use ($search, $cleanSearch) {
                 $query->whereDate('sales.date_sell', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
