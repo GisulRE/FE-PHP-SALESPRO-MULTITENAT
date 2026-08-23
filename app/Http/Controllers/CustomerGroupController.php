@@ -24,16 +24,18 @@ class CustomerGroupController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = auth()->user()->company_id ?? null;
         $this->validate($request, [
             'name' => [
                 'max:255',
-                    Rule::unique('customer_groups')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('customer_groups')->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ],
         ]);
         $lims_customer_group_data = $request->all();
         $lims_customer_group_data['is_active'] = true;
+        $lims_customer_group_data['company_id'] = $companyId;
         CustomerGroup::create($lims_customer_group_data);
         return redirect('customer_group')->with('message', 'Data inserted successfully');
     }
@@ -46,11 +48,12 @@ class CustomerGroupController extends Controller
 
     public function update(Request $request, $id)
     {
+        $companyId = auth()->user()->company_id ?? null;
         $this->validate($request, [
             'name' => [
                 'max:255',
-                    Rule::unique('customer_groups')->ignore($request->customer_group_id)->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('customer_groups')->ignore($request->customer_group_id)->where(function ($query) use ($companyId) {
+                    return $query->where('is_active', 1)->where('company_id', $companyId);
                 }),
             ],
         ]);
