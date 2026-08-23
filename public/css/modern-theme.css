@@ -360,50 +360,112 @@ button.payment-btn {
     background: #161e2e !important;
     color: #f8fafc !important;
     border-radius: 8px !important;
-    border-top: 1px solid #2d3748 !important;
-    border-right: 1px solid #2d3748 !important;
-    border-bottom: 1px solid #2d3748 !important;
+    border-top: 1.5px solid #2d3748 !important;
+    border-right: 1.5px solid #2d3748 !important;
+    border-bottom: 1.5px solid #2d3748 !important;
     border-left: 4px solid #00cec9 !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
     transition: all 0.2s ease-in-out !important;
     font-weight: 600 !important;
 }
 
-.payment-options .btn-custom:hover,
-.pos-v2-action-bar button:hover,
-.pos-v2-btn-row button:hover,
-div.column-5 button:hover,
-button.btn-custom:hover,
-button.payment-btn:hover {
-    transform: translateY(-2px) !important;
-    filter: brightness(1.15) !important;
-}
-
+/* Specific Accent Colors per Action (Normal State Left Edge) */
 #cash-btn, button[id*="cash"] { border-left-color: #00cec9 !important; }
 #qrsimple-btn, button[id*="qr"] { border-left-color: #2bf710 !important; }
 #multiple-pay-btn, button[id*="multiple"] { border-left-color: #1f6feb !important; }
 #qrcash-btn, button[id*="qrcash"] { border-left-color: #b130ec !important; }
-#presale-btn, button[id*="presale"] { border-left-color: #00cec9 !important; }
+#presale-btn, button[id*="presale"] { border-left-color: #2bf710 !important; }
 #proforma-btn, #showproforma-list-btn { border-left-color: #1f6feb !important; }
 #cancel-btn { border-left-color: #d63031 !important; }
 #abonar-btn { border-left-color: #06b6d4 !important; }
 #cheque-btn { border-left-color: #fd7272 !important; }
 #gift-card-btn { border-left-color: #5f27cd !important; }
 #deposit-btn { border-left-color: #b33771 !important; }
-button[data-target="#order-cobrar"] { border-left-color: #4024e0 !important; }
+button[data-target="#order-cobrar"] { border-left-color: #38bdf8 !important; }
 button[data-target="#recentTransaction"] { border-left-color: #eab308 !important; }
 
-#cash-btn:hover, button[id*="cash"]:hover { box-shadow: 0 6px 18px rgba(0, 206, 201, 0.4) !important; }
-#qrsimple-btn:hover, button[id*="qr"]:hover { box-shadow: 0 6px 18px rgba(43, 247, 16, 0.4) !important; }
-#multiple-pay-btn:hover, button[id*="multiple"]:hover { box-shadow: 0 6px 18px rgba(31, 111, 235, 0.4) !important; }
-#qrcash-btn:hover, button[id*="qrcash"]:hover { box-shadow: 0 6px 18px rgba(177, 48, 236, 0.4) !important; }
-#presale-btn:hover, button[id*="presale"]:hover { box-shadow: 0 6px 18px rgba(0, 206, 201, 0.4) !important; }
-#proforma-btn:hover, #showproforma-list-btn:hover { box-shadow: 0 6px 18px rgba(31, 111, 235, 0.4) !important; }
-#cancel-btn:hover { box-shadow: 0 6px 18px rgba(214, 48, 49, 0.4) !important; }
-#abonar-btn:hover { box-shadow: 0 6px 18px rgba(6, 182, 212, 0.4) !important; }
-#cheque-btn:hover { box-shadow: 0 6px 18px rgba(253, 114, 114, 0.4) !important; }
-#gift-card-btn:hover { box-shadow: 0 6px 18px rgba(95, 39, 205, 0.4) !important; }
-#deposit-btn:hover { box-shadow: 0 6px 18px rgba(179, 55, 113, 0.4) !important; }
+/* HOVER / ACTIVE STATE: Full 360° Glowing Accent Border & Aura (Match screenshot media_1787457275370.png) */
+.payment-options .btn-custom:hover,
+.pos-v2-action-bar button:hover,
+.pos-v2-btn-row button:hover,
+div.column-5 button:hover,
+button.btn-custom:hover,
+button.payment-btn:hover,
+.payment-options .btn-custom.active,
+.pos-v2-action-bar button.active,
+.pos-v2-btn-row button.active,
+div.column-5 button.active,
+button.btn-custom.active,
+button.payment-btn.active {
+    transform: translateY(-2px) !important;
+    background-color: #1c273a !important;
+    color: #ffffff !important;
+}
+
+#cash-btn:hover, button[id*="cash"]:hover, #cash-btn.active {
+    border: 1.5px solid #00cec9 !important;
+    box-shadow: 0 0 14px rgba(0, 206, 201, 0.45) !important;
+}
+
+#qrsimple-btn:hover, button[id*="qr"]:hover, #qrsimple-btn.active {
+    border: 1.5px solid #2bf710 !important;
+    box-shadow: 0 0 14px rgba(43, 247, 16, 0.45) !important;
+}
+
+#multiple-pay-btn:hover, button[id*="multiple"]:hover, #multiple-pay-btn.active {
+    border: 1.5px solid #1f6feb !important;
+    box-shadow: 0 0 14px rgba(31, 111, 235, 0.45) !important;
+}
+
+#qrcash-btn:hover, button[id*="qrcash"]:hover, #qrcash-btn.active {
+    border: 1.5px solid #b130ec !important;
+    box-shadow: 0 0 14px rgba(177, 48, 236, 0.45) !important;
+}
+
+#presale-btn:hover, button[id*="presale"]:hover, #presale-btn.active {
+    border: 1.5px solid #2bf710 !important;
+    box-shadow: 0 0 14px rgba(43, 247, 16, 0.45) !important;
+}
+
+#proforma-btn:hover, #showproforma-list-btn:hover, #proforma-btn.active, #showproforma-list-btn.active {
+    border: 1.5px solid #1f6feb !important;
+    box-shadow: 0 0 14px rgba(31, 111, 235, 0.45) !important;
+}
+
+#cancel-btn:hover, #cancel-btn.active {
+    border: 1.5px solid #d63031 !important;
+    box-shadow: 0 0 14px rgba(214, 48, 49, 0.45) !important;
+}
+
+#abonar-btn:hover, #abonar-btn.active {
+    border: 1.5px solid #06b6d4 !important;
+    box-shadow: 0 0 14px rgba(6, 182, 212, 0.45) !important;
+}
+
+#cheque-btn:hover, #cheque-btn.active {
+    border: 1.5px solid #fd7272 !important;
+    box-shadow: 0 0 14px rgba(253, 114, 114, 0.45) !important;
+}
+
+#gift-card-btn:hover, #gift-card-btn.active {
+    border: 1.5px solid #5f27cd !important;
+    box-shadow: 0 0 14px rgba(95, 39, 205, 0.45) !important;
+}
+
+#deposit-btn:hover, #deposit-btn.active {
+    border: 1.5px solid #b33771 !important;
+    box-shadow: 0 0 14px rgba(179, 55, 113, 0.45) !important;
+}
+
+button[data-target="#order-cobrar"]:hover, button[data-target="#order-cobrar"].active {
+    border: 1.5px solid #38bdf8 !important;
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.45) !important;
+}
+
+button[data-target="#recentTransaction"]:hover, button[data-target="#recentTransaction"].active {
+    border: 1.5px solid #eab308 !important;
+    box-shadow: 0 0 14px rgba(234, 179, 8, 0.45) !important;
+}
 
 /* 3. Botones de Filtro Superiores (#category-filter, #brand-filter, #featured-filter) */
 #category-filter,
