@@ -46,13 +46,48 @@
 
     <script>
         (function() {
+            function updateThemeIcon() {
+                var isDark = document.body.classList.contains('dark-mode');
+                var toggleIcon = document.getElementById('theme-toggle-icon');
+                if (toggleIcon) {
+                    if (isDark) {
+                        toggleIcon.className = 'dripicons-brightness-max';
+                        if (toggleIcon.parentElement) toggleIcon.parentElement.setAttribute('title', 'Modo Diurno');
+                    } else {
+                        toggleIcon.className = 'dripicons-brightness-low';
+                        if (toggleIcon.parentElement) toggleIcon.parentElement.setAttribute('title', 'Modo Nocturno');
+                    }
+                }
+            }
+
             var theme = localStorage.getItem('theme');
             if (theme === 'dark') {
                 document.documentElement.classList.add('dark-mode');
                 document.addEventListener('DOMContentLoaded', function() {
                     document.body.classList.add('dark-mode');
+                    updateThemeIcon();
                 });
             }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                updateThemeIcon();
+
+                var toggleBtn = document.getElementById('theme-toggle-btn');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var isDark = document.body.classList.toggle('dark-mode');
+                        document.documentElement.classList.toggle('dark-mode', isDark);
+
+                        if (isDark) {
+                            localStorage.setItem('theme', 'dark');
+                        } else {
+                            localStorage.setItem('theme', 'light');
+                        }
+                        updateThemeIcon();
+                    });
+                }
+            });
         })();
     </script>
     <!-- Tweaks for older IEs--><!--[if lt IE 9]>

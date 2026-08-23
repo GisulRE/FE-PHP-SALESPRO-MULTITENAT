@@ -349,24 +349,40 @@ body.dark-mode .badge-warning {
     transform: scale(1.04) !important;
 }
 
-/* 2. Botones de Acción Inferiores (.payment-options .btn-custom, .payment-btn) */
+/* 2. Botones de Acción Inferiores (Modo Claro NATIVO) */
 .payment-options .btn-custom,
 .pos-v2-action-bar button,
 .pos-v2-btn-row button,
 div.column-5 button,
 button.btn-custom,
 button.payment-btn {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border-radius: 8px !important;
+    border-top: 1.5px solid #cbd5e1 !important;
+    border-right: 1.5px solid #cbd5e1 !important;
+    border-bottom: 1.5px solid #cbd5e1 !important;
+    border-left: 4px solid #00cec9 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+    transition: all 0.2s ease-in-out !important;
+    font-weight: 600 !important;
+}
+
+/* Modo Nocturno (.dark-mode) para Botones Inferiores */
+body.dark-mode .payment-options .btn-custom,
+body.dark-mode .pos-v2-action-bar button,
+body.dark-mode .pos-v2-btn-row button,
+body.dark-mode div.column-5 button,
+body.dark-mode button.btn-custom,
+body.dark-mode button.payment-btn {
     background-color: #161e2e !important;
     background: #161e2e !important;
     color: #f8fafc !important;
-    border-radius: 8px !important;
     border-top: 1.5px solid #2d3748 !important;
     border-right: 1.5px solid #2d3748 !important;
     border-bottom: 1.5px solid #2d3748 !important;
-    border-left: 4px solid #00cec9 !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
-    transition: all 0.2s ease-in-out !important;
-    font-weight: 600 !important;
 }
 
 /* Specific Accent Colors per Action (Normal State Left Edge) */
@@ -384,7 +400,7 @@ button.payment-btn {
 button[data-target="#order-cobrar"] { border-left-color: #38bdf8 !important; }
 button[data-target="#recentTransaction"] { border-left-color: #eab308 !important; }
 
-/* HOVER / ACTIVE STATE: Full 360° Glowing Accent Border & Aura (Match screenshot media_1787457275370.png) */
+/* HOVER / ACTIVE STATE: Full 360° Glowing Accent Border & Aura */
 .payment-options .btn-custom:hover,
 .pos-v2-action-bar button:hover,
 .pos-v2-btn-row button:hover,
@@ -398,6 +414,22 @@ div.column-5 button.active,
 button.btn-custom.active,
 button.payment-btn.active {
     transform: translateY(-2px) !important;
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+}
+
+body.dark-mode .payment-options .btn-custom:hover,
+body.dark-mode .pos-v2-action-bar button:hover,
+body.dark-mode .pos-v2-btn-row button:hover,
+body.dark-mode div.column-5 button:hover,
+body.dark-mode button.btn-custom:hover,
+body.dark-mode button.payment-btn:hover,
+body.dark-mode .payment-options .btn-custom.active,
+body.dark-mode .pos-v2-action-bar button.active,
+body.dark-mode .pos-v2-btn-row button.active,
+body.dark-mode div.column-5 button.active,
+body.dark-mode button.btn-custom.active,
+body.dark-mode button.payment-btn.active {
     background-color: #1c273a !important;
     color: #ffffff !important;
 }
