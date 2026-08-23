@@ -51,19 +51,33 @@ body.dark-mode .side-navbar ul li a {
 
 body.dark-mode nav.side-navbar a:hover,
 body.dark-mode nav.side-navbar a:focus,
-body.dark-mode nav.side-navbar a[aria-expanded="true"],
 body.dark-mode .side-navbar a:hover,
 body.dark-mode .side-navbar a:focus,
-body.dark-mode .side-navbar a[aria-expanded="true"],
 body.dark-mode .side-navbar li a:focus,
-body.dark-mode .side-navbar li a:hover,
-body.dark-mode .side-navbar li.active > a,
-body.dark-mode .side-navbar li > a.active,
+body.dark-mode .side-navbar li a:hover {
+    background-color: #1e293b !important;
+    background: #1e293b !important;
+    color: #38bdf8 !important;
+}
+
+body.dark-mode nav.side-navbar a[aria-expanded="true"],
+body.dark-mode .side-navbar a[aria-expanded="true"],
 body.dark-mode .side-navbar li a[aria-expanded="true"],
 body.dark-mode ul.side-navbar li a[aria-expanded="true"] {
     background-color: #1e293b !important;
     background: #1e293b !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode .side-navbar li.active > a,
+body.dark-mode .side-navbar li > a.active,
+body.dark-mode nav.side-navbar li.active > a,
+body.dark-mode nav.side-navbar li a.active {
+    background-color: #1e3a8a !important;
+    background: #1e3a8a !important;
     color: #38bdf8 !important;
+    border-left: 4px solid #38bdf8 !important;
+    font-weight: 600 !important;
 }
 
 body.dark-mode nav.side-navbar ul,

@@ -152,11 +152,21 @@ nav.side-navbar li a {
     padding: 10px 14px !important;
     font-weight: 500 !important;
     transition: all 0.15s ease !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #475569 !important;
+}
+
+nav.side-navbar li a:hover {
+    background: #f1f5f9 !important;
+    background-color: #f1f5f9 !important;
+    color: #0284c7 !important;
 }
 
 nav.side-navbar li.active > a,
 nav.side-navbar li a.active {
     background: #0284c7 !important;
+    background-color: #0284c7 !important;
     color: #ffffff !important;
     font-weight: 600 !important;
 }
@@ -241,6 +251,8 @@ body.dark-mode nav.side-navbar {
 
 body.dark-mode nav.side-navbar li a {
     color: #cbd5e1 !important;
+    background-color: transparent !important;
+    background: transparent !important;
 }
 
 body.dark-mode nav.side-navbar li a:hover {
@@ -250,8 +262,11 @@ body.dark-mode nav.side-navbar li a:hover {
 
 body.dark-mode nav.side-navbar li.active > a,
 body.dark-mode nav.side-navbar li a.active {
-    background-color: #0284c7 !important;
-    color: #ffffff !important;
+    background-color: #1e3a8a !important;
+    background: #1e3a8a !important;
+    color: #38bdf8 !important;
+    border-left: 4px solid #38bdf8 !important;
+    font-weight: 600 !important;
 }
 
 body.dark-mode .badge-success {
