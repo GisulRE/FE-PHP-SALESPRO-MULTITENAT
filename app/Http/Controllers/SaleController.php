@@ -254,7 +254,9 @@ class SaleController extends Controller
                 foreach ($lims_product_sale_data as $sale_data) {
                     if ($sale_data->employee_id != null) {
                         $employee = Employee::select('name')->find($sale_data->employee_id);
-                        $employes_names = $employes_names . " " . $employee->name;
+                        if ($employee) {
+                            $employes_names = $employes_names . " " . $employee->name;
+                        }
                     }
                 }
                 
