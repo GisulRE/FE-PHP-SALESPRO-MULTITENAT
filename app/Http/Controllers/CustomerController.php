@@ -167,7 +167,11 @@ class CustomerController extends Controller
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('customers-add')) {
             $lims_customer_group_all = CustomerGroup::where('is_active', true)->get();
-            $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
+            $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')
+                ->select('codigo_clasificador', 'descripcion')
+                ->groupBy('codigo_clasificador', 'descripcion')
+                ->orderBy('codigo_clasificador', 'ASC')
+                ->get();
             $lims_sucursal_all = SiatSucursal::where('estado', 1)->get();
             return view('customer.create', compact('lims_customer_group_all', 'lista_documentos', 'lims_sucursal_all'));
         } else
@@ -236,7 +240,11 @@ class CustomerController extends Controller
             $lims_customer_data = Customer::find($id);
             $lims_customer_company = CustomerCompany::where([['is_active', true], ['customer_id', $id]])->first();
             $lims_customer_group_all = CustomerGroup::where('is_active', true)->get();
-            $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
+            $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')
+                ->select('codigo_clasificador', 'descripcion')
+                ->groupBy('codigo_clasificador', 'descripcion')
+                ->orderBy('codigo_clasificador', 'ASC')
+                ->get();
             $lims_sucursal_all = SiatSucursal::where('estado', 1)->get();
             return view('customer.edit', compact('lims_customer_data', 'lims_customer_group_all', 'lista_documentos', 'lims_sucursal_all', 'lims_customer_company'));
         } else

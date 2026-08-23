@@ -2995,8 +2995,16 @@ class SaleController extends Controller
                 $lims_coupon_list = Coupon::where('is_active', true)->get();
                 $flag = 0;
 
-                $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
-                $lista_metodo_pago = SiatParametricaVario::where('tipo_clasificador', 'tipoMetodoPago')->orderBy('codigo_clasificador', 'ASC')->get();
+                $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')
+                    ->select('codigo_clasificador', 'descripcion')
+                    ->groupBy('codigo_clasificador', 'descripcion')
+                    ->orderBy('codigo_clasificador', 'ASC')
+                    ->get();
+                $lista_metodo_pago = SiatParametricaVario::where('tipo_clasificador', 'tipoMetodoPago')
+                    ->select('codigo_clasificador', 'descripcion')
+                    ->groupBy('codigo_clasificador', 'descripcion')
+                    ->orderBy('codigo_clasificador', 'ASC')
+                    ->get();
                 $customer_data = Customer::select("id", "name")->find($lims_pos_setting_data->customer_id);
                 $lims_sucursal_all = SiatSucursal::where('estado', 1)->get();
                 $siatConfigured = !empty(trim((string) ($lims_pos_setting_data->user_siat ?? '')))
@@ -3130,8 +3138,16 @@ class SaleController extends Controller
                 $lims_coupon_list = Coupon::where('is_active', true)->get();
                 $flag = 0;
 
-                $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
-                $lista_metodo_pago = SiatParametricaVario::where('tipo_clasificador', 'tipoMetodoPago')->orderBy('codigo_clasificador', 'ASC')->get();
+                $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')
+                    ->select('codigo_clasificador', 'descripcion')
+                    ->groupBy('codigo_clasificador', 'descripcion')
+                    ->orderBy('codigo_clasificador', 'ASC')
+                    ->get();
+                $lista_metodo_pago = SiatParametricaVario::where('tipo_clasificador', 'tipoMetodoPago')
+                    ->select('codigo_clasificador', 'descripcion')
+                    ->groupBy('codigo_clasificador', 'descripcion')
+                    ->orderBy('codigo_clasificador', 'ASC')
+                    ->get();
                 $customer_data = Customer::select("id", "name")->find($lims_pos_setting_data->customer_id);
                 $lims_sucursal_all = SiatSucursal::where('estado', 1)->get();
                 $siatConfigured = !empty(trim((string) ($lims_pos_setting_data->user_siat ?? '')))
