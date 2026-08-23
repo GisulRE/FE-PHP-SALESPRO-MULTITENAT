@@ -403,6 +403,12 @@
                                         </a>
                                     </li>
                                 @endif
+
+                                @if (in_array('customer_group', $permissions))
+                                    <li id="customer-group-menu">
+                                        <a href="{{ route('customer_group.index') }}">{{ trans('file.Customer Group') }}</a>
+                                    </li>
+                                @endif
                             @endif
 
                             @if (in_array('billers-index', $permissions) && !in_array('biller', $blocked_modules))
