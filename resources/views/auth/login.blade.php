@@ -31,7 +31,18 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
     <link rel="stylesheet" href="/public/css/style.default.css" id="theme-stylesheet" type="text/css">
     <!-- Custom stylesheet - for your changes-->
     <link rel="stylesheet" href="/public/css/custom-{{ $general_setting->theme }}" type="text/css">
-    <link rel="stylesheet" href="/public/css/custom-{{ $general_setting->theme }}" type="text/css">
+    <link rel="stylesheet" href="/public/css/dark-mode.css" type="text/css" id="dark-mode-style">
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark-mode');
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.body.classList.add('dark-mode');
+                });
+            }
+        })();
+    </script>
     <!-- Favicon-->
     <link rel="icon" type="image/png" href="{{ url('logo', $general_setting->site_logo) }}" />
 

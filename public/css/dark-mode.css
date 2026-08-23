@@ -464,3 +464,40 @@ body.dark-mode .toggle-off.btn-secondary {
     background-color: #334155 !important;
     color: #f8fafc !important;
 }
+
+/* Login Page Dark Mode */
+body.dark-mode .login-page,
+body.dark-mode .login-page .form-outer,
+body.dark-mode .login-page .form-inner {
+    background-color: #0f172a !important;
+    background: #0f172a !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode .login-page .form-inner {
+    border: 1px solid #334155 !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+body.dark-mode .login-page .logo span {
+    color: #38bdf8 !important;
+}
+
+body.dark-mode .login-page .input-material {
+    color: #f8fafc !important;
+    border-bottom-color: #475569 !important;
+}
+
+body.dark-mode .login-page .input-material:focus {
+    border-bottom-color: #38bdf8 !important;
+}
+
+body.dark-mode .login-page .label-material {
+    color: #94a3b8 !important;
+}
+
+body.dark-mode .login-page .forgot-pass,
+body.dark-mode .login-page .copyrights,
+body.dark-mode .login-page .copyrights a {
+    color: #cbd5e1 !important;
+}
