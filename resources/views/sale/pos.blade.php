@@ -3878,15 +3878,24 @@
             else if (!warehouse_id)
                 Swal.fire("Información", "Por favor, seleccione almacén!", "info");
             else {
-                var data = $(this).data('product');
-                data = data.split(" ");
+                var $elem = $(this).closest('.product-img');
+                var rawProduct = $elem.data('product') || $elem.attr('data-product');
+                if (!rawProduct) return;
+                var data = rawProduct.split(" ");
+                var term = data[0];
+                var modoProformaVal = (typeof getModoProforma === 'function') ? getModoProforma() : false;
                 $.get("sales/search_product", { 
-                    term: data[0],
-                    id_customer: $('#customer_id').val(),  
-                    id_warehouse: $('select[name="warehouse_id"]').val(),  
+                    term: term,
+                    id_customer: customer_id,  
+                    id_warehouse: warehouse_id,
+                    modo_proforma: modoProformaVal
                 }, 
                 function(res) {
-                    filter.push(data[0]);
+                    if (!res || !res.length) {
+                        Swal.fire("Información", "Producto no encontrado o sin stock disponible.", "warning");
+                        return;
+                    }
+                    filter.push(term);
                     filter.push(customer_id);
                     product_code.push(res[0].code);
                     product_name.push(res[0].name);

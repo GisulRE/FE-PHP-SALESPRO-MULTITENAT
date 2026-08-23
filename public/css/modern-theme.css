@@ -349,13 +349,38 @@ body.dark-mode .badge-warning {
     transform: scale(1.04) !important;
 }
 
-/* 2. Botones de Acción Inferiores (Modo Claro NATIVO) */
+/* 2. Botones de Acción Inferiores (Modo Claro NATIVO) y Contención Flexbox */
+.payment-options {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 8px 0 0 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+div.column-5,
+.payment-options .column-5 {
+    float: left !important;
+    flex: 0 0 20% !important;
+    max-width: 20% !important;
+    min-width: 0 !important;
+    padding: 2px !important;
+    box-sizing: border-box !important;
+}
+
 .payment-options .btn-custom,
 .pos-v2-action-bar button,
 .pos-v2-btn-row button,
 div.column-5 button,
 button.btn-custom,
 button.payment-btn {
+    width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
     background-color: #ffffff !important;
     background: #ffffff !important;
     color: #1e293b !important;
@@ -367,6 +392,9 @@ button.payment-btn {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
     transition: all 0.2s ease-in-out !important;
     font-weight: 600 !important;
+    padding: 6px 4px !important;
+    font-size: 0.76rem !important;
+    box-sizing: border-box !important;
 }
 
 /* Modo Nocturno (.dark-mode) para Botones Inferiores */
