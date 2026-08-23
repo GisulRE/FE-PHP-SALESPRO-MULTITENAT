@@ -300,53 +300,84 @@ body.dark-mode .badge-warning {
     color: #fde68a !important;
 }
 
-/* POS Category & Brand Cards */
+/* POS Category, Brand & Product Cards Hover/Active Effect */
+.category-card-box,
+.brand-card-box,
+#product-table td.product-img {
+    border: 1.5px solid transparent !important;
+    border-radius: 10px !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
 .category-card-box:hover,
-.brand-card-box:hover {
+.brand-card-box:hover,
+#product-table td.product-img:hover,
+.category-card-box.active,
+.brand-card-box.active,
+#product-table td.product-img.active {
+    border: 1.5px solid #00cec9 !important;
+    box-shadow: 0 0 14px rgba(0, 206, 201, 0.35) !important;
     transform: translateY(-2px) !important;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12) !important;
-    border-color: #0284c7 !important;
 }
 
 body.dark-mode .category-card-box,
-body.dark-mode .brand-card-box {
+body.dark-mode .brand-card-box,
+body.dark-mode #product-table td.product-img {
     background-color: #1e293b !important;
-    border-color: #334155 !important;
-    color: #f8fafc !important;
+    border: 1px solid #334155 !important;
 }
 
 body.dark-mode .category-card-box:hover,
-body.dark-mode .brand-card-box:hover {
+body.dark-mode .brand-card-box:hover,
+body.dark-mode #product-table td.product-img:hover,
+body.dark-mode .category-card-box.active,
+body.dark-mode .brand-card-box.active,
+body.dark-mode #product-table td.product-img.active {
     background-color: #162032 !important;
-    border-color: #38bdf8 !important;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+    border: 1.5px solid #00cec9 !important;
+    box-shadow: 0 0 16px rgba(0, 206, 201, 0.45) !important;
 }
 
-/* POS Product Cards */
-#product-table td.product-img {
-    border-radius: 12px !important;
-    border: 1px solid #cbd5e1 !important;
-    background-color: #ffffff !important;
-    transition: all 0.2s ease !important;
-    padding: 8px 6px !important;
-    vertical-align: middle !important;
-}
-
-#product-table td.product-img:hover {
-    transform: translateY(-3px) !important;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14) !important;
-    border-color: #4f46e5 !important;
-    cursor: pointer !important;
-}
-
-body.dark-mode #product-table td.product-img {
-    background-color: #1e293b !important;
-    border-color: #334155 !important;
+/* POS Bottom Action & Payment Buttons (Dark Pill with Color Left Edge Accent) */
+.pos-v2-action-bar button,
+.pos-v2-btn-row button,
+div.column-5 button,
+button.btn-custom {
+    background-color: #161e2e !important;
+    background: #161e2e !important;
     color: #f8fafc !important;
+    border-radius: 8px !important;
+    border-top: 1px solid #2d3748 !important;
+    border-right: 1px solid #2d3748 !important;
+    border-bottom: 1px solid #2d3748 !important;
+    border-left: 4px solid #00cec9 !important; /* Default cyan accent */
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+    transition: all 0.2s ease !important;
+    font-weight: 600 !important;
 }
 
-body.dark-mode #product-table td.product-img:hover {
-    background-color: #162032 !important;
-    border-color: #818cf8 !important;
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45) !important;
+/* Specific Accent Colors per Action */
+#cash-btn, button[id*="cash"] { border-left-color: #00cec9 !important; }
+#qrsimple-btn, button[id*="qr"] { border-left-color: #2bf710 !important; }
+#multiple-pay-btn, button[id*="multiple"] { border-left-color: #1f6feb !important; }
+#qrcash-btn, button[id*="qrcash"] { border-left-color: #b130ec !important; }
+#presale-btn, button[id*="presale"] { border-left-color: #00cec9 !important; }
+#proforma-btn, #showproforma-list-btn { border-left-color: #1f6feb !important; }
+#cancel-btn { border-left-color: #d63031 !important; }
+#abonar-btn { border-left-color: #06b6d4 !important; }
+#cheque-btn { border-left-color: #fd7272 !important; }
+#gift-card-btn { border-left-color: #5f27cd !important; }
+#deposit-btn { border-left-color: #b33771 !important; }
+button[data-target="#order-cobrar"] { border-left-color: #4024e0 !important; }
+button[data-target="#recentTransaction"] { border-left-color: #eab308 !important; }
+
+/* Bottom Button Hover State */
+.pos-v2-action-bar button:hover,
+.pos-v2-btn-row button:hover,
+div.column-5 button:hover,
+button.btn-custom:hover {
+    background-color: #243047 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35) !important;
+    color: #ffffff !important;
 }
