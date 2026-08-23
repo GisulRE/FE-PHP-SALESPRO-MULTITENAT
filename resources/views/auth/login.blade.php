@@ -92,7 +92,7 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                     <form method="POST" action="{{ route('login') }}" id="login-form">
                         @csrf
                         <div class="form-group-material">
-                            <input id="login-nit" type="text" name="nit_login" required class="input-material"
+                            <input id="login-nit" type="text" name="nit_login" required class="input-material dark-input"
                                 value="{{ old('nit_login') ?? \Illuminate\Support\Facades\Cookie::get('remember_nit') ?? session('login_nit') }}" maxlength="30">
                             <label for="login-nit" class="label-material">NIT *</label>
                             @if ($errors->has('nit_login'))
@@ -103,7 +103,7 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                         </div>
 
                         <div class="form-group-material">
-                            <input id="login-username" type="text" name="name" required class="input-material"
+                            <input id="login-username" type="text" name="name" required class="input-material dark-input"
                                 value="">
                             <label for="login-username" class="label-material">{{ trans('file.UserName') }}</label>
                             @if ($errors->has('name'))
@@ -114,7 +114,7 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                         </div>
 
                         <div class="form-group-material position-relative">
-                            <input id="login-password" type="password" name="password" required class="input-material"
+                            <input id="login-password" type="password" name="password" required class="input-material dark-input"
                                 value="">
                             <button type="button" id="toggle-password" class="btn btn-link" aria-label="Mostrar contraseña" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); padding:0; color:#6c757d;">
                                 <i class="fa fa-eye" aria-hidden="true"></i>
@@ -138,7 +138,7 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                         <div class="form-group text-left mb-3">
                             <div class="custom-control custom-checkbox">
                                 <input type="checkbox" name="remember" class="custom-control-input" id="remember" {{ old('remember') || true ? 'checked' : '' }}>
-                                <label class="custom-control-label" for="remember" style="font-size: 0.85rem; color: #6c757d; cursor: pointer;">Recordar sesión</label>
+                                <label class="custom-control-label dark-label" for="remember" style="font-size: 0.85rem; cursor: pointer;">Recordar sesión</label>
                             </div>
                         </div>
 

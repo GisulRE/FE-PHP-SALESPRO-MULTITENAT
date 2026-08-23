@@ -495,10 +495,12 @@ body.dark-mode .login-page .form-group-material {
 }
 
 body.dark-mode .login-page input.input-material,
-body.dark-mode .login-page .form-group-material input {
+body.dark-mode .login-page .form-group-material input,
+body.dark-mode input.dark-input,
+body.dark-mode .dark-input {
     background-color: transparent !important;
     background: transparent !important;
-    color: #f8fafc !important;
+    color: #ffffff !important;
     border: none !important;
     border-bottom: 2px solid #475569 !important;
     border-radius: 0 !important;
@@ -507,7 +509,9 @@ body.dark-mode .login-page .form-group-material input {
 }
 
 body.dark-mode .login-page input.input-material:focus,
-body.dark-mode .login-page .form-group-material input:focus {
+body.dark-mode .login-page .form-group-material input:focus,
+body.dark-mode input.dark-input:focus,
+body.dark-mode .dark-input:focus {
     border-bottom-color: #38bdf8 !important;
 }
 
@@ -515,8 +519,9 @@ body.dark-mode .login-page .form-group-material input:focus {
 body.dark-mode .login-page input:-webkit-autofill,
 body.dark-mode .login-page input:-webkit-autofill:hover,
 body.dark-mode .login-page input:-webkit-autofill:focus,
-body.dark-mode .login-page input:-webkit-autofill:active {
-    -webkit-text-fill-color: #f8fafc !important;
+body.dark-mode .login-page input:-webkit-autofill:active,
+body.dark-mode input.dark-input:-webkit-autofill {
+    -webkit-text-fill-color: #ffffff !important;
     -webkit-box-shadow: 0 0 0px 1000px #1e293b inset !important;
     transition: background-color 5000s ease-in-out 0s;
 }
@@ -533,7 +538,8 @@ body.dark-mode .login-page #toggle-password {
     color: #94a3b8 !important;
 }
 
-body.dark-mode .login-page .custom-control-label {
+body.dark-mode .login-page .custom-control-label,
+body.dark-mode .dark-label {
     color: #cbd5e1 !important;
 }
 
