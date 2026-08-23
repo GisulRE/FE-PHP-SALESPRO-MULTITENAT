@@ -105,11 +105,22 @@ body, html {
 }
 
 /* 4. Tables & DataTables */
+.table-responsive,
+.dataTables_wrapper {
+    overflow: visible !important;
+}
+
 table.dataTable, table.table {
     border-collapse: separate !important;
     border-spacing: 0 !important;
     border-radius: 12px !important;
-    overflow: hidden !important;
+}
+
+.table-responsive .dropdown-menu,
+table.dataTable td .dropdown-menu,
+.dataTables_wrapper .dropdown-menu {
+    z-index: 1050 !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25) !important;
 }
 
 table.dataTable thead th, table.table thead th {

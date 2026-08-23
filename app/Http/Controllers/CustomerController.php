@@ -144,10 +144,9 @@ class CustomerController extends Controller
                     $nestedData['options'] .= \Form::open(["route" => ["customer.destroy", $customer->id], "method" => "DELETE"]) . '
                             <li>
                               <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' . trans("file.delete") . '</button>
-                            </li>' . \Form::close() . '
-                        </ul>
-                    </div>';
+                            </li>' . \Form::close();
                 }
+                $nestedData['options'] .= '</ul></div>';
                 if ($customer->is_active)
                     $data[] = $nestedData;
             }
