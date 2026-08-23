@@ -321,3 +321,32 @@ body.dark-mode .brand-card-box:hover {
     border-color: #38bdf8 !important;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
 }
+
+/* POS Product Cards */
+#product-table td.product-img {
+    border-radius: 12px !important;
+    border: 1px solid #cbd5e1 !important;
+    background-color: #ffffff !important;
+    transition: all 0.2s ease !important;
+    padding: 8px 6px !important;
+    vertical-align: middle !important;
+}
+
+#product-table td.product-img:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14) !important;
+    border-color: #4f46e5 !important;
+    cursor: pointer !important;
+}
+
+body.dark-mode #product-table td.product-img {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode #product-table td.product-img:hover {
+    background-color: #162032 !important;
+    border-color: #818cf8 !important;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45) !important;
+}

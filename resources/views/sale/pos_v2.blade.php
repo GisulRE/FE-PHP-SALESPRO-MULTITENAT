@@ -2174,62 +2174,40 @@
                                 <tbody>
                                     @for ($i = 0; $i < ceil($product_number / 5); $i++)
                                         <tr>
-                                            <td class="product-img sound-btn"
-                                                title="{{ $lims_product_list[0 + $i * 5]->name }}"
-                                                data-product="{{ $lims_product_list[0 + $i * 5]->code . ' (' . $lims_product_list[0 + $i * 5]->name . ')' }}">
-                                                <img src="{{ url('images/product', $lims_product_list[0 + $i * 5]->base_image) }}"
-                                                    width="100%" />
-                                                <p>{{ $lims_product_list[0 + $i * 5]->name }}</p>
-                                                <span>{{ $lims_product_list[0 + $i * 5]->code }}</span>
-                                            </td>
-                                            @if (!empty($lims_product_list[1 + $i * 5]))
-                                                <td class="product-img sound-btn"
-                                                    title="{{ $lims_product_list[1 + $i * 5]->name }}"
-                                                    data-product="{{ $lims_product_list[1 + $i * 5]->code . ' (' . $lims_product_list[1 + $i * 5]->name . ')' }}">
-                                                    <img src="{{ url('images/product', $lims_product_list[1 + $i * 5]->base_image) }}"
-                                                        width="100%" />
-                                                    <p>{{ $lims_product_list[1 + $i * 5]->name }}</p>
-                                                    <span>{{ $lims_product_list[1 + $i * 5]->code }}</span>
-                                                </td>
-                                            @else
-                                                <td style="border:none;"></td>
-                                            @endif
-                                            @if (!empty($lims_product_list[2 + $i * 5]))
-                                                <td class="product-img sound-btn"
-                                                    title="{{ $lims_product_list[2 + $i * 5]->name }}"
-                                                    data-product="{{ $lims_product_list[2 + $i * 5]->code . ' (' . $lims_product_list[2 + $i * 5]->name . ')' }}">
-                                                    <img src="{{ url('images/product', $lims_product_list[2 + $i * 5]->base_image) }}"
-                                                        width="100%" />
-                                                    <p>{{ $lims_product_list[2 + $i * 5]->name }}</p>
-                                                    <span>{{ $lims_product_list[2 + $i * 5]->code }}</span>
-                                                </td>
-                                            @else
-                                                <td style="border:none;"></td>
-                                            @endif
-                                            @if (!empty($lims_product_list[3 + $i * 5]))
-                                                <td class="product-img sound-btn"
-                                                    title="{{ $lims_product_list[3 + $i * 5]->name }}"
-                                                    data-product="{{ $lims_product_list[3 + $i * 5]->code . ' (' . $lims_product_list[3 + $i * 5]->name . ')' }}">
-                                                    <img src="{{ url('images/product', $lims_product_list[3 + $i * 5]->base_image) }}"
-                                                        width="100%" />
-                                                    <p>{{ $lims_product_list[3 + $i * 5]->name }}</p>
-                                                    <span>{{ $lims_product_list[3 + $i * 5]->code }}</span>
-                                                </td>
-                                            @else
-                                                <td style="border:none;"></td>
-                                            @endif
-                                            @if (!empty($lims_product_list[4 + $i * 5]))
-                                                <td class="product-img sound-btn"
-                                                    title="{{ $lims_product_list[4 + $i * 5]->name }}"
-                                                    data-product="{{ $lims_product_list[4 + $i * 5]->code . ' (' . $lims_product_list[4 + $i * 5]->name . ')' }}">
-                                                    <img src="{{ url('images/product', $lims_product_list[4 + $i * 5]->base_image) }}"
-                                                        width="100%" />
-                                                    <p>{{ $lims_product_list[4 + $i * 5]->name }}</p>
-                                                    <span>{{ $lims_product_list[4 + $i * 5]->code }}</span>
-                                                </td>
-                                            @else
-                                                <td style="border:none;"></td>
-                                            @endif
+                                            @for ($j = 0; $j < 5; $j++)
+                                                @php
+                                                    $pIdx = $j + $i * 5;
+                                                    $prod = $lims_product_list[$pIdx] ?? null;
+                                                @endphp
+                                                @if ($prod)
+                                                    @php
+                                                        $hasImg = !empty($prod->base_image) && $prod->base_image !== 'zummXD2dvAtI.png';
+                                                        $productInfo = $prod->code . ' (' . $prod->name . ')';
+                                                    @endphp
+                                                    <td class="product-img sound-btn text-center p-2"
+                                                        title="{{ $prod->name }}"
+                                                        data-product="{{ $productInfo }}">
+                                                        <div class="product-card-inner text-center d-flex flex-column align-items-center justify-content-center" style="min-height: 100px;">
+                                                            @if ($hasImg)
+                                                                <img src="{{ url('images/product', $prod->base_image) }}"
+                                                                    style="max-height: 52px; max-width: 100%; object-fit: contain; margin-bottom: 6px;"
+                                                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                                                <div class="product-icon-fallback" style="display: none; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; align-items: center; justify-content: center; margin-bottom: 6px;">
+                                                                    <i class="fa fa-cube fa-lg"></i>
+                                                                </div>
+                                                            @else
+                                                                <div class="product-icon-fallback" style="display: flex; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; align-items: center; justify-content: center; margin-bottom: 6px;">
+                                                                    <i class="fa fa-cube fa-lg"></i>
+                                                                </div>
+                                                            @endif
+                                                            <p class="font-weight-bold mb-1 text-truncate w-100" style="font-size: 0.82rem; line-height: 1.2;" title="{{ $prod->name }}">{{ $prod->name }}</p>
+                                                            <span class="badge badge-secondary px-2 py-1" style="font-size: 0.72rem; font-weight: 500;">{{ $prod->code }}</span>
+                                                        </div>
+                                                    </td>
+                                                @else
+                                                    <td style="border:none;"></td>
+                                                @endif
+                                            @endfor
                                         </tr>
                                     @endfor
                                 </tbody>
@@ -3583,18 +3561,23 @@
             if (Object.keys(data).length != 0) {
                 $.each(data['name'], function(index) {
                     var product_info = data['code'][index] + ' (' + data['name'][index] + ')';
+                    var hasImg = data['image'][index] && data['image'][index] !== 'zummXD2dvAtI.png';
+                    var imgMarkup = '';
+                    if (hasImg) {
+                        imgMarkup = '<img src="images/product/' + data['image'][index] + '" style="max-height: 52px; max-width: 100%; object-fit: contain; margin-bottom: 6px;" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';" />' +
+                                    '<div class="product-icon-fallback" style="display: none; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; align-items: center; justify-content: center; margin-bottom: 6px;"><i class="fa fa-cube fa-lg"></i></div>';
+                    } else {
+                        imgMarkup = '<div class="product-icon-fallback" style="display: flex; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; align-items: center; justify-content: center; margin-bottom: 6px;"><i class="fa fa-cube fa-lg"></i></div>';
+                    }
+                    var cellHtml = '<div class="product-card-inner text-center d-flex flex-column align-items-center justify-content-center" style="min-height: 100px;">' +
+                                   imgMarkup +
+                                   '<p class="font-weight-bold mb-1 text-truncate w-100" style="font-size: 0.82rem; line-height: 1.2;" title="' + data['name'][index] + '">' + data['name'][index] + '</p>' +
+                                   '<span class="badge badge-secondary px-2 py-1" style="font-size: 0.72rem; font-weight: 500;">' + data['code'][index] + '</span></div>';
+
                     if (index % 5 == 0 && index != 0)
-                        tableData += '</tr><tr><td class="product-img sound-btn" title="' + data['name'][index] +
-                        '" data-product = "' + product_info + '"><img  src="public/images/product/' + data['image'][
-                            index
-                        ] + '" width="100%" /><p>' + data['name'][index] + '</p><span>' + data['code'][index] +
-                        '</span></td>';
+                        tableData += '</tr><tr><td class="product-img sound-btn text-center p-2" title="' + data['name'][index] + '" data-product = "' + product_info + '">' + cellHtml + '</td>';
                     else
-                        tableData += '<td class="product-img sound-btn" title="' + data['name'][index] +
-                        '" data-product = "' + product_info + '"><img  src="public/images/product/' + data['image'][
-                            index
-                        ] + '" width="100%" /><p>' + data['name'][index] + '</p><span>' + data['code'][index] +
-                        '</span></td>';
+                        tableData += '<td class="product-img sound-btn text-center p-2" title="' + data['name'][index] + '" data-product = "' + product_info + '">' + cellHtml + '</td>';
                 });
 
                 if (data['name'].length % 5) {
