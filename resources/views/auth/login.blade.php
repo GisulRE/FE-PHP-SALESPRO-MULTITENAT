@@ -327,7 +327,7 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                     <div class="modern-input-group">
                         <i class="fa fa-user-o input-icon"></i>
                         <input id="login-username" type="text" name="name" required class="form-control"
-                            placeholder="Nombre de usuario" value="">
+                            placeholder="Nombre de usuario" value="{{ old('name') ?? \Illuminate\Support\Facades\Cookie::get('remember_username') }}">
                     </div>
                     @if ($errors->has('name'))
                         <small class="text-danger font-weight-bold mt-1 d-block">{{ $errors->first('name') }}</small>
@@ -378,26 +378,57 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
 
     <script type="text/javascript">
         $(document).ready(function() {
-            // Toggle password visibility
-            $('#toggle-password').on('click', function() {
+            // Toggle password visibility with e.preventDefault()
+            $(document).on('click', '#toggle-password', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
                 var $input = $('#login-password');
-                var type = $input.attr('type') === 'password' ? 'text' : 'password';
-                $input.attr('type', type);
+                var currentType = $input.attr('type');
+                var newType = currentType === 'password' ? 'text' : 'password';
+                $input.attr('type', newType);
                 $(this).find('i').toggleClass('fa-eye fa-eye-slash');
             });
 
-            // Persist NIT in localStorage and Cookies
+            // Remember session & prefill NIT + Username
+            var isRemembered = localStorage.getItem('login_remember') === 'true' || (typeof $.cookie === 'function' && $.cookie('login_remember') === 'true');
             var savedNit = localStorage.getItem('login_nit') || (typeof $.cookie === 'function' ? $.cookie('remember_nit') : '');
+            var savedUser = localStorage.getItem('login_username') || (typeof $.cookie === 'function' ? $.cookie('remember_username') : '');
+
             if (savedNit && !$('#login-nit').val()) {
                 $('#login-nit').val(savedNit);
             }
+            if (savedUser && !$('#login-username').val()) {
+                $('#login-username').val(savedUser);
+            }
+
+            if (isRemembered || savedNit || savedUser) {
+                $('#remember').prop('checked', true);
+            }
 
             $('#login-form').on('submit', function() {
+                var isChecked = $('#remember').is(':checked');
                 var nit = $('#login-nit').val();
-                if (nit) {
-                    localStorage.setItem('login_nit', nit);
+                var user = $('#login-username').val();
+
+                if (isChecked) {
+                    localStorage.setItem('login_remember', 'true');
+                    if (nit) localStorage.setItem('login_nit', nit);
+                    if (user) localStorage.setItem('login_username', user);
+
                     if (typeof $.cookie === 'function') {
-                        $.cookie('remember_nit', nit, { expires: 365, path: '/' });
+                        $.cookie('login_remember', 'true', { expires: 365, path: '/' });
+                        if (nit) $.cookie('remember_nit', nit, { expires: 365, path: '/' });
+                        if (user) $.cookie('remember_username', user, { expires: 365, path: '/' });
+                    }
+                } else {
+                    localStorage.removeItem('login_remember');
+                    localStorage.removeItem('login_nit');
+                    localStorage.removeItem('login_username');
+
+                    if (typeof $.cookie === 'function') {
+                        $.cookie('login_remember', null, { path: '/' });
+                        $.cookie('remember_nit', null, { path: '/' });
+                        $.cookie('remember_username', null, { path: '/' });
                     }
                 }
             });

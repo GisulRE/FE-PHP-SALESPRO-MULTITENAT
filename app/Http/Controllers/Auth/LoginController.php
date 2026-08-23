@@ -39,8 +39,16 @@ class LoginController extends Controller
     public function credentials(Request $request)
     {
         $nitLogin = trim((string) $request->input('nit_login'));
+        $userName = trim((string) $request->input('name'));
         Session::put('login_nit', $nitLogin);
-        \Illuminate\Support\Facades\Cookie::queue('remember_nit', $nitLogin, 525600);
+
+        if ($request->has('remember')) {
+            \Illuminate\Support\Facades\Cookie::queue('remember_nit', $nitLogin, 525600);
+            \Illuminate\Support\Facades\Cookie::queue('remember_username', $userName, 525600);
+        } else {
+            \Illuminate\Support\Facades\Cookie::queue(\Illuminate\Support\Facades\Cookie::forget('remember_nit'));
+            \Illuminate\Support\Facades\Cookie::queue(\Illuminate\Support\Facades\Cookie::forget('remember_username'));
+        }
 
         $companyId = Company::where('nit', $nitLogin)->value('id');
         Session::put('login_company_id', $companyId);
