@@ -41,8 +41,8 @@
     <link rel="stylesheet" href="/public/css/style.default.css" id="theme-stylesheet" type="text/css">
     <link rel="stylesheet" href="/public/css/dropzone.css">
     <link rel="stylesheet" href="/public/css/style.css">
-    <link rel="stylesheet" href="/public/printjs/print.min.css">
-    <link rel="stylesheet" href="/public/css/dark-mode.css?v={{ time() }}">
+    <link rel="stylesheet" href="{{ url('public/css/modern-theme.css') }}?v={{ time() }}">
+    <link rel="stylesheet" href="{{ url('public/css/dark-mode.css') }}?v={{ time() }}">
 
     <script>
         (function() {

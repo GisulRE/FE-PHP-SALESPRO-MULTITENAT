@@ -2169,7 +2169,7 @@
                                     <div class="col-6 col-md-3 p-1">
                                         <div class="category-img category-card-box text-center p-2"
                                             data-category="{{ $category->id }}"
-                                            style="cursor: pointer; border-radius: 12px; border: 1px solid #cbd5e1; background-color: #ffffff; transition: all 0.2s ease; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 95px;">
+                                            style="cursor: pointer; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 95px;">
                                             @if ($category->image)
                                                 <img src="{{ url('images/category', $category->image) }}"
                                                     style="max-height: 50px; max-width: 100%; object-fit: contain; margin-bottom: 6px;"
@@ -2202,7 +2202,7 @@
                                     <div class="col-6 col-md-3 p-1">
                                         <div class="brand-img brand-card-box text-center p-2"
                                             data-brand="{{ $brand->id }}"
-                                            style="cursor: pointer; border-radius: 12px; border: 1px solid #cbd5e1; background-color: #ffffff; transition: all 0.2s ease; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 95px;">
+                                            style="cursor: pointer; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 95px;">
                                             @if ($brand->image)
                                                 <img src="{{ url('images/brand', $brand->image) }}"
                                                     style="max-height: 50px; max-width: 100%; object-fit: contain; margin-bottom: 6px;"
