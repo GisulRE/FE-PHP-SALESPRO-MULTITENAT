@@ -1,0 +1,275 @@
+/* ==========================================================================
+   SalesPro ERP - Modern 2026 SaaS UI Global Design System
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Typography & Reset */
+body, html {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    letter-spacing: -0.01em;
+}
+
+/* 1. Cards & Containers */
+.card, .box, .panel {
+    border-radius: 14px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+.card:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+.card-header {
+    background-color: transparent !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    padding: 1.25rem 1.5rem !important;
+}
+
+.card-header h3, .card-header h4, .card-header h5 {
+    font-weight: 700 !important;
+    font-size: 1.15rem !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* 2. Modern Buttons */
+.btn {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 0.88rem !important;
+    padding: 0.55rem 1.2rem !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.btn:hover {
+    transform: translateY(-1px) !important;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25) !important;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 100%) !important;
+    box-shadow: 0 6px 16px rgba(2, 132, 199, 0.35) !important;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25) !important;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25) !important;
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+}
+
+.btn-secondary {
+    background-color: #64748b !important;
+    border: none !important;
+    color: #ffffff !important;
+}
+
+/* 3. Inputs & Form Controls */
+.form-control {
+    border-radius: 8px !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 0.6rem 0.9rem !important;
+    font-size: 0.92rem !important;
+    transition: all 0.2s ease !important;
+}
+
+.form-control:focus {
+    border-color: #0284c7 !important;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
+}
+
+.bootstrap-select .btn {
+    border-radius: 8px !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+/* 4. Tables & DataTables */
+table.dataTable, table.table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+
+table.dataTable thead th, table.table thead th {
+    background-color: #f8fafc !important;
+    color: #475569 !important;
+    font-weight: 700 !important;
+    font-size: 0.8rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: 0.9rem 1rem !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+
+table.dataTable tbody td, table.table tbody td {
+    padding: 0.85rem 1rem !important;
+    vertical-align: middle !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    font-size: 0.9rem !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    border-color: #0284c7 !important;
+}
+
+/* 5. Navigation Sidebar */
+nav.side-navbar {
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+nav.side-navbar li a {
+    border-radius: 8px !important;
+    margin: 3px 8px !important;
+    padding: 10px 14px !important;
+    font-weight: 500 !important;
+    transition: all 0.15s ease !important;
+}
+
+nav.side-navbar li.active > a,
+nav.side-navbar li a.active {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+/* 6. Badges & Indicators */
+.badge {
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    padding: 0.35em 0.65em !important;
+}
+
+.badge-success {
+    background-color: #d1fae5 !important;
+    color: #065f46 !important;
+}
+
+.badge-danger {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+}
+
+.badge-info {
+    background-color: #e0f2fe !important;
+    color: #075985 !important;
+}
+
+.badge-warning {
+    background-color: #fef3c7 !important;
+    color: #92400e !important;
+}
+
+/* 7. System-Wide Dark Mode Overrides */
+body.dark-mode {
+    background-color: #090d16 !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode .card, body.dark-mode .box, body.dark-mode .panel {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+body.dark-mode .card-header {
+    border-bottom-color: #1e293b !important;
+}
+
+body.dark-mode table.dataTable thead th,
+body.dark-mode table.table thead th {
+    background-color: #162032 !important;
+    color: #94a3b8 !important;
+    border-bottom-color: #334155 !important;
+}
+
+body.dark-mode table.dataTable tbody td,
+body.dark-mode table.table tbody td {
+    background-color: #0f172a !important;
+    color: #e2e8f0 !important;
+    border-bottom-color: #1e293b !important;
+}
+
+body.dark-mode table.table-striped tbody tr:nth-of-type(odd) td {
+    background-color: #131c2e !important;
+}
+
+body.dark-mode .form-control {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .form-control:focus {
+    background-color: #162032 !important;
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
+}
+
+body.dark-mode nav.side-navbar {
+    background-color: #090d16 !important;
+    border-right-color: #1e293b !important;
+}
+
+body.dark-mode nav.side-navbar li a {
+    color: #cbd5e1 !important;
+}
+
+body.dark-mode nav.side-navbar li a:hover {
+    background-color: #1e293b !important;
+    color: #38bdf8 !important;
+}
+
+body.dark-mode nav.side-navbar li.active > a,
+body.dark-mode nav.side-navbar li a.active {
+    background-color: #0284c7 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .badge-success {
+    background-color: #064e3b !important;
+    color: #a7f3d0 !important;
+}
+
+body.dark-mode .badge-danger {
+    background-color: #7f1d1d !important;
+    color: #fecaca !important;
+}
+
+body.dark-mode .badge-info {
+    background-color: #0c4a6e !important;
+    color: #bae6fd !important;
+}
+
+body.dark-mode .badge-warning {
+    background-color: #78350f !important;
+    color: #fde68a !important;
+}
