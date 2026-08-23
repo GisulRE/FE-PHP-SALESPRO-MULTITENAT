@@ -409,7 +409,7 @@ div.column-5,
     box-sizing: border-box !important;
 }
 
-/* Compact Buttons Styling */
+/* Compact Buttons Base Styling */
 .payment-options .btn-custom,
 .payment-options button,
 .pos-v2-action-bar button,
@@ -434,16 +434,42 @@ button.payment-btn {
     text-overflow: ellipsis !important;
     border-radius: 7px !important;
     box-sizing: border-box !important;
-    background-color: #ffffff !important;
-    color: #1e293b !important;
-    border-top: 1.5px solid #cbd5e1 !important;
-    border-right: 1.5px solid #cbd5e1 !important;
-    border-bottom: 1.5px solid #cbd5e1 !important;
-    border-left: 4px solid #00cec9 !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05) !important;
     transition: all 0.2s ease-in-out !important;
+    border: none !important;
 }
 
+/* ==========================================================================
+   1. MODO CLARO (Default / Light Mode): Color Característico Completo por Botón
+   ========================================================================== */
+body:not(.dark-mode) #credit-card-btn { background: #0984e3 !important; color: #ffffff !important; }
+body:not(.dark-mode) #cash-btn { background: #00cec9 !important; color: #ffffff !important; }
+body:not(.dark-mode) #multiple-pay-btn { background: #1f6feb !important; color: #ffffff !important; }
+body:not(.dark-mode) #qrcash-btn { background: #b130ec !important; color: #ffffff !important; }
+body:not(.dark-mode) button[data-target="#order-cobrar"] { background: #4024e0 !important; color: #ffffff !important; }
+body:not(.dark-mode) #qrsimple-btn { background: #2bf710 !important; color: #0f172a !important; font-weight: 700 !important; }
+body:not(.dark-mode) #cheque-btn { background: #fd7272 !important; color: #ffffff !important; }
+body:not(.dark-mode) #gift-card-btn { background: #5f27cd !important; color: #ffffff !important; }
+body:not(.dark-mode) #deposit-btn { background: #b33771 !important; }
+body:not(.dark-mode) #presale-btn { background: #2bf710 !important; color: #0f172a !important; font-weight: 700 !important; }
+body:not(.dark-mode) #cancel-btn { background: #d63031 !important; color: #ffffff !important; }
+body:not(.dark-mode) button[data-target="#recentTransaction"] { background: #ffc107 !important; color: #0f172a !important; font-weight: 700 !important; }
+body:not(.dark-mode) #abonar-btn { background: #06b6d4 !important; color: #ffffff !important; }
+body:not(.dark-mode) #showpresale-btn { background: #ff07de !important; color: #ffffff !important; }
+body:not(.dark-mode) #proforma-btn { background: #0b07ff !important; color: #ffffff !important; }
+body:not(.dark-mode) #showproforma-list-btn { background: #6c5ce7 !important; color: #ffffff !important; }
+
+/* Hover en Modo Claro */
+body:not(.dark-mode) .payment-options button:hover,
+body:not(.dark-mode) div.column-5 button:hover,
+body:not(.dark-mode) button.btn-custom:hover {
+    transform: translateY(-2px) !important;
+    filter: brightness(1.15) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* ==========================================================================
+   2. MODO NOCTURNO (.dark-mode): Fondo Oscuro Slate con Borde Lateral e Iluminación 360°
+   ========================================================================== */
 body.dark-mode .payment-options .btn-custom,
 body.dark-mode .payment-options button,
 body.dark-mode .pos-v2-action-bar button,
@@ -451,114 +477,50 @@ body.dark-mode div.column-5 button,
 body.dark-mode button.btn-custom,
 body.dark-mode button.payment-btn {
     background-color: #161e2e !important;
+    background: #161e2e !important;
     color: #f8fafc !important;
     border-top: 1.5px solid #2d3748 !important;
     border-right: 1.5px solid #2d3748 !important;
     border-bottom: 1.5px solid #2d3748 !important;
+    border-left: 4px solid #00cec9 !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
 }
 
-/* Specific Left Border Color Accents */
-#cash-btn, button[id*="cash"] { border-left-color: #00cec9 !important; }
-#qrsimple-btn, button[id*="qr"] { border-left-color: #2bf710 !important; }
-#multiple-pay-btn, button[id*="multiple"] { border-left-color: #1f6feb !important; }
-#qrcash-btn, button[id*="qrcash"] { border-left-color: #b130ec !important; }
-#presale-btn, button[id*="presale"] { border-left-color: #2bf710 !important; }
-#proforma-btn, #showproforma-list-btn { border-left-color: #1f6feb !important; }
-#cancel-btn { border-left-color: #d63031 !important; }
-#abonar-btn { border-left-color: #06b6d4 !important; }
-#cheque-btn { border-left-color: #fd7272 !important; }
-#gift-card-btn { border-left-color: #5f27cd !important; }
-#deposit-btn { border-left-color: #b33771 !important; }
-button[data-target="#order-cobrar"] { border-left-color: #38bdf8 !important; }
-button[data-target="#recentTransaction"] { border-left-color: #eab308 !important; }
+body.dark-mode #cash-btn, body.dark-mode button[id*="cash"] { border-left-color: #00cec9 !important; }
+body.dark-mode #qrsimple-btn, body.dark-mode button[id*="qr"] { border-left-color: #2bf710 !important; }
+body.dark-mode #multiple-pay-btn, body.dark-mode button[id*="multiple"] { border-left-color: #1f6feb !important; }
+body.dark-mode #qrcash-btn, body.dark-mode button[id*="qrcash"] { border-left-color: #b130ec !important; }
+body.dark-mode #presale-btn, body.dark-mode button[id*="presale"] { border-left-color: #2bf710 !important; }
+body.dark-mode #proforma-btn, body.dark-mode #showproforma-list-btn { border-left-color: #1f6feb !important; }
+body.dark-mode #cancel-btn { border-left-color: #d63031 !important; }
+body.dark-mode #abonar-btn { border-left-color: #06b6d4 !important; }
+body.dark-mode #cheque-btn { border-left-color: #fd7272 !important; }
+body.dark-mode #gift-card-btn { border-left-color: #5f27cd !important; }
+body.dark-mode #deposit-btn { border-left-color: #b33771 !important; }
+body.dark-mode button[data-target="#order-cobrar"] { border-left-color: #38bdf8 !important; }
+body.dark-mode button[data-target="#recentTransaction"] { border-left-color: #eab308 !important; }
 
-/* Hover / Active 360° Glow Border */
-.payment-options .btn-custom:hover,
-.payment-options button:hover,
-div.column-5 button:hover,
-button.btn-custom:hover,
-button.payment-btn:hover,
-.payment-options .btn-custom.active,
-button.btn-custom.active {
-    transform: translateY(-2px) !important;
-    background-color: #f8fafc !important;
-    color: #0f172a !important;
-}
-
-body.dark-mode .payment-options .btn-custom:hover,
 body.dark-mode .payment-options button:hover,
 body.dark-mode div.column-5 button:hover,
-body.dark-mode button.btn-custom:hover,
-body.dark-mode button.payment-btn:hover {
+body.dark-mode button.btn-custom:hover {
+    transform: translateY(-2px) !important;
     background-color: #1c273a !important;
     color: #ffffff !important;
 }
 
-#cash-btn:hover, button[id*="cash"]:hover, #cash-btn.active {
-    border: 1.5px solid #00cec9 !important;
-    box-shadow: 0 0 12px rgba(0, 206, 201, 0.45) !important;
-}
-
-#qrsimple-btn:hover, button[id*="qr"]:hover, #qrsimple-btn.active {
-    border: 1.5px solid #2bf710 !important;
-    box-shadow: 0 0 12px rgba(43, 247, 16, 0.45) !important;
-}
-
-#multiple-pay-btn:hover, button[id*="multiple"]:hover, #multiple-pay-btn.active {
-    border: 1.5px solid #1f6feb !important;
-    box-shadow: 0 0 12px rgba(31, 111, 235, 0.45) !important;
-}
-
-#qrcash-btn:hover, button[id*="qrcash"]:hover, #qrcash-btn.active {
-    border: 1.5px solid #b130ec !important;
-    box-shadow: 0 0 12px rgba(177, 48, 236, 0.45) !important;
-}
-
-#presale-btn:hover, button[id*="presale"]:hover, #presale-btn.active {
-    border: 1.5px solid #2bf710 !important;
-    box-shadow: 0 0 12px rgba(43, 247, 16, 0.45) !important;
-}
-
-#proforma-btn:hover, #showproforma-list-btn:hover, #proforma-btn.active, #showproforma-list-btn.active {
-    border: 1.5px solid #1f6feb !important;
-    box-shadow: 0 0 12px rgba(31, 111, 235, 0.45) !important;
-}
-
-#cancel-btn:hover, #cancel-btn.active {
-    border: 1.5px solid #d63031 !important;
-    box-shadow: 0 0 12px rgba(214, 48, 49, 0.45) !important;
-}
-
-#abonar-btn:hover, #abonar-btn.active {
-    border: 1.5px solid #06b6d4 !important;
-    box-shadow: 0 0 12px rgba(6, 182, 212, 0.45) !important;
-}
-
-#cheque-btn:hover, #cheque-btn.active {
-    border: 1.5px solid #fd7272 !important;
-    box-shadow: 0 0 12px rgba(253, 114, 114, 0.45) !important;
-}
-
-#gift-card-btn:hover, #gift-card-btn.active {
-    border: 1.5px solid #5f27cd !important;
-    box-shadow: 0 0 12px rgba(95, 39, 205, 0.45) !important;
-}
-
-#deposit-btn:hover, #deposit-btn.active {
-    border: 1.5px solid #b33771 !important;
-    box-shadow: 0 0 12px rgba(179, 55, 113, 0.45) !important;
-}
-
-button[data-target="#order-cobrar"]:hover, button[data-target="#order-cobrar"].active {
-    border: 1.5px solid #38bdf8 !important;
-    box-shadow: 0 0 12px rgba(56, 189, 248, 0.45) !important;
-}
-
-button[data-target="#recentTransaction"]:hover, button[data-target="#recentTransaction"].active {
-    border: 1.5px solid #eab308 !important;
-    box-shadow: 0 0 12px rgba(234, 179, 8, 0.45) !important;
-}
+body.dark-mode #cash-btn:hover, body.dark-mode button[id*="cash"]:hover { border: 1.5px solid #00cec9 !important; box-shadow: 0 0 12px rgba(0, 206, 201, 0.45) !important; }
+body.dark-mode #qrsimple-btn:hover, body.dark-mode button[id*="qr"]:hover { border: 1.5px solid #2bf710 !important; box-shadow: 0 0 12px rgba(43, 247, 16, 0.45) !important; }
+body.dark-mode #multiple-pay-btn:hover, body.dark-mode button[id*="multiple"]:hover { border: 1.5px solid #1f6feb !important; box-shadow: 0 0 12px rgba(31, 111, 235, 0.45) !important; }
+body.dark-mode #qrcash-btn:hover, body.dark-mode button[id*="qrcash"]:hover { border: 1.5px solid #b130ec !important; box-shadow: 0 0 12px rgba(177, 48, 236, 0.45) !important; }
+body.dark-mode #presale-btn:hover, body.dark-mode button[id*="presale"]:hover { border: 1.5px solid #2bf710 !important; box-shadow: 0 0 12px rgba(43, 247, 16, 0.45) !important; }
+body.dark-mode #proforma-btn:hover, body.dark-mode #showproforma-list-btn:hover { border: 1.5px solid #1f6feb !important; box-shadow: 0 0 12px rgba(31, 111, 235, 0.45) !important; }
+body.dark-mode #cancel-btn:hover { border: 1.5px solid #d63031 !important; box-shadow: 0 0 12px rgba(214, 48, 49, 0.45) !important; }
+body.dark-mode #abonar-btn:hover { border: 1.5px solid #06b6d4 !important; box-shadow: 0 0 12px rgba(6, 182, 212, 0.45) !important; }
+body.dark-mode #cheque-btn:hover { border: 1.5px solid #fd7272 !important; box-shadow: 0 0 12px rgba(253, 114, 114, 0.45) !important; }
+body.dark-mode #gift-card-btn:hover { border: 1.5px solid #5f27cd !important; box-shadow: 0 0 12px rgba(95, 39, 205, 0.45) !important; }
+body.dark-mode #deposit-btn:hover { border: 1.5px solid #b33771 !important; box-shadow: 0 0 12px rgba(179, 55, 113, 0.45) !important; }
+body.dark-mode button[data-target="#order-cobrar"]:hover { border: 1.5px solid #38bdf8 !important; box-shadow: 0 0 12px rgba(56, 189, 248, 0.45) !important; }
+body.dark-mode button[data-target="#recentTransaction"]:hover { border: 1.5px solid #eab308 !important; box-shadow: 0 0 12px rgba(234, 179, 8, 0.45) !important; }
 
 #cash-btn:hover, button[id*="cash"]:hover, #cash-btn.active {
     border: 1.5px solid #00cec9 !important;
