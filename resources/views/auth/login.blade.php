@@ -71,6 +71,9 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
         <div class="container">
             <div class="form-outer text-center d-flex align-items-center">
                 <div class="form-inner">
+                    <button type="button" id="login-theme-toggle" class="btn btn-sm btn-outline-secondary" style="position: absolute; top: 15px; right: 15px; border-radius: 50%; width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; z-index: 10;" title="Cambiar Tema (Modo Nocturno)">
+                        <i class="fa fa-moon-o" id="login-theme-icon"></i>
+                    </button>
                     <div class="logo"><span>GISUL POS</span></div>
                     @if (session()->has('delete_message'))
                         <div class="alert alert-danger alert-dismissible text-center"><button type="button"
@@ -226,5 +229,25 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                 $.cookie('remember_nit', nit, { expires: 365, path: '/' });
             }
         }
+    });
+
+    // Theme Toggle Handler on Login
+    function updateLoginThemeIcon() {
+        var icon = document.getElementById('login-theme-icon');
+        if (!icon) return;
+        if (document.documentElement.classList.contains('dark-mode') || document.body.classList.contains('dark-mode')) {
+            icon.className = 'fa fa-sun-o';
+        } else {
+            icon.className = 'fa fa-moon-o';
+        }
+    }
+    updateLoginThemeIcon();
+
+    $('#login-theme-toggle').on('click', function(e) {
+        e.preventDefault();
+        var isDark = $('body').toggleClass('dark-mode').hasClass('dark-mode');
+        $('html').toggleClass('dark-mode', isDark);
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        updateLoginThemeIcon();
     });
 </script>

@@ -465,7 +465,7 @@ body.dark-mode .toggle-off.btn-secondary {
     color: #f8fafc !important;
 }
 
-/* Login Page Dark Mode */
+/* Login Page Dark Mode Enhancements */
 body.dark-mode .login-page,
 body.dark-mode .login-page .form-outer,
 body.dark-mode .login-page .form-inner {
@@ -475,29 +475,83 @@ body.dark-mode .login-page .form-inner {
 }
 
 body.dark-mode .login-page .form-inner {
+    position: relative;
     border: 1px solid #334155 !important;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
+    border-radius: 12px !important;
+    padding: 2.5rem !important;
 }
 
 body.dark-mode .login-page .logo span {
     color: #38bdf8 !important;
+    font-weight: 700 !important;
+    letter-spacing: 1px;
 }
 
-body.dark-mode .login-page .input-material {
+/* Material Inputs in Dark Mode */
+body.dark-mode .login-page .form-group-material {
+    position: relative;
+    margin-bottom: 25px;
+}
+
+body.dark-mode .login-page input.input-material,
+body.dark-mode .login-page .form-group-material input {
+    background-color: transparent !important;
+    background: transparent !important;
     color: #f8fafc !important;
-    border-bottom-color: #475569 !important;
+    border: none !important;
+    border-bottom: 2px solid #475569 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 10px 0 !important;
 }
 
-body.dark-mode .login-page .input-material:focus {
+body.dark-mode .login-page input.input-material:focus,
+body.dark-mode .login-page .form-group-material input:focus {
     border-bottom-color: #38bdf8 !important;
+}
+
+/* Chrome/Edge Autofill Override in Dark Mode */
+body.dark-mode .login-page input:-webkit-autofill,
+body.dark-mode .login-page input:-webkit-autofill:hover,
+body.dark-mode .login-page input:-webkit-autofill:focus,
+body.dark-mode .login-page input:-webkit-autofill:active {
+    -webkit-text-fill-color: #f8fafc !important;
+    -webkit-box-shadow: 0 0 0px 1000px #1e293b inset !important;
+    transition: background-color 5000s ease-in-out 0s;
 }
 
 body.dark-mode .login-page .label-material {
     color: #94a3b8 !important;
 }
 
-body.dark-mode .login-page .forgot-pass,
+body.dark-mode .login-page .label-material.active {
+    color: #38bdf8 !important;
+}
+
+body.dark-mode .login-page #toggle-password {
+    color: #94a3b8 !important;
+}
+
+body.dark-mode .login-page .custom-control-label {
+    color: #cbd5e1 !important;
+}
+
+body.dark-mode .login-page .forgot-pass {
+    color: #38bdf8 !important;
+    font-weight: 500;
+}
+
+body.dark-mode .login-page .forgot-pass:hover {
+    color: #7dd3fc !important;
+    text-decoration: underline !important;
+}
+
 body.dark-mode .login-page .copyrights,
 body.dark-mode .login-page .copyrights a {
-    color: #cbd5e1 !important;
+    color: #94a3b8 !important;
+}
+
+body.dark-mode .login-page .copyrights a:hover {
+    color: #38bdf8 !important;
 }
