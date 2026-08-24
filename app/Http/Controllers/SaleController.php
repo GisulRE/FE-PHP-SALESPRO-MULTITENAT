@@ -124,6 +124,7 @@ class SaleController extends Controller
 
     public function index()
     {
+        ini_set('memory_limit', '512M');
         $start_date = date('Y-m-d', strtotime(' -7 day'));
         $end_date = date('Y-m-d');
         $role = Role::find(Auth::user()->role_id);
@@ -141,7 +142,7 @@ class SaleController extends Controller
             $lims_pos_setting_data = PosSetting::latest()->first();
             $lims_account_list = Account::where('is_active', true)->get();
             $lims_methodpay_list = MethodPayment::where('name', '!=', 'Guardar Mas Tarde')->get();
-            $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
+            $lista_documentos = SiatParametricaVario::select('id', 'codigo_clasificador', 'descripcion')->where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
 
             return view('sale.index', compact('lims_gift_card_list', 'lims_pos_setting_data', 'lims_account_list', 'all_permission', 'start_date', 'end_date', 'lims_methodpay_list', 'lista_documentos'));
         } else {
@@ -151,6 +152,7 @@ class SaleController extends Controller
 
     public function saleData(Request $request)
     {
+        ini_set('memory_limit', '512M');
         $start_date = $request->input('start_date');
         $end_date = $request->input('end_date');
 
