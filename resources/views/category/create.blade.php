@@ -252,6 +252,7 @@
         });
         $(document).ready(function() {
             $('#category-table').DataTable({
+                destroy: true,
                 "processing": true,
                 "serverSide": true,
                 "ajax": {

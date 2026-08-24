@@ -20,6 +20,11 @@ class Category extends Model
     	return $this->hasMany('App\Product');
     }
 
+    public function parent()
+    {
+        return $this->belongsTo('App\Category', 'parent_id');
+    }
+
     protected static function boot()
     {
         parent::boot();

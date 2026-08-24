@@ -22,157 +22,194 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role && $role->hasPermissionTo('category')) {
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('category', $permissions);
+
+        if ($hasPermission) {
             $lims_pos_setting_data = PosSetting::latest()->first();
             $lims_categories = Category::where('is_active', true)->pluck('name', 'id');
             if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
                 $lims_category_all = Category::select('categories.id', 'categories.name', 'categories.image', 'categories.parent_id', 'categories.is_active', 'categories.codigo_actividad', 'categories.codigo_producto_servicio')
-                    ->join('user_category', 'categories.id', '=', 'user_category.category_id')->where('user_category.user_id', '=', Auth::user()->id)->where('categories.is_active', '=', true)->get();
-            } else
+                    ->join('user_category', 'categories.id', '=', 'user_category.category_id')
+                    ->where('user_category.user_id', '=', Auth::user()->id)
+                    ->where('categories.is_active', '=', true)->get();
+            } else {
                 $lims_category_all = Category::where('is_active', true)->get();
+            }
 
             return view('category.create', compact('lims_categories', 'lims_category_all'));
         } else {
-            Log::warning('[CategoryController@index] Acceso DENEGADO por falta de permiso, redirigiendo a back()', [
-                'user_id'   => $user->id,
-                'role_id'   => $role_id,
-                'role_name' => $role->name,
-                'referer'   => request()->headers->get('referer', 'sin_referer'),
-            ]);
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
     }
 
     public function categoryData(Request $request)
     {
-        $columns = array(
-            0 => 'id',
-            2 => 'name',
-            3 => 'parent_id',
-            4 => 'is_active',
-        );
-        $lims_pos_setting_data = PosSetting::latest()->first();
-        if ($lims_pos_setting_data && $lims_pos_setting_data->user_category)
-            $totalData = UserCategory::where('user_id', Auth::user()->id)->count();
-        else
-            $totalData = Category::where('is_active', true)->count();
+        try {
+            $columns = array(
+                0 => 'id',
+                2 => 'name',
+                3 => 'parent_id',
+                4 => 'is_active',
+            );
+            $lims_pos_setting_data = PosSetting::latest()->first();
+            if ($lims_pos_setting_data && $lims_pos_setting_data->user_category)
+                $totalData = UserCategory::where('user_id', Auth::user()->id)->count();
+            else
+                $totalData = Category::where('is_active', true)->count();
 
-        $totalFiltered = $totalData;
+            $totalFiltered = $totalData;
 
-        if ($request->input('length') != -1)
-            $limit = $request->input('length');
-        else
-            $limit = $totalData;
-        $start = $request->input('start');
-        $order = $columns[$request->input('order.0.column')];
-        $dir = $request->input('order.0.dir');
-        if (empty($request->input('search.value'))) {
-            if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
-                $categories = Category::select('categories.id', 'categories.name', 'categories.image', 'categories.parent_id', 'categories.is_active', 'categories.codigo_actividad', 'categories.codigo_producto_servicio')
-                ->offset($start)
-                    ->join('user_category', 'categories.id', '=', 'user_category.category_id')
-                    ->where('categories.is_active', true)
-                    ->where('user_category.user_id', '=', Auth::user()->id)
-                    ->limit($limit)
-                    ->orderBy($order, $dir)
-                    ->get();
+            if ($request->input('length') != -1 && $request->input('length') !== null)
+                $limit = (int)$request->input('length');
+            else
+                $limit = 500;
+            
+            $start = $request->input('start', 0);
+            $order = $columns[$request->input('order.0.column')] ?? 'id';
+            $dir = $request->input('order.0.dir', 'asc');
+
+            if (empty($request->input('search.value'))) {
+                if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
+                    $categories = Category::select('categories.id', 'categories.name', 'categories.image', 'categories.parent_id', 'categories.is_active', 'categories.codigo_actividad', 'categories.codigo_producto_servicio')
+                        ->with('parent')
+                        ->offset($start)
+                        ->join('user_category', 'categories.id', '=', 'user_category.category_id')
+                        ->where('categories.is_active', true)
+                        ->where('user_category.user_id', '=', Auth::user()->id)
+                        ->limit($limit)
+                        ->orderBy('categories.' . $order, $dir)
+                        ->get();
+                } else {
+                    $categories = Category::with('parent')
+                        ->offset($start)
+                        ->where('is_active', true)
+                        ->limit($limit)
+                        ->orderBy($order, $dir)
+                        ->get();
+                }
             } else {
-                $categories = Category::offset($start)
+                $search = $request->input('search.value');
+                if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
+                    $categories = Category::select('categories.id', 'categories.name', 'categories.image', 'categories.parent_id', 'categories.is_active', 'categories.codigo_actividad', 'categories.codigo_producto_servicio')
+                        ->with('parent')
+                        ->join('user_category', 'categories.id', '=', 'user_category.category_id')
+                        ->where([
+                            ['categories.name', 'LIKE', "%{$search}%"],
+                            ['categories.is_active', true]
+                        ])
+                        ->where('user_category.user_id', '=', Auth::user()->id)
+                        ->offset($start)
+                        ->limit($limit)
+                        ->orderBy('categories.' . $order, $dir)->get();
+
+                    $totalFiltered = Category::join('user_category', 'categories.id', '=', 'user_category.category_id')
+                        ->where([
+                            ['categories.name', 'LIKE', "%{$search}%"],
+                            ['categories.is_active', true]
+                        ])->where('user_category.user_id', '=', Auth::user()->id)->count();
+                } else {
+                    $categories = Category::with('parent')
+                        ->where([
+                            ['name', 'LIKE', "%{$search}%"],
+                            ['is_active', true]
+                        ])->offset($start)
+                        ->limit($limit)
+                        ->orderBy($order, $dir)->get();
+
+                    $totalFiltered = Category::where([
+                        ['name', 'LIKE', "%{$search}%"],
+                        ['is_active', true]
+                    ])->count();
+                }
+            }
+
+            $data = array();
+            if (!empty($categories)) {
+                $categoryIds = $categories->pluck('id')->toArray();
+                
+                // Consulta agrupada en lote para calcular estadísticas de productos sin N+1
+                $stats = \DB::table('products')
+                    ->select(
+                        'category_id',
+                        \DB::raw('COUNT(id) as total_products'),
+                        \DB::raw('COALESCE(SUM(CAST(qty AS NUMERIC)), 0) as total_qty'),
+                        \DB::raw('COALESCE(SUM(CAST(price AS NUMERIC) * CAST(qty AS NUMERIC)), 0) as total_price'),
+                        \DB::raw('COALESCE(SUM(CAST(cost AS NUMERIC) * CAST(qty AS NUMERIC)), 0) as total_cost')
+                    )
+                    ->whereIn('category_id', $categoryIds)
                     ->where('is_active', true)
-                    ->limit($limit)
-                    ->orderBy($order, $dir)
-                    ->get();
-            }
-        } else {
-            $search = $request->input('search.value');
-            if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
-                $categories = Category::select('categories.id', 'categories.name', 'categories.image', 'categories.parent_id', 'categories.is_active', 'categories.codigo_actividad', 'categories.codigo_producto_servicio')
-                ->join('user_category', 'categories.id', '=', 'user_category.category_id')
-                ->where([
-                    ['categories.name', 'LIKE', "%{$search}%"],
-                    ['categories.is_active', true]
-                ])
-                ->where('user_category.user_id', '=', Auth::user()->id)
-                ->offset($start)
-                    ->limit($limit)
-                    ->orderBy($order, $dir)->get();
+                    ->groupBy('category_id')
+                    ->get()
+                    ->keyBy('category_id');
 
-                $totalFiltered = Category::select('categories.id', 'categories.name', 'categories.image', 'categories.parent_id', 'categories.is_active', 'categories.codigo_actividad', 'categories.codigo_producto_servicio')
-                ->join('user_category', 'categories.id', '=', 'user_category.category_id')
-                ->where([
-                    ['categories.name', 'LIKE', "%{$search}%"],
-                    ['categories.is_active', true]
-                ])->where('user_category.user_id', '=', Auth::user()->id)->count();
-            } else {
-                $categories = Category::where([
-                    ['name', 'LIKE', "%{$search}%"],
-                    ['is_active', true]
-                ])->offset($start)
-                    ->limit($limit)
-                    ->orderBy($order, $dir)->get();
+                $curr = config('currency', 'Bs');
+                $currPos = config('currency_position', 'prefix');
 
-                $totalFiltered = Category::where([
-                    ['name', 'LIKE', "%{$search}%"],
-                    ['is_active', true]
-                ])->count();
+                foreach ($categories as $key => $category) {
+                    $nestedData['id'] = $category->id;
+                    $nestedData['key'] = $key;
+
+                    if ($category->image)
+                        $nestedData['image'] = '<img src="' . url('public/images/category', $category->image) . '" height="70" width="70">';
+                    else
+                        $nestedData['image'] = '<img src="' . url('public/images/product/zummXD2dvAtI.png') . '" height="80" width="80">';
+
+                    $nestedData['name'] = $category->name;
+                    $nestedData['parent_id'] = $category->parent ? $category->parent->name : "N/A";
+
+                    $catStat = $stats->get($category->id);
+                    $productCount = $catStat ? (int)$catStat->total_products : 0;
+                    $stockQty = $catStat ? (float)$catStat->total_qty : 0;
+                    $totalPrice = $catStat ? (float)$catStat->total_price : 0;
+                    $totalCost = $catStat ? (float)$catStat->total_cost : 0;
+
+                    $nestedData['number_of_product'] = $productCount;
+                    $nestedData['stock_qty'] = number_format($stockQty, 2, '.', '');
+
+                    if ($currPos == 'prefix')
+                        $nestedData['stock_worth'] = $curr . ' ' . number_format($totalPrice, 2, '.', ',') . ' / ' . $curr . ' ' . number_format($totalCost, 2, '.', ',');
+                    else
+                        $nestedData['stock_worth'] = number_format($totalPrice, 2, '.', ',') . ' ' . $curr . ' / ' . number_format($totalCost, 2, '.', ',') . ' ' . $curr;
+
+                    $nestedData['options'] = '<div class="btn-group">
+                                <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">' . trans("file.action") . '
+                                    <span class="caret"></span>
+                                    <span class="sr-only">Toggle Dropdown</span>
+                                </button>
+                                <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
+                                    <li>
+                                        <button type="button" data-id="' . $category->id . '" class="open-EditCategoryDialog btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="dripicons-document-edit"></i> ' . trans("file.edit") . '</button>
+                                    </li>
+                                    <li class="divider"></li>
+                                    <form action="' . route('category.destroy', $category->id) . '" method="POST" style="display:inline">' . csrf_field() . method_field('DELETE') . '
+                                    <li>
+                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' . trans("file.delete") . '</button> 
+                                    </li></form>
+                                </ul>
+                            </div>';
+                    $data[] = $nestedData;
+                }
             }
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data
+            );
+
+            return response()->json($json_data);
+        } catch (\Throwable $e) {
+            \Log::error('Error en categoryData: ' . $e->getMessage());
+            return response()->json([
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => 0,
+                "recordsFiltered" => 0,
+                "data" => [],
+                "error" => $e->getMessage()
+            ]);
         }
-        $data = array();
-        if (!empty($categories)) {
-            foreach ($categories as $key => $category) {
-                $nestedData['id'] = $category->id;
-                $nestedData['key'] = $key;
-
-                if ($category->image)
-                    $nestedData['image'] = '<img src="' . url('public/images/category', $category->image) . '" height="70" width="70">';
-                else
-                    $nestedData['image'] = '<img src="' . url('public/images/product/zummXD2dvAtI.png') . '" height="80" width="80">';
-
-                $nestedData['name'] = $category->name;
-
-                if ($category->parent_id)
-                    $nestedData['parent_id'] = Category::find($category->parent_id)->name;
-                else
-                    $nestedData['parent_id'] = "N/A";
-
-                $nestedData['number_of_product'] = $category->product()->where('is_active', true)->count();
-                $nestedData['stock_qty'] = $category->product()->where('is_active', true)->sum('qty');
-                $total_price = $category->product()->where('is_active', true)->sum(\DB::raw('CAST(price AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
-                $total_cost = $category->product()->where('is_active', true)->sum(\DB::raw('CAST(cost AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
-
-                if (config('currency_position') == 'prefix')
-                    $nestedData['stock_worth'] = config('currency') . ' ' . $total_price . ' / ' . config('currency') . ' ' . $total_cost;
-                else
-                    $nestedData['stock_worth'] = $total_price . ' ' . config('currency') . ' / ' . $total_cost . ' ' . config('currency');
-
-                $nestedData['options'] = '<div class="btn-group">
-                            <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">' . trans("file.action") . '
-                                <span class="caret"></span>
-                                <span class="sr-only">Toggle Dropdown</span>
-                            </button>
-                            <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
-                                <li>
-                                    <button type="button" data-id="' . $category->id . '" class="open-EditCategoryDialog btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="dripicons-document-edit"></i> ' . trans("file.edit") . '</button>
-                                </li>
-                                <li class="divider"></li>' .
-                    \Form::open(["route" => ["category.destroy", $category->id], "method" => "DELETE"]) . '
-                                <li>
-                                    <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' . trans("file.delete") . '</button> 
-                                </li>' . \Form::close() . '
-                            </ul>
-                        </div>';
-                $data[] = $nestedData;
-            }
-        }
-        $json_data = array(
-            "draw" => intval($request->input('draw')),
-            "recordsTotal" => intval($totalData),
-            "recordsFiltered" => intval($totalFiltered),
-            "data" => $data
-        );
-
-        echo json_encode($json_data);
     }
 
     public function store(Request $request)
