@@ -949,7 +949,7 @@
                 "processing": true,
                 "serverSide": true,
                 "ajax": {
-                    url: "list_booksales",
+                    url: "{{ url('sales/list_booksales') }}",
                     dataType: "json",
                     data: {
                         fechaInc: start_date_get,

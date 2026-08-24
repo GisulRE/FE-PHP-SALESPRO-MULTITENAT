@@ -5592,43 +5592,35 @@ class SaleController extends Controller
 
     public function libroVentas()
     {
-        $role = Role::find(Auth::user()->role_id);
-        $fecha_actual = date('Y-m-d');
-        $data_biller = Biller::where('id', Auth::user()->biller_id)->first();
-        if ($data_biller == null) {
-            $data_biller = Biller::first();
-        }
-        $data_p_venta = SiatPuntoVenta::where([
-            'sucursal' => $data_biller->sucursal,
-            'codigo_punto_venta' => $data_biller->punto_venta_siat
-        ])->get();
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('sales-list-booksale', $permissions);
 
-        $usuarios = User::select('id', 'name')->where('is_active', true)->get();
-        $sucursales = SiatSucursal::where('estado', true)->get();
-        if ($role->hasPermissionTo('sales-list-booksale')) {
-            $all_permission = \DB::table('permissions')
-                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                ->where('role_id', Auth::user()->role_id)
-                ->pluck('name')
-                ->toArray();
-            if (empty($all_permission))
-                $all_permission[] = 'dummy text';
+        if ($hasPermission) {
+            $fecha_actual = date('Y-m-d');
+            $data_biller = ($user && $user->biller_id) ? Biller::find($user->biller_id) : Biller::first();
+            if ($data_biller == null) {
+                $data_biller = (object)['sucursal' => 0, 'punto_venta_siat' => 0];
+            }
+            $data_p_venta = SiatPuntoVenta::select('codigo_punto_venta', 'nombre_punto_venta')
+                ->where([
+                    'sucursal' => $data_biller->sucursal ?? 0,
+                    'codigo_punto_venta' => $data_biller->punto_venta_siat ?? 0
+                ])->get();
+
+            $usuarios = User::select('id', 'name')->where('is_active', true)->get();
+            $sucursales = SiatSucursal::select('sucursal', 'nombre')->where('estado', true)->get();
+            $all_permission = !empty($permissions) ? $permissions : ['sales-list-booksale'];
 
             return view('sale.sales-book', compact('all_permission', 'fecha_actual', 'sucursales', 'data_biller', 'data_p_venta', 'usuarios'));
-        } else
+        } else {
             return redirect()->back()->with('not_permitted', 'Lo siento! Usted no tiene acceso a este modulo');
+        }
     }
 
     public function listBooksales(Request $request)
     {
         try {
-            $role = Role::find(Auth::user()->role_id);
-
-            $list_invoices = collect();
-            $columns = array(
-                0 => 'numeroFactura'
-            );
-            
             $data = $request->all();
             
             // Validar datos requeridos
@@ -5650,23 +5642,16 @@ class SaleController extends Controller
             $dataFilter['puntoVenta'] = isset($data['puntoVenta']) ? $data['puntoVenta'] : '0';
             $dataFilter['sucursal'] = isset($data['sucursal']) ? $data['sucursal'] : '0';
             $dataFilter['estadoFactura'] = isset($data['estado']) ? $data['estado'] : 'T';
-        if ($request->input('start') > 9) {
-            $dataFilter['pagina'] = substr($request->input('start'), 0, -1);
-        } else {
-            $dataFilter['pagina'] = $request->input('start');
-        }
-        $dataFilter['fila'] = $request->input('length');
-        if ($data['valor'] == null) {
-            $dataFilter['valor'] = "";
-        } else {
-            $dataFilter['valor'] = $data['valor'];
-        }
-        $dataFilter['cuf'] = "";
-        
-        Log::info('===== INICIO listBooksales =====');
-        Log::info('Filtros enviados:', $dataFilter);
-        
-        $list_facturas = $this->buscarFacturasxLibro($dataFilter); // SiatTrait
+            if ($request->input('start') > 9) {
+                $dataFilter['pagina'] = substr($request->input('start'), 0, -1);
+            } else {
+                $dataFilter['pagina'] = $request->input('start');
+            }
+            $dataFilter['fila'] = $request->input('length', 10);
+            $dataFilter['valor'] = $data['valor'] ?? "";
+            $dataFilter['cuf'] = "";
+            
+            $list_facturas = $this->buscarFacturasxLibro($dataFilter); // SiatTrait
         
         Log::info('Respuesta recibida de buscarFacturasxLibro:', [
             'status' => isset($list_facturas['status']) ? $list_facturas['status'] : 'no definido',
