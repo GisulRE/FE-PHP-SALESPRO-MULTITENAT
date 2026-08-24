@@ -566,32 +566,26 @@ class SaleController extends Controller
     public function create()
     {
 
-        $role = Role::find(Auth::user()->role_id);
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $canAdd = ($user && $user->role_id <= 2) || in_array('sales-add', $permissions);
 
-        if ($role->hasPermissionTo('sales-add')) {
-            $all_permission = \DB::table('permissions')
-                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                ->where('role_id', Auth::user()->role_id)
-                ->pluck('name')
-                ->toArray();
-
-            if (empty($all_permission)) {
-                $all_permission[] = 'dummy text';
-            }
+        if ($canAdd) {
+            $all_permission = !empty($permissions) ? $permissions : ['sales-index', 'sales-add', 'sales-edit', 'sales-delete'];
 
             $lims_pos_setting_data = PosSetting::latest()->first();
 
-            if (Auth::user()->biller_id != null) {
-                $user = Auth::user();
+            if ($user && $user->biller_id != null) {
                 $biller_data = Biller::select('id', 'account_id', 'warehouse_id')->find($user->biller_id);
-                $lims_account_data = Account::select('id', 'name', 'account_no')->find($biller_data->account_id);
+                $lims_account_data = $biller_data ? Account::select('id', 'name', 'account_no')->find($biller_data->account_id) : null;
             } else {
                 $biller_data = $lims_pos_setting_data;
                 $lims_account_data = Account::select('id', 'name', 'account_no')->where('is_default', true)->first();
             }
 
-            $account_data = $lims_account_data->name . " [" . $lims_account_data->account_no . "]";
-            $lims_cashier_data = Cashier::select('id', 'end_date')->where([['account_id', $lims_account_data->id], ['is_active', true]])->first();
+            $account_data = $lims_account_data ? ($lims_account_data->name . " [" . $lims_account_data->account_no . "]") : "Cuenta Principal";
+            $accountId = $lims_account_data ? $lims_account_data->id : 0;
+            $lims_cashier_data = Cashier::select('id', 'end_date')->where([['account_id', $accountId], ['is_active', true]])->first();
             $lims_customer_list = Customer::select('id', 'name', 'phone_number', 'is_credit', 'credit')->where('is_active', true)->get();
             $lims_customer_group_all = CustomerGroup::select('id', 'name')->where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::select('id', 'name')->where('is_active', true)->get();

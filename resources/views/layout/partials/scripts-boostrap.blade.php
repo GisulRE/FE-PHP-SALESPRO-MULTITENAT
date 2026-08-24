@@ -44,4 +44,6 @@
 <script type="text/javascript" src="/public/js/sweetalert.min.js"></script>
 <script src="https://js.pusher.com/7.2/pusher.min.js"></script>
 <script type="text/javascript" src="/public/printjs/print.min.js"></script>
+<script type="text/javascript" src="/public/js/turbo.min.js"></script>
+<script type="text/javascript" src="/public/js/spa-turbo-adapter.js"></script>
  

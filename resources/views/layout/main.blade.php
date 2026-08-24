@@ -83,6 +83,12 @@
             /* Non-prefixed version, currently
                                         supported by Chrome, Edge, Opera and Firefox */
         }
+        .turbo-progress-bar {
+            height: 3px;
+            background: linear-gradient(90deg, #4f46e5, #06b6d4, #10b981);
+            box-shadow: 0 0 10px rgba(79, 70, 229, 0.7);
+            z-index: 99999;
+        }
     </style>
 </head>
 
