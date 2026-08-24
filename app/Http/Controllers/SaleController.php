@@ -244,14 +244,15 @@ class SaleController extends Controller
                 ->leftJoin('customers', 'sales.customer_id', '=', 'customers.id')
                 ->leftJoin('billers', 'sales.biller_id', '=', 'billers.id');
 
-            $q->where(function($query) use ($search, $cleanSearch) {
+            $castExpr = \DB::getDriverName() === 'pgsql' ? 'CAST((sales.grand_total - sales.paid_amount) AS TEXT)' : '(sales.grand_total - sales.paid_amount)';
+            $q->where(function($query) use ($search, $cleanSearch, $castExpr) {
                 $query->whereDate('sales.date_sell', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
                       ->orWhere('sales.reference_no', 'LIKE', "%{$search}%")
                       ->orWhere('customers.name', 'LIKE', "%{$search}%")
                       ->orWhere('billers.name', 'LIKE', "%{$search}%")
                       ->orWhere('sales.grand_total', 'LIKE', "%{$cleanSearch}%")
                       ->orWhere('sales.paid_amount', 'LIKE', "%{$cleanSearch}%")
-                      ->orWhereRaw('(sales.grand_total - sales.paid_amount) LIKE ?', ["%{$cleanSearch}%"]);
+                      ->orWhereRaw("{$castExpr} LIKE ?", ["%{$cleanSearch}%"]);
             });
 
             $totalFiltered = $q->count();

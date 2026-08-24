@@ -292,8 +292,10 @@ class SettingController extends Controller
         $failed = 0;
         $errors = [];
 
-        \DB::statement('SET FOREIGN_KEY_CHECKS=0');
-        \DB::statement("SET SESSION sql_mode = ''");
+        if (\DB::getDriverName() === 'mysql') {
+            \DB::statement('SET FOREIGN_KEY_CHECKS=0');
+            \DB::statement("SET SESSION sql_mode = ''");
+        }
 
         try {
             foreach ($statements as $statement) {
@@ -328,7 +330,9 @@ class SettingController extends Controller
                 }
             }
         } finally {
-            \DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            if (\DB::getDriverName() === 'mysql') {
+                \DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            }
             if ($tempToDelete && file_exists($tempToDelete)) {
                 @unlink($tempToDelete);
             }
