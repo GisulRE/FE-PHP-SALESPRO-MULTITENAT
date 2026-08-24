@@ -565,6 +565,7 @@
 
         $(document).ready(function () {
             var table = $('#product-data-table').DataTable({
+                destroy: true,
                 responsive: true,
                 fixedHeader: {
                     header: true,
@@ -573,10 +574,8 @@
                 "processing": true,
                 "serverSide": true,
                 "ajax": {
-                    url: "products/product-data",
+                    url: "{{ url('products/product-data') }}",
                     data: function (d) {
-                        // Enviar permiso y filtro de categoría al servidor
-                        d.all_permission = all_permission;
                         d.category_id = $('#filter_category').val() || 0;
                     },
                     dataType: "json",

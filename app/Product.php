@@ -58,6 +58,11 @@ class Product extends Model
         return $this->belongsTo('App\Account', 'account_id');
     }
 
+    public function tax()
+    {
+        return $this->belongsTo('App\Tax', 'tax_id');
+    }
+
 
     public function scopeActiveStandard($query)
     {
