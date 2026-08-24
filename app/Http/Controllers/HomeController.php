@@ -119,17 +119,11 @@ class HomeController extends Controller
             $yearly_purchase_amount[] = number_format((float)$purchase_amount, 2, '.', '');
             $start = strtotime("+1 month", $start);
         }
-        $permissions = DB::table('permissions')
-            ->select('name')
+        $p_ready = DB::table('permissions')
             ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
             ->where('role_id', Auth::user()->role_id)
-            ->get();
-
-        $permisos = json_decode(json_encode($permissions), true);
-        $p_ready = [];
-        foreach ($permisos as $p) {
-            $p_ready[] = $p['name'];
-        }
+            ->pluck('name')
+            ->toArray();
 
         session()->put('permissions', $p_ready);
 
