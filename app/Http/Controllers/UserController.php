@@ -63,20 +63,30 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = $request->input('company_id') ?: (Auth::user() ? Auth::user()->company_id : null);
+
         $this->validate($request, [
             'name' => [
                 'required',
                 'max:255',
-                Rule::unique('users')->where(function ($query) {
-                    return $query->where('is_deleted', false);
+                Rule::unique('users')->where(function ($query) use ($companyId) {
+                    $q = $query->where('is_deleted', false);
+                    if ($companyId) {
+                        $q->where('company_id', $companyId);
+                    }
+                    return $q;
                 }),
             ],
             'email' => [
                 'required',
                 'email',
                 'max:255',
-                Rule::unique('users')->where(function ($query) {
-                    return $query->where('is_deleted', false);
+                Rule::unique('users')->where(function ($query) use ($companyId) {
+                    $q = $query->where('is_deleted', false);
+                    if ($companyId) {
+                        $q->where('company_id', $companyId);
+                    }
+                    return $q;
                 }),
             ],
         ]);
@@ -133,20 +143,31 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
+        $currentUser = User::find($id);
+        $companyId = $request->input('company_id') ?: ($currentUser ? $currentUser->company_id : (Auth::user() ? Auth::user()->company_id : null));
+
         $this->validate($request, [
             'name' => [
                 'required',
                 'max:255',
-                Rule::unique('users')->ignore($id)->where(function ($query) {
-                    return $query->where('is_deleted', false);
+                Rule::unique('users')->ignore($id)->where(function ($query) use ($companyId) {
+                    $q = $query->where('is_deleted', false);
+                    if ($companyId) {
+                        $q->where('company_id', $companyId);
+                    }
+                    return $q;
                 }),
             ],
             'email' => [
                 'required',
                 'email',
                 'max:255',
-                Rule::unique('users')->ignore($id)->where(function ($query) {
-                    return $query->where('is_deleted', false);
+                Rule::unique('users')->ignore($id)->where(function ($query) use ($companyId) {
+                    $q = $query->where('is_deleted', false);
+                    if ($companyId) {
+                        $q->where('company_id', $companyId);
+                    }
+                    return $q;
                 }),
             ],
         ]);
