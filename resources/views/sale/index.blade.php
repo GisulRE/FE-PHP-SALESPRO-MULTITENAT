@@ -1126,7 +1126,6 @@
                 "ajax": {
                     url: "{{ url('sales/sale-data') }}",
                     data: {
-                        all_permission: all_permission,
                         start_date: start_date_get,
                         end_date: end_date_get
                     },

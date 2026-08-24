@@ -385,16 +385,6 @@ class SaleController extends Controller
 
                 $venta_facturada = CustomerSale::where('sale_id', $sale->id)->first(['estado_factura', 'cuf', 'nro_factura']);
                 
-                // Log para debugging - Solo en desarrollo
-                if (config('app.debug')) {
-                    \Log::debug('[SaleController::index] Construyendo array de venta', [
-                        'sale_id' => $sale->id,
-                        'venta_facturada_existe' => $venta_facturada ? 'SÍ' : 'NO',
-                        'cuf' => $venta_facturada ? ($venta_facturada->cuf ?? 'NULL') : 'NO_FACTURADA',
-                        'nro_factura' => $venta_facturada ? ($venta_facturada->nro_factura ?? 'NULL') : 'NO_FACTURADA'
-                    ]);
-                }
-                
                 $nestedData['options'] = '<div class="btn-group">
                             <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">' . trans("file.action") . '
                             <span class="caret"></span>
