@@ -171,9 +171,9 @@
         <div style="display:none;" id="content" class="animate-bottom">
             @yield('content')
         </div>
-        <?php use App\Http\Controllers\BillerController;
+        <?php
         if(Auth::user()->role_id > 2 && Auth::user()->biller_id){
-            $lims_warehouse_authorizates = BillerController::warehouseAuthorizate(Auth::user()->biller_id);
+            $lims_warehouse_authorizates = \App\Http\Controllers\BillerController::warehouseAuthorizate(Auth::user()->biller_id);
         }else{
             $lims_warehouse_authorizates = \App\Warehouse::where('is_active', true)->get();
         }
