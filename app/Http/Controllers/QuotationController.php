@@ -30,19 +30,16 @@ class QuotationController extends Controller
 {
     public function index()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('quotes-index')) {
-            $all_permission = \DB::table('permissions')
-                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                ->where('role_id', Auth::user()->role_id)
-                ->pluck('name')
-                ->toArray();
-            if (empty($all_permission))
-                $all_permission[] = 'dummy text';
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('quotes-index', $permissions);
 
+        if ($hasPermission) {
+            $all_permission = !empty($permissions) ? $permissions : ['quotes-index', 'quotes-add', 'quotes-edit', 'quotes-delete'];
             return view('quotation.index', compact('all_permission'));
-        } else
+        } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function listData(Request $request)
@@ -187,16 +184,20 @@ class QuotationController extends Controller
 
     public function create()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('quotes-add')) {
-            $lims_biller_list = Biller::where('is_active', true)->get();
-            $lims_warehouse_list = Warehouse::where('is_active', true)->get();
-            $lims_supplier_list = Supplier::where('is_active', true)->get();
-            $lims_tax_list = Tax::where('is_active', true)->get();
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('quotes-add', $permissions);
+
+        if ($hasPermission) {
+            $lims_biller_list = Biller::select('id', 'name', 'company_name')->where('is_active', true)->get();
+            $lims_warehouse_list = Warehouse::select('id', 'name')->where('is_active', true)->get();
+            $lims_supplier_list = Supplier::select('id', 'name', 'company_name', 'phone_number')->where('is_active', true)->get();
+            $lims_tax_list = Tax::select('id', 'name', 'rate')->where('is_active', true)->get();
 
             return view('quotation.create', compact('lims_biller_list', 'lims_warehouse_list', 'lims_supplier_list', 'lims_tax_list'));
-        } else
+        } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function store(Request $request)

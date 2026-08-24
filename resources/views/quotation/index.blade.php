@@ -175,7 +175,7 @@
                 "processing": true,
                 "serverSide": true,
                 "ajax": {
-                    url: "quotations/list-data",
+                    url: "{{ url('quotations/list-data') }}",
                     data: {
                         all_permission: all_permission
                     },

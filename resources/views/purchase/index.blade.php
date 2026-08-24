@@ -482,10 +482,11 @@
         });
 
         $('#purchase-table').DataTable({
+            destroy: true,
             "processing": true,
             "serverSide": true,
             "ajax": {
-                url: "purchases/purchase-data",
+                url: "{{ url('purchases/purchase-data') }}",
                 data: {
                     all_permission: all_permission
                 },

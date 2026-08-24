@@ -230,53 +230,23 @@ class ProductController extends Controller
 
     public function create()
     {
-        $user    = Auth::user();
-        $role_id = $user ? $user->role_id : null;
-
-        Log::info('[ProductController@create] Intentando acceder', [
-            'user_id'   => $user ? $user->id   : null,
-            'user_name' => $user ? $user->name  : null,
-            'role_id'   => $role_id,
-        ]);
-
-        $role = Role::firstOrCreate(['id' => $role_id]);
-
-        $hasPermission = $role->hasPermissionTo('products-add');
-
-        Log::info('[ProductController@create] Resultado de verificación de permiso', [
-            'user_id'           => $user ? $user->id : null,
-            'role_id'           => $role_id,
-            'role_name'         => $role->name,
-            'permiso_requerido' => 'products-add',
-            'tiene_permiso'     => $hasPermission,
-        ]);
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('products-add', $permissions);
 
         if ($hasPermission) {
-            $lims_product_list = [];
-            $lims_product_list_std = Product::where([['is_active', true], ['type', 'standard']])->get();
-            $lims_product_list_dig = Product::where([['is_active', true], ['type', 'digital']])->get();
-            foreach ($lims_product_list_std as $key => $value) {
-                $lims_product_list[] = $value;
-            }
-            foreach ($lims_product_list_dig as $key => $value) {
-                $lims_product_list[] = $value;
-            }
-            $lims_product_list_ins = Product::where([['is_active', true], ['type', 'insumo']])->get();
-            $lims_product_list_all = Product::where('is_active', true)->get();
-            $lims_brand_list = Brand::where('is_active', true)->get();
-            $lims_category_list = Category::where('is_active', true)->get();
-            $lims_unit_list = Unit::where('is_active', true)->get();
-            $lims_tax_list = Tax::where('is_active', true)->get();
-            $actividades = SiatActividadEconomica::get()->sortBy('descripcion');
+            $lims_product_list_all = Product::select('id', 'name', 'code', 'type')->where('is_active', true)->get();
+            $lims_product_list = $lims_product_list_all->whereIn('type', ['standard', 'digital'])->values();
+            $lims_product_list_ins = $lims_product_list_all->where('type', 'insumo')->values();
+            $lims_brand_list = Brand::select('id', 'title')->where('is_active', true)->get();
+            $lims_category_list = Category::select('id', 'name')->where('is_active', true)->get();
+            $lims_unit_list = Unit::select('id', 'unit_name', 'unit_code')->where('is_active', true)->get();
+            $lims_tax_list = Tax::select('id', 'name', 'rate')->where('is_active', true)->get();
+            $actividades = SiatActividadEconomica::select('codigo_caeb', 'descripcion')->get()->sortBy('descripcion');
             $lims_account_list = Account::select('id', 'name', 'account_no')->where('is_active', true)->get();
+
             return view('product.create', compact('lims_product_list', 'lims_brand_list', 'lims_category_list', 'lims_unit_list', 'lims_tax_list', 'lims_product_list_all', 'lims_product_list_ins', 'actividades', 'lims_account_list'));
         } else {
-            Log::warning('[ProductController@create] Acceso DENEGADO por falta de permiso, redirigiendo a back()', [
-                'user_id'   => $user ? $user->id : null,
-                'role_id'   => $role_id,
-                'role_name' => $role->name,
-                'referer'   => request()->headers->get('referer', 'sin_referer'),
-            ]);
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
     }

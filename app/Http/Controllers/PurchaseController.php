@@ -33,26 +33,15 @@ class PurchaseController extends Controller
 {
     public function index()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('purchases-index')) {
-            if (Auth::user()->role_id > 2 && config('staff_access') == 'own') {
-                $lims_purchase_list = Purchase::orderBy('id', 'desc')->where('user_id', Auth::id())->get();
-            } else {
-                $lims_purchase_list = Purchase::orderBy('id', 'desc')->get();
-            }
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('purchases-index', $permissions);
 
-            $all_permission = \DB::table('permissions')
-                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                ->where('role_id', Auth::user()->role_id)
-                ->pluck('name')
-                ->toArray();
-
-            if (empty($all_permission)) {
-                $all_permission[] = 'dummy text';
-            }
-
+        if ($hasPermission) {
+            $lims_purchase_list = collect();
+            $all_permission = !empty($permissions) ? $permissions : ['purchases-index', 'purchases-add', 'purchases-edit', 'purchases-delete'];
             $lims_pos_setting_data = PosSetting::latest()->first();
-            $lims_account_list = Account::where('is_active', true)->get();
+            $lims_account_list = Account::select('id', 'name', 'account_no')->where('is_active', true)->get();
             return view('purchase.index', compact('lims_purchase_list', 'lims_account_list', 'all_permission', 'lims_pos_setting_data'));
         } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
@@ -262,11 +251,14 @@ class PurchaseController extends Controller
 
     public function create()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('purchases-add')) {
-            $lims_supplier_list = Supplier::where('is_active', true)->get();
-            $lims_warehouse_list = Warehouse::where('is_active', true)->get();
-            $lims_tax_list = Tax::where('is_active', true)->get();
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('purchases-add', $permissions);
+
+        if ($hasPermission) {
+            $lims_supplier_list = Supplier::select('id', 'name', 'company_name', 'phone_number')->where('is_active', true)->get();
+            $lims_warehouse_list = Warehouse::select('id', 'name')->where('is_active', true)->get();
+            $lims_tax_list = Tax::select('id', 'name', 'rate')->where('is_active', true)->get();
 
             return view('purchase.create', compact('lims_supplier_list', 'lims_warehouse_list', 'lims_tax_list'));
         } else {
