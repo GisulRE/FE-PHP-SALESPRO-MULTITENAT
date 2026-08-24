@@ -86,15 +86,7 @@
                                         <input type="text" name="company_name" class="form-control"
                                             value="{{$lims_user_data->company_name}}">
                                     </div>
-                                    <div class="form-group">
-                                        <label><strong>Company *</strong></label>
-                                        <input type="hidden" name="company_id_hidden" value="{{$lims_user_data->company_id}}">
-                                        <select name="company_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select Company...">
-                                          @foreach($lims_company_list as $company)
-                                              <option value="{{$company->id}}">{{$company->name}}</option>
-                                          @endforeach
-                                        </select>
-                                    </div>
+                                    <input type="hidden" name="company_id" value="{{ $lims_user_data->company_id ?? Auth::user()->company_id }}">
                                     <div class="form-group">
                                         <label><strong>{{trans('file.Role')}} *</strong></label>
                                         <input type="hidden" name="role_id_hidden" value="{{$lims_user_data->role_id}}">
