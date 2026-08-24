@@ -34,13 +34,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         @ini_set('memory_limit', '1024M');
-
-        try {
-            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-        } catch (\Throwable $e) {
-            // Ignore if Spatie is not bound yet
-        }
-
         if (isset($_COOKIE['language'])) {
             \App::setLocale($_COOKIE['language']);
         } else {
