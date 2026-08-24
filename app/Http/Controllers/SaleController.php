@@ -155,7 +155,7 @@ class SaleController extends Controller
         $end_date = $request->input('end_date');
 
         if (empty($start_date) || $start_date === 'undefined' || $start_date === 'null') {
-            $start_date = '2000-01-01';
+            $start_date = date('Y-m-d', strtotime('-30 day'));
         }
         if (empty($end_date) || $end_date === 'undefined' || $end_date === 'null') {
             $end_date = date('Y-m-d');
@@ -177,19 +177,23 @@ class SaleController extends Controller
             $baseQuery->where('sales.user_id', Auth::id());
         }
 
-        $baseQuery->where(function($q) use ($start_date, $end_date_full) {
-            $q->whereBetween('sales.date_sell', [$start_date, $end_date_full])
-              ->orWhereBetween('sales.created_at', [$start_date, $end_date_full])
-              ->orWhereNull('sales.date_sell');
-        });
+        if ($start_date !== '2000-01-01' && $start_date !== '1970-01-01') {
+            $baseQuery->where(function($q) use ($start_date, $end_date_full) {
+                $q->whereBetween('sales.date_sell', [$start_date, $end_date_full])
+                  ->orWhereBetween('sales.created_at', [$start_date, $end_date_full]);
+            });
+        }
 
         $totalData = (clone $baseQuery)->count();
 
         $totalFiltered = $totalData;
-        if ($request->input('length') != -1) {
-            $limit = $request->input('length');
+        $req_length = $request->input('length');
+        if ($req_length && $req_length != -1) {
+            $limit = (int)$req_length;
+        } else if ($req_length == -1) {
+            $limit = 500;
         } else {
-            $limit = $totalData;
+            $limit = 10;
         }
 
         $start = $request->input('start', 0);
