@@ -25,7 +25,7 @@ class Category extends Model
         parent::boot();
 
         $table = (new static)->getTable();
-        if (Schema::hasColumn($table, 'company_id')) {
+        if (true) {
             static::addGlobalScope('company', function (Builder $builder) {
                 if (auth()->check()) {
                     $builder->where('company_id', auth()->user()->company_id);

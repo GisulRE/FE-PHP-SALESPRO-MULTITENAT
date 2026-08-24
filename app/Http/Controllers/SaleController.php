@@ -196,19 +196,17 @@ class SaleController extends Controller
             8 => 'paid_amount',
         );
 
-        $role = Role::find(Auth::user()->role_id);
-        $has_all_permission = ($role && $role->hasPermissionTo('sales-index-all')) || Auth::user()->role_id <= 2;
+        $user = Auth::user();
+        $has_all_permission = ($user && $user->role_id <= 2) || (is_array(session('permissions')) && in_array('sales-index-all', session('permissions')));
 
         $baseQuery = Sale::query();
-        if (!$has_all_permission) {
+        if (!$has_all_permission && Auth::check()) {
             $baseQuery->where('sales.user_id', Auth::id());
         }
 
         if ($start_date !== '2000-01-01' && $start_date !== '1970-01-01') {
-            $baseQuery->where(function($q) use ($start_date, $end_date_full) {
-                $q->whereBetween('sales.date_sell', [$start_date, $end_date_full])
-                  ->orWhereBetween('sales.created_at', [$start_date, $end_date_full]);
-            });
+            $baseQuery->where('sales.created_at', '>=', $start_date . ' 00:00:00')
+                      ->where('sales.created_at', '<=', $end_date_full);
         }
 
         $totalData = (clone $baseQuery)->count();

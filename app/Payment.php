@@ -18,7 +18,7 @@ class Payment extends Model
         parent::boot();
 
         $table = (new static)->getTable();
-        if (Schema::hasColumn($table, 'company_id')) {
+        if (true) {
             static::addGlobalScope('company', function (Builder $builder) {
                 if (auth()->check()) {
                     $builder->where($builder->getModel()->getTable() . '.company_id', auth()->user()->company_id);

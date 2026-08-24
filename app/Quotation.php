@@ -46,7 +46,7 @@ class Quotation extends Model
         parent::boot();
 
         $table = (new static)->getTable();
-        if (Schema::hasColumn($table, 'company_id')) {
+        if (true) {
             static::addGlobalScope('company', function (Builder $builder) use ($table) {
                 if (auth()->check()) {
                     $builder->where($table . '.company_id', auth()->user()->company_id);
