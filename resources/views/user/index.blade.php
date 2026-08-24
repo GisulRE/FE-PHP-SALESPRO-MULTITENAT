@@ -48,9 +48,8 @@
                             <td>{{ $user->name }}</td>
                             <td>{{ $user->email }}</td>
                             <td>{{ $user->company_name }}</td>
-                            <td>{{ $user->phone }}</td>
-                            <?php $role = DB::table('roles')->find($user->role_id); ?>
-                            <td>{{ $role->name }}</td>
+                            <?php $role = \DB::table('roles')->find($user->role_id); ?>
+                            <td>{{ $role->name ?? 'N/A' }}</td>
                             @if ($user->is_active)
                                 <td>
                                     <div class="badge badge-success">Active</div>

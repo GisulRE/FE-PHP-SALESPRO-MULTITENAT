@@ -12,16 +12,18 @@
     }
 
     if ($is_admin) {
-        $permissions = \DB::table('permissions')->pluck('name')->toArray();
+        if (empty($permissions)) {
+            $permissions = \DB::table('permissions')->pluck('name')->toArray();
+            session()->put('permissions', $permissions);
+        }
         $blocked_modules = [];
     } else {
         if ((empty($permissions) || !is_array($permissions)) && Auth::check()) {
-            $p_list = \DB::table('permissions')
+            $permissions = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
                 ->toArray();
-            $permissions = $p_list;
             session()->put('permissions', $permissions);
         }
         $permissions = is_array($permissions) ? $permissions : [];

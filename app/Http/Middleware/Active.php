@@ -67,19 +67,14 @@ class Active
             return redirect('/dashboard');
         }
 
-        $permissions = DB::table('permissions')
-            ->select('name')
-            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-            ->where('role_id', $user->role_id)
-            ->get();
-
-        $permisos = json_decode(json_encode($permissions), true);
-        $p_ready = [];
-        foreach ($permisos as $p) {
-            $p_ready[] = $p['name'];
+        if (!session()->has('permissions') || empty(session('permissions'))) {
+            $p_ready = \DB::table('permissions')
+                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                ->where('role_id', $user->role_id)
+                ->pluck('name')
+                ->toArray();
+            session()->put('permissions', $p_ready);
         }
-        
-        session()->put('permissions', $p_ready);
 
         return $next($request);
 
