@@ -24,31 +24,35 @@ class UserController extends Controller
 
     public function index()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('users-index')) {
-            $all_permission = \DB::table('permissions')
-                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                ->where('role_id', Auth::user()->role_id)
-                ->pluck('name')
-                ->toArray();
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('users-index', $permissions);
+
+        if ($hasPermission) {
+            $all_permission = !empty($permissions) ? $permissions : ['users-index', 'users-add', 'users-edit', 'users-delete'];
             $lims_user_list = User::where('is_deleted', false)->get();
-            $categories = Category::where('is_active', true)->get();
+            $categories = Category::select('id', 'name')->where('is_active', true)->get();
             return view('user.index', compact('lims_user_list', 'all_permission', 'categories'));
-        } else
+        } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function create()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('users-add')) {
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('users-add', $permissions);
+
+        if ($hasPermission) {
             $lims_role_list = Roles::where('is_active', true)->get();
-            $lims_biller_list = Biller::where('is_active', true)->get();
-            $lims_warehouse_list = Warehouse::where('is_active', true)->get();
+            $lims_biller_list = Biller::select('id', 'name', 'company_name')->where('is_active', true)->get();
+            $lims_warehouse_list = Warehouse::select('id', 'name')->where('is_active', true)->get();
             $lims_company_list = Company::all();
             return view('user.create', compact('lims_role_list', 'lims_biller_list', 'lims_warehouse_list', 'lims_company_list'));
-        } else
+        } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function generatePassword()
@@ -61,12 +65,14 @@ class UserController extends Controller
     {
         $this->validate($request, [
             'name' => [
+                'required',
                 'max:255',
                 Rule::unique('users')->where(function ($query) {
                     return $query->where('is_deleted', false);
                 }),
             ],
             'email' => [
+                'required',
                 'email',
                 'max:255',
                 Rule::unique('users')->where(function ($query) {
@@ -82,40 +88,61 @@ class UserController extends Controller
                 $message->to($data['email'])->subject('User Account Details');
             });
         } catch (\Exception $e) {
-            $message = 'User created successfully. Please setup your <a href="setting/mail_setting">mail setting</a> to send mail.';
+            $message = 'User created successfully.';
         }
         if (!isset($data['is_active']))
             $data['is_active'] = false;
         $data['is_deleted'] = false;
-        $data['password'] = bcrypt($data['password']);
-        User::create($data);
+        if (!empty($data['password']))
+            $data['password'] = bcrypt($data['password']);
+        
+        if (isset($data['biller_id']) && $data['biller_id'] === '') $data['biller_id'] = null;
+        if (isset($data['company_id']) && $data['company_id'] === '') $data['company_id'] = null;
+        if (isset($data['warehouse_id']) && $data['warehouse_id'] === '') $data['warehouse_id'] = null;
+
+        $user = User::create($data);
+        if ($user && !empty($data['role_id'])) {
+            $role = Role::find($data['role_id']);
+            if ($role) {
+                $user->syncRoles([$role->name]);
+            }
+        }
         return redirect('user')->with('message1', $message);
     }
 
     public function edit($id)
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('users-edit')) {
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('users-edit', $permissions);
+
+        if ($hasPermission) {
             $lims_user_data = User::find($id);
+            if (!$lims_user_data) {
+                return redirect('user')->with('not_permitted', 'Usuario no encontrado');
+            }
             $lims_role_list = Roles::where('is_active', true)->get();
-            $lims_biller_list = Biller::where('is_active', true)->get();
-            $lims_warehouse_list = Warehouse::where('is_active', true)->get();
+            $lims_biller_list = Biller::select('id', 'name', 'company_name')->where('is_active', true)->get();
+            $lims_warehouse_list = Warehouse::select('id', 'name')->where('is_active', true)->get();
             $lims_company_list = Company::all();
             return view('user.edit', compact('lims_user_data', 'lims_role_list', 'lims_biller_list', 'lims_warehouse_list', 'lims_company_list'));
-        } else
+        } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function update(Request $request, $id)
     {
         $this->validate($request, [
             'name' => [
+                'required',
                 'max:255',
                 Rule::unique('users')->ignore($id)->where(function ($query) {
                     return $query->where('is_deleted', false);
                 }),
             ],
             'email' => [
+                'required',
                 'email',
                 'max:255',
                 Rule::unique('users')->ignore($id)->where(function ($query) {
@@ -124,14 +151,36 @@ class UserController extends Controller
             ],
         ]);
 
-        $input = $request->except('password');
-        if (!isset($input['is_active']))
-            $input['is_active'] = false;
-        if (!empty($request['password']))
-            $input['password'] = bcrypt($request['password']);
-        $lims_user_data = User::find($id);
-        $lims_user_data->update($input);
-        return redirect('user')->with('message2', 'Data updated successfullly');
+        try {
+            $input = $request->except(['password', '_token', '_method']);
+            if (!isset($input['is_active']))
+                $input['is_active'] = false;
+            if (!empty($request['password']))
+                $input['password'] = bcrypt($request['password']);
+
+            if (isset($input['biller_id']) && $input['biller_id'] === '') $input['biller_id'] = null;
+            if (isset($input['company_id']) && $input['company_id'] === '') $input['company_id'] = null;
+            if (isset($input['warehouse_id']) && $input['warehouse_id'] === '') $input['warehouse_id'] = null;
+
+            $lims_user_data = User::find($id);
+            if (!$lims_user_data) {
+                return redirect('user')->with('not_permitted', 'Usuario no encontrado');
+            }
+
+            $lims_user_data->update($input);
+
+            if (!empty($input['role_id'])) {
+                $role = Role::find($input['role_id']);
+                if ($role) {
+                    $lims_user_data->syncRoles([$role->name]);
+                }
+            }
+
+            return redirect('user')->with('message2', 'Usuario actualizado correctamente');
+        } catch (\Throwable $e) {
+            \Log::error('Error actualizando usuario ' . $id . ': ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('not_permitted', 'Error al actualizar usuario: ' . $e->getMessage());
+        }
     }
 
     public function profile($id)

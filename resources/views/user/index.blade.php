@@ -188,6 +188,7 @@
             });
 
             $('#user-table').DataTable({
+                destroy: true,
                 "order": [],
                 'language': {
                     'lengthMenu': '_MENU_ {{ trans('file.records per page') }}',
