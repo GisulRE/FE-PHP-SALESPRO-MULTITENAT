@@ -1398,6 +1398,9 @@
             }
         });
 
+        if (document.querySelector('div#imageUpload') && document.querySelector('div#imageUpload').dropzone) {
+            try { document.querySelector('div#imageUpload').dropzone.destroy(); } catch(e) {}
+        }
         myDropzone = new Dropzone('div#imageUpload', {
             addRemoveLinks: true,
             autoProcessQueue: false,

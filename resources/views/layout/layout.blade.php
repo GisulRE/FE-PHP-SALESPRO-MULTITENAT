@@ -30,13 +30,36 @@
                 'X-Requested-With': 'XMLHttpRequest'
             },
             success: function(data) {
-                // Reemplaza únicamente el contenido del contenedor principal #page
+                // 1. Limpiar instancias previas de DataTables
+                if ($.fn.DataTable) {
+                    $.fn.dataTable.ext.errMode = 'none'; // Suprimir alertas emergentes de DataTables
+                    $('#page table').each(function() {
+                        try {
+                            if ($.fn.DataTable.isDataTable(this)) {
+                                $(this).DataTable().destroy();
+                            }
+                        } catch (e) {}
+                    });
+                }
+
+                // 2. Limpiar instancias previas de Dropzone
+                if (typeof Dropzone !== 'undefined') {
+                    Dropzone.autoDiscover = false;
+                    if (Dropzone.instances && Dropzone.instances.length) {
+                        Dropzone.instances.forEach(function(dz) {
+                            try { dz.destroy(); } catch(e) {}
+                        });
+                        Dropzone.instances = [];
+                    }
+                }
+
+                // 3. Reemplaza únicamente el contenido del contenedor principal #page
                 var $temp = $('<div>').append($.parseHTML(data, document, true));
                 var newContent = $temp.find('#page').length ? $temp.find('#page').html() : data;
                 
                 $('#page').html(newContent);
 
-                // Ejecutar scripts que vengan en la nueva vista
+                // 4. Ejecutar scripts que vengan en la nueva vista
                 $temp.find('script').each(function() {
                     var src = $(this).attr('src');
                     if (!src) {
