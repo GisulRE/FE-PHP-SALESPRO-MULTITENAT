@@ -227,9 +227,11 @@ class SaleController extends Controller
         $order = 'sales.' . ($columns[$request->input('order.0.column')] ?? 'created_at');
         $dir = $request->input('order.0.dir', 'desc');
 
+        $eagerRelations = ['biller', 'customer', 'warehouse', 'user', 'customerSale', 'payments', 'coupon', 'productSales.employee'];
+
         if (empty($request->input('search.value'))) {
             $sales = (clone $baseQuery)
-                ->with('biller', 'customer', 'warehouse', 'user')
+                ->with($eagerRelations)
                 ->offset($start)
                 ->limit($limit)
                 ->orderBy($order, $dir)
@@ -240,7 +242,7 @@ class SaleController extends Controller
 
             $q = (clone $baseQuery)
                 ->select('sales.*')
-                ->with('biller', 'customer', 'warehouse', 'user')
+                ->with($eagerRelations)
                 ->leftJoin('customers', 'sales.customer_id', '=', 'customers.id')
                 ->leftJoin('billers', 'sales.biller_id', '=', 'billers.id');
 
@@ -268,14 +270,13 @@ class SaleController extends Controller
                 $nestedData['id'] = $sale->id;
                 $nestedData['key'] = $key;
                 $nestedData['date'] = date(config('date_format'), strtotime($sale->date_sell));
-                $nestedData['reference_no'] = $sale->reference_no . $this->getEstadoVentaFacturada($sale->id);
-                $lims_product_sale_data = Product_Sale::select('id', 'employee_id')->where('sale_id', $sale->id)->get();
+                $nestedData['reference_no'] = $sale->reference_no . $this->getEstadoVentaFacturadaObject($sale->customerSale);
+                
                 $employes_names = "";
-                foreach ($lims_product_sale_data as $sale_data) {
-                    if ($sale_data->employee_id != null) {
-                        $employee = Employee::select('name')->find($sale_data->employee_id);
-                        if ($employee) {
-                            $employes_names = $employes_names . " " . $employee->name;
+                if (!empty($sale->productSales)) {
+                    foreach ($sale->productSales as $sale_data) {
+                        if ($sale_data->employee) {
+                            $employes_names .= " " . $sale_data->employee->name;
                         }
                     }
                 }
@@ -289,8 +290,8 @@ class SaleController extends Controller
                 
                 // Validar customer
                 if ($sale->customer) {
-                    if ($sale->codigoCliente != null || $sale->codigoCliente != '')
-                        $nestedData['customer'] = $sale->customer->name . "|" . $sale->codigoCliente . "|" . $sale->numero_medidor;
+                    if (!empty($sale->codigoCliente))
+                        $nestedData['customer'] = $sale->customer->name . "|" . $sale->codigoCliente . "|" . ($sale->numero_medidor ?? '');
                     else
                         $nestedData['customer'] = $sale->customer->name;
                 } else {
@@ -321,10 +322,11 @@ class SaleController extends Controller
                     $nestedData['payment_status'] = '<span class="badge badge-success">' . trans('file.Paid') . '</span>';
                 }
 
-                $nestedData['grand_total'] = number_format($sale->grand_total, 2);
-                $nestedData['paid_amount'] = number_format($sale->paid_amount, 2);
-                $nestedData['due'] = number_format($sale->grand_total - $sale->paid_amount, 2);
-                $payments_list = Payment::where('sale_id', $sale->id)->get();
+                $nestedData['grand_total'] = number_format((float)($sale->grand_total ?? 0), 2);
+                $nestedData['paid_amount'] = number_format((float)($sale->paid_amount ?? 0), 2);
+                $nestedData['due'] = number_format((float)(($sale->grand_total ?? 0) - ($sale->paid_amount ?? 0)), 2);
+                
+                $payments_list = $sale->payments ?? [];
                 $method = "";
                 foreach ($payments_list as $payment) {
                     if ($payment->paying_method == "Efectivo") {
@@ -474,12 +476,7 @@ class SaleController extends Controller
                 //////////////////////////////////////////////////////////////////////////
 
                 // data for sale details by one click
-                $coupon = Coupon::find($sale->coupon_id);
-                if ($coupon) {
-                    $coupon_code = $coupon->code;
-                } else {
-                    $coupon_code = null;
-                }
+                $coupon_code = $sale->coupon ? $sale->coupon->code : null;
 
                 // Validar relaciones
                 $biller = $sale->biller;
@@ -5201,6 +5198,35 @@ class SaleController extends Controller
         return $respuesta;
     }
 
+
+    public function getEstadoVentaFacturadaObject($venta_facturada)
+    {
+        $tipo_factura_lookup = [
+            1 => 'COM-VEN',
+            2 => 'ALQ',
+            13 => 'SERV',
+        ];
+
+        $estado_factura = " ";
+        if (!empty($venta_facturada)) {
+            if ($venta_facturada->estado_factura === 'ANULADO') {
+                $estado_factura .= ' <span class="badge badge-secondary" title="Sin facturar"><i class="fa fa-exclamation-circle"></i> SIN FACTURA</span>';
+                return $estado_factura;
+            }
+
+            if ($venta_facturada->estado_factura != null) {
+                $tipo_factura = $tipo_factura_lookup[$venta_facturada->codigo_documento_sector ?? 1] ?? 'COM-VEN';
+                if ($venta_facturada->nro_factura != null) {
+                    $texto_factura = '[FACT-' . $tipo_factura . '#' . $venta_facturada->nro_factura . '|' . $venta_facturada->estado_factura . ']';
+                    $estado_factura .= $texto_factura;
+                } else {
+                    $texto_factura = '[FACT-' . '<div class="badge badge-info">Manual</div>' . '-' . $tipo_factura . '#' . ($venta_facturada->nro_factura_manual ?? '') . ' |' . $venta_facturada->estado_factura . ']';
+                    $estado_factura .= $texto_factura;
+                }
+            }
+        }
+        return $estado_factura;
+    }
 
     // Devuelve texto label descripción de la venta 
     public function getEstadoVentaFacturada($sale_id)

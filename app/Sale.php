@@ -47,6 +47,21 @@ class Sale extends Model
         return $this->hasMany('App\Product_Sale', 'sale_id', 'id');
     }
 
+    public function customerSale()
+    {
+        return $this->hasOne('App\CustomerSale', 'sale_id', 'id');
+    }
+
+    public function payments()
+    {
+        return $this->hasMany('App\Payment', 'sale_id', 'id');
+    }
+
+    public function coupon()
+    {
+        return $this->belongsTo('App\Coupon', 'coupon_id', 'id');
+    }
+
     protected static function boot()
     {
         parent::boot();
