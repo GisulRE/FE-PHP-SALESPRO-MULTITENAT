@@ -1,3 +1,10 @@
+@if(request()->ajax() && !request()->has('full_page'))
+    <div id="page" class="animate-bottom">
+        @yield('content')
+    </div>
+    @yield('scripts')
+    @yield('script')
+@else
 <!DOCTYPE html>
 <html>
 
@@ -751,9 +758,201 @@
 
         }
         $(document).ready(function() {
-            // Permitir navegación nativa tradicional en todos los enlaces del menú
-            $('.stopReload, .stopReload_out').off('click');
+            // Mantener abierto el menú padre y seleccionada la opción activa
+            var currentPath = window.location.pathname.replace(/\/$/, '');
+            $('nav.side-navbar a').each(function() {
+                var href = $(this).attr('href');
+                if (href && href !== '#' && href.indexOf('javascript') === -1) {
+                    try {
+                        var linkPath = new URL(href, window.location.origin).pathname.replace(/\/$/, '');
+                        if (linkPath === currentPath) {
+                            $(this).addClass('active');
+                            $(this).closest('li').addClass('active');
 
+                            var parentUl = $(this).closest('ul.collapse');
+                            if (parentUl.length) {
+                                parentUl.addClass('show').addClass('in');
+                                var parentId = parentUl.attr('id');
+                                var parentA = $('a[href="#' + parentId + '"]');
+                                parentA.attr('aria-expanded', 'true');
+                                parentA.removeClass('collapsed');
+                                parentA.closest('li').addClass('active');
+                            }
+                        }
+        // }
+
+        $("div.alert").delay(3000).slideUp(750);
+
+        function confirmDelete() {
+            if (confirm("Esta seguro de querer eliminar esto?")) {
+                return true;
+            }
+            return false;
+        }
+
+        $("a#add-expense").click(function(e) {
+            e.preventDefault();
+            $('#expense-modal').modal();
+        });
+
+        $("a#add-account").click(function(e) {
+            e.preventDefault();
+            $('#account-modal').modal();
+        });
+
+        $("a#account-statement").click(function(e) {
+            e.preventDefault();
+            $('#account-statement-modal').modal();
+        });
+
+        $("a#profitLoss-link").click(function(e) {
+            e.preventDefault();
+            $("#profitLoss-report-form").submit();
+        });
+
+        $("a#productfinish-report-link").click(function(e) {
+            e.preventDefault();
+            $("#product-finish-report-form").submit();
+        });
+
+        $("a#report-link").click(function(e) {
+            e.preventDefault();
+            $("#product-report-form").submit();
+        });
+
+        $("a#purchase-report-link").click(function(e) {
+            e.preventDefault();
+            $("#purchase-report-form").submit();
+        });
+
+        $("a#sale-report-link").click(function(e) {
+            e.preventDefault();
+            $("#sale-report-form").submit();
+        });
+
+        $("a#sale-biller-report-link").click(function(e) {
+            e.preventDefault();
+            $("#sale-biller-report-form").submit();
+        });
+
+        $("a#sale-renueve-report-link").click(function(e) {
+            e.preventDefault();
+            $("#sale-renueve-report-form").submit();
+        });
+
+        $("a#sale-item-report-link").click(function(e) {
+            e.preventDefault();
+            $("#sale-item-report-form").submit();
+        });
+
+        $("a#sale-customer-report-link").click(function(e) {
+            e.preventDefault();
+            $("#sale-customer-report-form").submit();
+        });
+
+        $("a#sale-product-report-link").click(function(e) {
+            e.preventDefault();
+            $("#sale-product-report-form").submit();
+        });
+        $("a#sale-courtesy-report-link").click(function(e) {
+            e.preventDefault();
+            $("#sale-courtesy-report-form").submit();
+        });
+        $("a#servicemp-report-link").click(function(e) {
+            e.preventDefault();
+            $("#servicemp-report-form").submit();
+        });
+        $("a#servicempcom-report-link").click(function(e) {
+            e.preventDefault();
+            $("#servicempcom-report-form").submit();
+        });
+        $("a#payment-report-link").click(function(e) {
+            e.preventDefault();
+            $("#payment-report-form").submit();
+        });
+
+        $("a#account-mov-report-link").click(function(e) {
+            e.preventDefault();
+            $("#account-mov-report-form").submit();
+        });
+
+        $("a#warehouse-report-link").click(function(e) {
+            e.preventDefault();
+            $('#warehouse-modal').modal();
+        });
+
+        $("a#warehouse-pro-report-link").click(function(e) {
+            e.preventDefault();
+            $('#warehouse-pro-modal').modal();
+        });
+
+        $("a#warehouse-sale-report-link").click(function(e) {
+            e.preventDefault();
+            $('#warehouse-sale-modal').modal();
+        });
+
+        $("a#user-report-link").click(function(e) {
+            e.preventDefault();
+            $('#user-modal').modal();
+        });
+
+        $("a#customer-report-link").click(function(e) {
+            e.preventDefault();
+            $('#customer-modal').modal();
+        });
+
+        $("a#supplier-report-link").click(function(e) {
+            e.preventDefault();
+            $('#supplier-modal').modal();
+        });
+
+        $("a#due-report-link").click(function(e) {
+            e.preventDefault();
+            $("#due-report-form").submit();
+        });
+
+        $(".daterangepicker-field").daterangepicker({
+            callback: function(startDate, endDate, period) {
+                var start_date = startDate.format('YYYY-MM-DD');
+                var end_date = endDate.format('YYYY-MM-DD');
+                var title = start_date + ' To ' + end_date;
+                $(this).val(title);
+                $('#account-statement-modal input[name="start_date"]').val(start_date);
+                $('#account-statement-modal input[name="end_date"]').val(end_date);
+            }
+        });
+
+        if ($.fn.selectpicker) {
+            $.fn.selectpicker.Constructor.DEFAULTS.noneSelectedText = 'Seleccione una opción...';
+            $.fn.selectpicker.Constructor.DEFAULTS.noneResultsText = 'No se encontraron resultados {0}';
+        }
+
+        $('.selectpicker').selectpicker({
+            style: 'btn-link',
+        });
+
+        function openDialogNew() {
+            var url = "accounts/"
+            url = url.concat("create");
+            $('#methodpaynew').empty();
+            $.get(url, function(data) {
+                addOptions("methodpaynew", data['list_method']);
+                $('.selectpicker').selectpicker('refresh');
+            });
+        }
+        // Rutina para agregar opciones a un <select>
+        function addOptions(domElement, array) {
+            var select = document.getElementById(domElement);
+
+            for (value in array) {
+                var option = document.createElement("option");
+                option.text = array[value].name;
+                option.value = array[value].id;
+                select.add(option);
+            }
+
+        }
+        $(document).ready(function() {
             // Mantener abierto el menú padre y seleccionada la opción activa
             var currentPath = window.location.pathname.replace(/\/$/, '');
             $('nav.side-navbar a').each(function() {
@@ -783,3 +982,4 @@
 </body>
 
 </html>
+@endif
