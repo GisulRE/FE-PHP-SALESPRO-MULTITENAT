@@ -2,10 +2,11 @@
     $permissions = session('permissions');
     $user = Auth::user();
     $is_admin = false;
+    $role = null;
 
     if ($user) {
-        $user_role = \App\Roles::find($user->role_id);
-        if ($user->role_id <= 2 || ($user_role && in_array(strtolower($user_role->name), ['admin', 'superadmin', 'administrador', 'owner']))) {
+        $role = \App\Roles::find($user->role_id);
+        if ($user->role_id <= 2 || ($role && in_array(strtolower($role->name), ['admin', 'superadmin', 'administrador', 'owner']))) {
             $is_admin = true;
         }
     }
@@ -24,7 +25,6 @@
             session()->put('permissions', $permissions);
         }
         $permissions = is_array($permissions) ? $permissions : [];
-        $role = \App\Roles::find(Auth::user()->role_id);
         $blocked_modules = [];
         if ($role && $role->blocked_modules) {
             $blocked_modules = json_decode($role->blocked_modules, true) ?? [];

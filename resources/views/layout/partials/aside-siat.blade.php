@@ -1,40 +1,33 @@
 <?php
-$panelsiat = DB::table('permissions')
-    ->where('name', 'panel_siat')
-    ->first();
-$panelsiat_permission_active = DB::table('role_has_permissions')
-    ->where([['permission_id', $panelsiat->id], ['role_id', $role->id]])
-    ->first();
-$sucursal_siat = DB::table('permissions')
-    ->where('name', 'sucursal_siat')
-    ->first();
-$sucursalsiat_permission_active = DB::table('role_has_permissions')
-    ->where([['permission_id', $sucursal_siat->id], ['role_id', $role->id]])
-    ->first();
-$urlws_siat = DB::table('permissions')
-    ->where('name', 'urlws_siat')
-    ->first();
-$urlwssiat_permission_active = DB::table('role_has_permissions')
-    ->where([['permission_id', $urlws_siat->id], ['role_id', $role->id]])
-    ->first();
-$authfact_siat = DB::table('permissions')
-    ->where('name', 'authfact_siat')
-    ->first();
-$authfactsiat_permission_active = DB::table('role_has_permissions')
-    ->where([['permission_id', $authfact_siat->id], ['role_id', $role->id]])
-    ->first();
-$puntoventa_siat = DB::table('permissions')
-    ->where('name', 'puntoventa_siat')
-    ->first();
-$puntoventasiat_permission_active = DB::table('role_has_permissions')
-    ->where([['permission_id', $puntoventa_siat->id], ['role_id', $role->id]])
-    ->first();
-$cafc_siat = DB::table('permissions')
-    ->where('name', 'cafc_siat')
-    ->first();
-$cafcsiat_permission_active = DB::table('role_has_permissions')
-    ->where([['permission_id', $cafc_siat->id], ['role_id', $role->id]])
-    ->first();
+$role = $role ?? ($user_role ?? (Auth::check() ? \App\Roles::find(Auth::user()->role_id) : null));
+$role_id = $role ? $role->id : (Auth::check() ? Auth::user()->role_id : 0);
+
+if (isset($is_admin) && $is_admin) {
+    $panelsiat_permission_active = true;
+    $sucursalsiat_permission_active = true;
+    $urlwssiat_permission_active = true;
+    $authfactsiat_permission_active = true;
+    $puntoventasiat_permission_active = true;
+    $cafcsiat_permission_active = true;
+} else {
+    $panelsiat = DB::table('permissions')->where('name', 'panel_siat')->first();
+    $panelsiat_permission_active = $panelsiat ? DB::table('role_has_permissions')->where([['permission_id', $panelsiat->id], ['role_id', $role_id]])->first() : null;
+
+    $sucursal_siat = DB::table('permissions')->where('name', 'sucursal_siat')->first();
+    $sucursalsiat_permission_active = $sucursal_siat ? DB::table('role_has_permissions')->where([['permission_id', $sucursal_siat->id], ['role_id', $role_id]])->first() : null;
+
+    $urlws_siat = DB::table('permissions')->where('name', 'urlws_siat')->first();
+    $urlwssiat_permission_active = $urlws_siat ? DB::table('role_has_permissions')->where([['permission_id', $urlws_siat->id], ['role_id', $role_id]])->first() : null;
+
+    $authfact_siat = DB::table('permissions')->where('name', 'authfact_siat')->first();
+    $authfactsiat_permission_active = $authfact_siat ? DB::table('role_has_permissions')->where([['permission_id', $authfact_siat->id], ['role_id', $role_id]])->first() : null;
+
+    $puntoventa_siat = DB::table('permissions')->where('name', 'puntoventa_siat')->first();
+    $puntoventasiat_permission_active = $puntoventa_siat ? DB::table('role_has_permissions')->where([['permission_id', $puntoventa_siat->id], ['role_id', $role_id]])->first() : null;
+
+    $cafc_siat = DB::table('permissions')->where('name', 'cafc_siat')->first();
+    $cafcsiat_permission_active = $cafc_siat ? DB::table('role_has_permissions')->where([['permission_id', $cafc_siat->id], ['role_id', $role_id]])->first() : null;
+}
 ?>
 <li><a href="#siat" aria-expanded="false" data-toggle="collapse">
         <i class="dripicons-pamphlet"></i>
