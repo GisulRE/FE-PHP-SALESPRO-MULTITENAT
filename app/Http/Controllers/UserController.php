@@ -25,7 +25,7 @@ class UserController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('users-index')) {
+        if ($role->hasPermissionTo('users-index')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -41,7 +41,7 @@ class UserController extends Controller
     public function create()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('users-add')) {
+        if ($role->hasPermissionTo('users-add')) {
             $lims_role_list = Roles::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
@@ -95,7 +95,7 @@ class UserController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('users-edit')) {
+        if ($role->hasPermissionTo('users-edit')) {
             $lims_user_data = User::find($id);
             $lims_role_list = Roles::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();

@@ -15,7 +15,7 @@ class ExpenseController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if(\App\Helpers\RolePermission::check('expenses-index')){
+        if($role->hasPermissionTo('expenses-index')){
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -62,7 +62,7 @@ class ExpenseController extends Controller
     public function edit($id)
     {
         $role = Role::firstOrCreate(['id' => Auth::user()->role_id]);
-        if (\App\Helpers\RolePermission::check('expenses-edit')) {
+        if ($role->hasPermissionTo('expenses-edit')) {
             $lims_expense_data = Expense::find($id);
             return $lims_expense_data;
         }

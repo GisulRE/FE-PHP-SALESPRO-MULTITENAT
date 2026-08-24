@@ -33,7 +33,7 @@ class SiatSucursalController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('sucursal_siat')) {
+        if ($role->hasPermissionTo('sucursal_siat')) {
             $empresa_id = Auth::user()->company_id;
             $sucursales = SiatSucursal::where('id_empresa', $empresa_id)->paginate();
             return view('siat-sucursal.index', ['sucursales' => $sucursales]);

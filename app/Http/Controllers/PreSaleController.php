@@ -41,7 +41,7 @@ class PreSaleController extends Controller
     public function preSale()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('presale-create')) {
+        if ($role->hasPermissionTo('presale-create')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -109,7 +109,7 @@ class PreSaleController extends Controller
         $datenow = date('Y-m-d');
         $data = array();
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('presale-index')) {
+        if ($role->hasPermissionTo('presale-index')) {
             $lims_presale_list = PreSale::where("status", 1)->whereDate('created_at', $datenow)->get();
             $totalData = PreSale::where("status", 1)->whereDate('created_at', $datenow)->count();
             $totalFiltered = $totalData;
@@ -117,7 +117,7 @@ class PreSaleController extends Controller
                 foreach ($lims_presale_list as $key => $presale) {
                     $nestedData['id'] = $presale->id;
                     $nestedData['key'] = $key + 1;
-                    if (\App\Helpers\RolePermission::check('attentionshift')) {
+                    if ($role->hasPermissionTo('attentionshift')) {
                         if ($presale->attentionshift_id) {
                             $nestedData['attentionshift'] = $presale->attentionshift->reference_nro;
                             $nestedData['customer'] = optional($presale->customer)->name ?? $presale->attentionshift->customer_name;
@@ -141,10 +141,10 @@ class PreSaleController extends Controller
                     $nestedData['grand_total'] = number_format($presale->grand_total, 2);
 
                     $nestedData['options'] = '<div class="btn-group">';
-                    if (\App\Helpers\RolePermission::check('presale-edit')) {
+                    if ($role->hasPermissionTo('presale-edit')) {
                         $nestedData['options'] .= '<button id="btnpresale_' . $presale->id . '" class="btn btn-link" onclick="this.disabled=true;loadPresale(' . $presale->id . ')"><i class="dripicons-document-edit" data-toggle="tooltip" data-placement="bottom" title="Editar o Crear Venta"></i></button>';
                     }
-                    if (\App\Helpers\RolePermission::check('presale-delete')) {
+                    if ($role->hasPermissionTo('presale-delete')) {
                         $nestedData['options'] .= \Form::open(["route" => ["presales.destroy", $presale->id], "method" => "DELETE"]) . '
                               <button type="submit" class="btn btn-link" onclick="return confirmDelete()" data-toggle="tooltip" data-placement="bottom" title="Borrar"><i class="dripicons-trash"></i> </button>' . \Form::close() . '</div>';
                     }

@@ -42,7 +42,7 @@ class CategoryController extends Controller
             return redirect()->route('home')->with('not_permitted', 'Error: rol de usuario no encontrado. Contacte al administrador.');
         }
 
-        $hasPermission = \App\Helpers\RolePermission::check('category');
+        $hasPermission = $role->hasPermissionTo('category');
 
         Log::info('[CategoryController@index] Resultado de verificación de permiso', [
             'user_id'       => $user->id,

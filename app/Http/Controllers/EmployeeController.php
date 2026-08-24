@@ -50,7 +50,7 @@ class EmployeeController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('employees-index')) {
+        if ($role->hasPermissionTo('employees-index')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -70,7 +70,7 @@ class EmployeeController extends Controller
     public function create()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('employees-add')) {
+        if ($role->hasPermissionTo('employees-add')) {
             $lims_role_list = Role::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
@@ -231,7 +231,7 @@ class EmployeeController extends Controller
     public function togglePublic(Request $request, $id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (! \App\Helpers\RolePermission::check('employees-edit')) {
+        if (! $role->hasPermissionTo('employees-edit')) {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
 
@@ -253,7 +253,7 @@ class EmployeeController extends Controller
     public function getReservationSchedules($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (!\App\Helpers\RolePermission::check('employees-edit')) {
+        if (!$role->hasPermissionTo('employees-edit')) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
@@ -291,7 +291,7 @@ class EmployeeController extends Controller
     public function saveReservationSchedules(Request $request, $id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (!\App\Helpers\RolePermission::check('employees-edit')) {
+        if (!$role->hasPermissionTo('employees-edit')) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
@@ -531,7 +531,7 @@ class EmployeeController extends Controller
     public function generateAttendancePin($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (!\App\Helpers\RolePermission::check('employees-edit')) {
+        if (!$role->hasPermissionTo('employees-edit')) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 

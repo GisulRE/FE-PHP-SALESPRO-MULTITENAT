@@ -31,7 +31,7 @@ class QuotationController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('quotes-index')) {
+        if ($role->hasPermissionTo('quotes-index')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -188,7 +188,7 @@ class QuotationController extends Controller
     public function create()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('quotes-add')) {
+        if ($role->hasPermissionTo('quotes-add')) {
             $lims_biller_list = Biller::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_supplier_list = Supplier::where('is_active', true)->get();
@@ -681,7 +681,7 @@ class QuotationController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('quotes-edit')) {
+        if ($role->hasPermissionTo('quotes-edit')) {
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
             $lims_supplier_list = Supplier::where('is_active', true)->get();
@@ -1007,7 +1007,7 @@ class QuotationController extends Controller
     public function listForPos(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (!\App\Helpers\RolePermission::check('quotes-index')) {
+        if (!$role->hasPermissionTo('quotes-index')) {
             return response()->json(['data' => [], 'recordsTotal' => 0, 'recordsFiltered' => 0]);
         }
 

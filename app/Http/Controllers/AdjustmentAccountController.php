@@ -15,7 +15,7 @@ class AdjustmentAccountController extends Controller
 {
     public function index(){
         $role = Role::find(Auth::user()->role_id);
-        //if(\App\Helpers\RolePermission::check('adjustment-account-index')){
+        //if($role->hasPermissionTo('adjustment-account-index')){
             $lims_adjustment_account_all = AdjustmentAccount::where('is_active', true)->get();
             return view('adjustment_account.index', compact('lims_adjustment_account_all'));
         //}

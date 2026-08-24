@@ -19,7 +19,7 @@ class StockCountController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if( \App\Helpers\RolePermission::check('stock_count') ) {
+        if( $role->hasPermissionTo('stock_count') ) {
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_brand_list = Brand::where('is_active', true)->get();
             $lims_category_list = Category::where('is_active', true)->get();

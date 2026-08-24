@@ -23,7 +23,7 @@ class PayrollController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('payroll')) {
+        if ($role->hasPermissionTo('payroll')) {
             $lims_account_list = Account::where('is_active', true)->get();
             $lims_employee_list = Employee::where('is_active', true)->where('company_id', Auth::user()->company_id)->get();
             return view('payroll.index', compact('lims_account_list', 'lims_employee_list'));

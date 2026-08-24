@@ -14,7 +14,7 @@ class HolidayController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('holiday')) {
+        if ($role->hasPermissionTo('holiday')) {
             $approve_permission = true;
             $lims_holiday_list = Holiday::orderBy('id', 'desc')->get();
         } else {
@@ -40,7 +40,7 @@ class HolidayController extends Controller
         ];
 
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('holiday')) {
+        if ($role->hasPermissionTo('holiday')) {
             $data['is_approved'] = true;
         } else {
             $data['is_approved'] = false;

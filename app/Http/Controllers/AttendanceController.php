@@ -20,7 +20,7 @@ class AttendanceController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('attendance')) {
+        if ($role->hasPermissionTo('attendance')) {
             $lims_employee_list = Employee::where('is_active', true)->get();
             $lims_hrm_setting_data = HrmSetting::latest()->first();
 

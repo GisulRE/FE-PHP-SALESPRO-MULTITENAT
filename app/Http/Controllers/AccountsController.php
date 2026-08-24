@@ -30,7 +30,7 @@ class AccountsController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('account-index')) {
+        if ($role->hasPermissionTo('account-index')) {
             $lims_account_all = Account::where('is_active', true)->get();
             return view('account.index', compact('lims_account_all'));
         } else
@@ -182,7 +182,7 @@ class AccountsController extends Controller
     public function balanceSheet()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('balance-sheet')) {
+        if ($role->hasPermissionTo('balance-sheet')) {
             $lims_account_list = Account::where('is_active', true)->get();
             $debit = [];
             $credit = [];
@@ -245,7 +245,7 @@ class AccountsController extends Controller
         $lims_account_list[] = $biller->account_id_swift;
 
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('balance-sheet-account')) {
+        if ($role->hasPermissionTo('balance-sheet-account')) {
             $lims_account_data = Account::find($biller->account_id);
             if ($lims_account_data != null) {
                 /* Ingreso */

@@ -15,7 +15,7 @@ class MoneyTransferController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if(\App\Helpers\RolePermission::check('money-transfer')){
+        if($role->hasPermissionTo('money-transfer')){
             $lims_money_transfer_all = MoneyTransfer::get();
             $lims_account_list = Account::where('is_active', true)->get();
             return view('money_transfer.index', compact('lims_money_transfer_all', 'lims_account_list'));

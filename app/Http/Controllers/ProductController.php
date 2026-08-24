@@ -49,7 +49,7 @@ class ProductController extends Controller
             return redirect()->route('home')->with('not_permitted', 'Error: rol de usuario no encontrado. Contacte al administrador.');
         }
 
-        $hasPermission = \App\Helpers\RolePermission::check('products-index');
+        $hasPermission = $role->hasPermissionTo('products-index');
 
         Log::info('[ProductController@index] Resultado de verificación de permiso', [
             'user_id'           => $user->id,
@@ -267,7 +267,7 @@ class ProductController extends Controller
 
         $role = Role::firstOrCreate(['id' => $role_id]);
 
-        $hasPermission = \App\Helpers\RolePermission::check('products-add');
+        $hasPermission = $role->hasPermissionTo('products-add');
 
         Log::info('[ProductController@create] Resultado de verificación de permiso', [
             'user_id'           => $user ? $user->id : null,
@@ -464,7 +464,7 @@ class ProductController extends Controller
 
         $role = Role::firstOrCreate(['id' => $role_id]);
 
-        $hasPermission = \App\Helpers\RolePermission::check('products-edit');
+        $hasPermission = $role->hasPermissionTo('products-edit');
 
         Log::info('[ProductController@edit] Resultado de verificación de permiso', [
             'user_id'           => $user ? $user->id : null,

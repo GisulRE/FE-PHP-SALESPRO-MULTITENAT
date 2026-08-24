@@ -29,7 +29,7 @@ class CustomerController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('customers-index')) {
+        if ($role->hasPermissionTo('customers-index')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -167,7 +167,7 @@ class CustomerController extends Controller
     public function create()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('customers-add')) {
+        if ($role->hasPermissionTo('customers-add')) {
             $lims_customer_group_all = CustomerGroup::where('is_active', true)->get();
             $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')
                 ->select('codigo_clasificador', 'descripcion')
@@ -238,7 +238,7 @@ class CustomerController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('customers-edit')) {
+        if ($role->hasPermissionTo('customers-edit')) {
             $lims_customer_data = Customer::find($id);
             $lims_customer_company = CustomerCompany::where([['is_active', true], ['customer_id', $id]])->first();
             $lims_customer_group_all = CustomerGroup::where('is_active', true)->get();
@@ -299,7 +299,7 @@ class CustomerController extends Controller
     public function importCustomer(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('customers-add')) {
+        if ($role->hasPermissionTo('customers-add')) {
             $upload = $request->file('file');
             $ext = pathinfo($upload->getClientOriginalName(), PATHINFO_EXTENSION);
             if ($ext != 'csv')
@@ -479,7 +479,7 @@ class CustomerController extends Controller
     public function importarClienteDetallado(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('customers-add')) {
+        if ($role->hasPermissionTo('customers-add')) {
             $this->validate($request, [
                 'file' => 'required|file|mimes:xls,xlsx,csv'
             ]);

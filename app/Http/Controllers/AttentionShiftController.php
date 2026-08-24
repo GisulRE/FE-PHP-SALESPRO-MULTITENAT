@@ -26,7 +26,7 @@ class AttentionShiftController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (\App\Helpers\RolePermission::check('attentionshift')) {
+        if ($role->hasPermissionTo('attentionshift')) {
             $this->date = date('Y-m-d');
             $lims_customer_list = Customer::select('id', 'name', 'phone_number')->where('is_active', true)->orderBy('name', 'asc')->get();
             $lims_customer_group_all = CustomerGroup::where('is_active', true)->orderBy('name', 'asc')->get();

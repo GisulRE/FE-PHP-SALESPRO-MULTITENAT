@@ -16,7 +16,7 @@ class SupplierController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if(\App\Helpers\RolePermission::check('suppliers-index')){
+        if($role->hasPermissionTo('suppliers-index')){
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -34,7 +34,7 @@ class SupplierController extends Controller
     public function create()
     {
         $role = Role::find(Auth::user()->role_id);
-        if(\App\Helpers\RolePermission::check('suppliers-add')){
+        if($role->hasPermissionTo('suppliers-add')){
             return view('supplier.create');
         }
         else
@@ -86,7 +86,7 @@ class SupplierController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if(\App\Helpers\RolePermission::check('suppliers-edit')){
+        if($role->hasPermissionTo('suppliers-edit')){
             $lims_supplier_data = Supplier::where('id',$id)->first();
             return view('supplier.edit',compact('lims_supplier_data'));
         }
