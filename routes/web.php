@@ -55,26 +55,72 @@ Route::get('/check-error-log', function () {
 
 Route::get('/debug-sale-data', function () {
     header('Content-Type: text/plain; charset=utf-8');
-    echo "=== TEST DIRECTO DE SaleController@saleData ===\n\n";
+    echo "=== TEST PASO A PASO DE SaleController@saleData ===\n\n";
+    $t0 = microtime(true);
+    
+    echo "1. Conectando a BD...\n";
     try {
-        $controller = app(\App\Http\Controllers\SaleController::class);
-        $request = \Illuminate\Http\Request::create('/sales/sale-data', 'POST', [
-            'start_date' => date('Y-m-d', strtotime('-30 day')),
-            'end_date' => date('Y-m-d'),
-            'length' => 10,
-            'start' => 0,
-            'draw' => 1
-        ]);
-        $response = $controller->saleData($request);
-        echo "HTTP Status: " . $response->getStatusCode() . "\n";
-        echo "Respuesta Content:\n" . substr($response->getContent(), 0, 1000) . "\n...";
+        $driver = \DB::getDriverName();
+        echo "   Motor BD: {$driver} (" . round((microtime(true) - $t0) * 1000, 2) . "ms)\n";
     } catch (\Throwable $e) {
-        echo "EXCEPCION CAPTURADA:\n";
-        echo "Tipo: " . get_class($e) . "\n";
-        echo "Mensaje: " . $e->getMessage() . "\n";
-        echo "Archivo: " . $e->getFile() . ":" . $e->getLine() . "\n\n";
-        echo "Trace:\n" . $e->getTraceAsString() . "\n";
+        echo "   ERROR EN PASO 1: " . $e->getMessage() . "\n";
+        exit;
     }
+    
+    echo "2. Probando Sale::count()...\n";
+    try {
+        $t1 = microtime(true);
+        $count = \App\Sale::count();
+        echo "   Total Sales: {$count} (" . round((microtime(true) - $t1) * 1000, 2) . "ms)\n";
+    } catch (\Throwable $e) {
+        echo "   ERROR EN PASO 2: " . $e->getMessage() . "\n";
+        exit;
+    }
+    
+    echo "3. Probando consulta con fechas...\n";
+    try {
+        $t2 = microtime(true);
+        $start_date = '2026-05-04';
+        $end_date_full = '2026-08-24 23:59:59';
+        $salesQuery = \App\Sale::where(function($q) use ($start_date, $end_date_full) {
+            $q->whereBetween('sales.date_sell', [$start_date, $end_date_full])
+              ->orWhereBetween('sales.created_at', [$start_date, $end_date_full]);
+        });
+        $totalFiltered = (clone $salesQuery)->count();
+        echo "   Total filtradas: {$totalFiltered} (" . round((microtime(true) - $t2) * 1000, 2) . "ms)\n";
+    } catch (\Throwable $e) {
+        echo "   ERROR EN PASO 3: " . $e->getMessage() . "\n";
+        exit;
+    }
+    
+    echo "4. Probando limit 10 con eager loading with()...\n";
+    try {
+        $t3 = microtime(true);
+        $sales = (clone $salesQuery)->with(['biller', 'customer', 'warehouse', 'user', 'customerSale', 'payments', 'coupon', 'productSales.employee'])
+            ->limit(10)
+            ->orderBy('sales.created_at', 'desc')
+            ->get();
+        echo "   Obtenidas: " . count($sales) . " ventas (" . round((microtime(true) - $t3) * 1000, 2) . "ms)\n";
+    } catch (\Throwable $e) {
+        echo "   ERROR EN PASO 4: " . $e->getMessage() . "\n";
+        exit;
+    }
+
+    echo "5. Probando procesamiento de filas en memoria...\n";
+    try {
+        $t4 = microtime(true);
+        $controller = app(\App\Http\Controllers\SaleController::class);
+        foreach ($sales as $sale) {
+            $label = $controller->getEstadoVentaFacturadaObject($sale->customerSale);
+            echo "   Venta ID: {$sale->id} | Ref: {$sale->reference_no} | Estado: " . trim(strip_tags($label)) . "\n";
+        }
+        echo "   Procesamiento completado (" . round((microtime(true) - $t4) * 1000, 2) . "ms)\n";
+    } catch (\Throwable $e) {
+        echo "   ERROR EN PASO 5: " . $e->getMessage() . "\n";
+        exit;
+    }
+
+    echo "\n=== TIEMPO TOTAL: " . round((microtime(true) - $t0) * 1000, 2) . "ms ===\n";
     exit;
 });
 
