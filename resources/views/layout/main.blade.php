@@ -90,13 +90,10 @@
             z-index: 99999;
         }
     </style>
+    @include('layout.partials.scripts-boostrap')
 </head>
 
 <body>
-
-    <div id="scripts-cont">
-        @include('layout.partials.scripts-boostrap')
-    </div>
 
     <div id="loader" style="display: none"></div>
     <!-- Side Navbar -->

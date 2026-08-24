@@ -14,7 +14,7 @@
         event.detail.fetchOptions.headers['X-Requested-With'] = 'XMLHttpRequest';
     });
 
-    // 2. Antes de guardar la página en caché de Turbo: limpiar modales, selectpickers y tooltips abiertos
+    // 2. Antes de guardar la página en caché de Turbo: limpiar modales, selectpickers y DataTables
     document.addEventListener('turbo:before-cache', function() {
         if (typeof $ !== 'undefined') {
             $('.modal.show').modal('hide');
@@ -24,6 +24,16 @@
                 $('[data-toggle="tooltip"]').tooltip('dispose');
             }
             $('.dropdown-menu.show').removeClass('show');
+
+            if ($.fn.DataTable) {
+                $('table.dataTable').each(function() {
+                    try {
+                        if ($.fn.DataTable.isDataTable(this)) {
+                            $(this).DataTable().destroy();
+                        }
+                    } catch (e) {}
+                });
+            }
         }
     });
 
