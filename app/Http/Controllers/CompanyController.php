@@ -16,7 +16,7 @@ class CompanyController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('users-index')) {
+        if (\App\Helpers\RolePermission::check('users-index')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -35,7 +35,7 @@ class CompanyController extends Controller
     public function create()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('users-add')) {
+        if (\App\Helpers\RolePermission::check('users-add')) {
             return view('company.create');
         } else {
             return redirect()->back()->with('not_permitted', '¡Lo sentimos! No tienes permiso para acceder a este módulo');
@@ -71,7 +71,7 @@ class CompanyController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('users-edit')) {
+        if (\App\Helpers\RolePermission::check('users-edit')) {
             $company = Company::findOrFail($id);
             return view('company.edit', compact('company'));
         } else {
@@ -102,7 +102,7 @@ class CompanyController extends Controller
     public function destroy($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('users-delete')) {
+        if (\App\Helpers\RolePermission::check('users-delete')) {
             $company = Company::findOrFail($id);
             $company->delete();
             return redirect('companies')->with('delete_message', 'Empresa eliminada exitosamente');

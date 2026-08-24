@@ -14,7 +14,7 @@ class TaxController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('tax')) {
+        if(\App\Helpers\RolePermission::check('tax')) {
             $lims_tax_all = Tax::where('is_active', true)->get();
             return view('tax.create', compact('lims_tax_all'));
         }

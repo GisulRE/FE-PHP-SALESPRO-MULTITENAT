@@ -26,7 +26,7 @@ class TransferController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('transfers-index')) {
+        if (\App\Helpers\RolePermission::check('transfers-index')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -49,7 +49,7 @@ class TransferController extends Controller
         $user = Auth::user();
         $role = Role::find($user->role_id);
 
-        if (!$role->hasPermissionTo('transfers-add')) {
+        if (!\App\Helpers\RolePermission::check('transfers-add')) {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
 
@@ -388,7 +388,7 @@ class TransferController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
 
-        if ($role->hasPermissionTo('transfers-index')) {
+        if (\App\Helpers\RolePermission::check('transfers-index')) {
 
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
@@ -430,7 +430,7 @@ class TransferController extends Controller
         $role = Role::find(Auth::user()->role_id);
         $all_permission = [];
 
-        if ($role->hasPermissionTo('transfers-index')) {
+        if (\App\Helpers\RolePermission::check('transfers-index')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -604,7 +604,7 @@ class TransferController extends Controller
     public function transferByCsv()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('transfers-add')) {
+        if (\App\Helpers\RolePermission::check('transfers-add')) {
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             return view('transfer.import', compact('lims_warehouse_list'));
         } else
@@ -783,7 +783,7 @@ class TransferController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('transfers-edit')) {
+        if (\App\Helpers\RolePermission::check('transfers-edit')) {
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_transfer_data = Transfer::find($id);
             $lims_product_transfer_data = ProductTransfer::where('transfer_id', $id)->get();

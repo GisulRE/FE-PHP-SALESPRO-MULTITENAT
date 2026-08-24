@@ -83,7 +83,7 @@ class CompanyDataImportController extends Controller
     protected function ensurePermission()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (!$role || !$role->hasPermissionTo('backup_database')) {
+        if (!$role || !\App\Helpers\RolePermission::check('backup_database')) {
             abort(403, 'No autorizado.');
         }
     }

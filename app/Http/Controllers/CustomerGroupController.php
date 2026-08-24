@@ -14,7 +14,7 @@ class CustomerGroupController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('customer_group')) {
+        if(\App\Helpers\RolePermission::check('customer_group')) {
             $lims_customer_group_all = CustomerGroup::where('is_active', true)->get();
             return view('customer_group.create',compact('lims_customer_group_all'));
         }

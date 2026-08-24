@@ -12,7 +12,7 @@ class UrlWsController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('urlws_siat')) {
+        if (\App\Helpers\RolePermission::check('urlws_siat')) {
             $items = UrlWs::paginate();
             return view('url-ws.index', ['items' => $items]);
         } else

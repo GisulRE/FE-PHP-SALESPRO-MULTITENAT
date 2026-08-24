@@ -18,7 +18,7 @@ class DeliveryController extends Controller
 	public function index()
 	{
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('category')) {
+        if(\App\Helpers\RolePermission::check('category')) {
     		$lims_delivery_all = Delivery::orderBy('id', 'desc')->get();
     		return view('delivery.index', compact('lims_delivery_all'));
         }

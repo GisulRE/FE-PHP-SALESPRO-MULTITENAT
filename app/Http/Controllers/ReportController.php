@@ -54,7 +54,7 @@ class ReportController extends Controller
     public function productQuantityAlert()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('product-qty-alert')) {
+        if (\App\Helpers\RolePermission::check('product-qty-alert')) {
             // Excluir productos cuya cantidad de alerta sea NULL para no generar alertas cuando no está definida
             $lims_product_data = Product::select('name', 'code', 'image', 'qty', 'alert_quantity')
                 ->where('is_active', true)
@@ -71,7 +71,7 @@ class ReportController extends Controller
     public function warehouseStock()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('warehouse-stock-report')) {
+        if (\App\Helpers\RolePermission::check('warehouse-stock-report')) {
             $total_item = DB::table('product_warehouse')
                 ->join('products', 'product_warehouse.product_id', '=', 'products.id')
                 ->where([
@@ -138,7 +138,7 @@ class ReportController extends Controller
     public function dailySale($year, $month)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('daily-sale')) {
+        if (\App\Helpers\RolePermission::check('daily-sale')) {
             $start = 1;
             $number_of_day = cal_days_in_month(CAL_GREGORIAN, $month, $year);
             while ($start <= $number_of_day) {
@@ -232,7 +232,7 @@ class ReportController extends Controller
     public function dailyPurchase($year, $month)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('daily-purchase')) {
+        if (\App\Helpers\RolePermission::check('daily-purchase')) {
             $start = 1;
             $number_of_day = cal_days_in_month(CAL_GREGORIAN, $month, $year);
             while ($start <= $number_of_day) {
@@ -327,7 +327,7 @@ class ReportController extends Controller
     public function monthlySale($year)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('monthly-sale')) {
+        if (\App\Helpers\RolePermission::check('monthly-sale')) {
             $start = strtotime($year . '-01-01');
             $end = strtotime($year . '-12-31');
             while ($start <= $end) {
@@ -409,7 +409,7 @@ class ReportController extends Controller
     public function monthlyPurchase($year)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('monthly-purchase')) {
+        if (\App\Helpers\RolePermission::check('monthly-purchase')) {
             $start = strtotime($year . '-01-01');
             $end = strtotime($year . '-12-31');
             while ($start <= $end) {
@@ -489,7 +489,7 @@ class ReportController extends Controller
     public function bestSeller()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('best-seller')) {
+        if (\App\Helpers\RolePermission::check('best-seller')) {
             $start = strtotime(date("Y-m", strtotime("-2 months")) . '-01');
             $end = strtotime(date("Y") . '-' . date("m") . '-31');
 

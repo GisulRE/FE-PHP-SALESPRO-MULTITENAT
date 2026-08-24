@@ -238,7 +238,7 @@ class ReservationController extends Controller
   public function index()
   {
     $role = Role::find(Auth::user()->role_id);
-    if ($role->hasPermissionTo('reservations-index')) {
+    if (\App\Helpers\RolePermission::check('reservations-index')) {
       $all_permission = DB::table('permissions')
         ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
         ->where('role_id', Auth::user()->role_id)
@@ -454,7 +454,7 @@ class ReservationController extends Controller
   public function create()
   {
     $role = Role::find(Auth::user()->role_id);
-    if ($role->hasPermissionTo('reservations-add')) {
+    if (\App\Helpers\RolePermission::check('reservations-add')) {
       $products = Product::where('is_active', true)->get();
       $warehouses = Warehouse::where('is_active', true)->get();
       $employees = \App\Employee::where('is_active', true)->orderBy('name', 'asc')->get();
@@ -646,7 +646,7 @@ class ReservationController extends Controller
   public function edit($id)
   {
     $role = Role::find(Auth::user()->role_id);
-    if ($role->hasPermissionTo('reservations-edit')) {
+    if (\App\Helpers\RolePermission::check('reservations-edit')) {
       $reservation = Reservation::findOrFail($id);
       $products = Product::where('is_active', true)->get();
       $warehouses = Warehouse::where('is_active', true)->get();

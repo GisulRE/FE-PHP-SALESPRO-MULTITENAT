@@ -21,7 +21,7 @@ class AdjustmentController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('adjustment')) {
+        if (\App\Helpers\RolePermission::check('adjustment')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)

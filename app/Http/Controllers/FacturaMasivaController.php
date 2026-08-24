@@ -40,7 +40,7 @@ class FacturaMasivaController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('facturamasiva_siat')) {
+        if (\App\Helpers\RolePermission::check('facturamasiva_siat')) {
             $fecha_actual = new Carbon();
             $list_f_masivas = FacturaMasiva::orderBy('fecha_inicio', 'DESC')->get();
             $sucursales = SiatSucursal::where('estado', true)->get();

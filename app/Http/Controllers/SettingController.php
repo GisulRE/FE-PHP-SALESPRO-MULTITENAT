@@ -139,7 +139,7 @@ class SettingController extends Controller
     public function restoreCompanyData()
     {
         $role = Role::find(Auth::user()->role_id);
-        if (!$role || !$role->hasPermissionTo('backup_database')) {
+        if (!$role || !\App\Helpers\RolePermission::check('backup_database')) {
             return redirect()->back()->with('not_permitted', '¡Lo sentimos! No tienes permiso para acceder a este módulo');
         }
 
@@ -151,7 +151,7 @@ class SettingController extends Controller
     public function restoreCompanyDataPreview(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (!$role || !$role->hasPermissionTo('backup_database')) {
+        if (!$role || !\App\Helpers\RolePermission::check('backup_database')) {
             return redirect()->back()->with('not_permitted', '¡Lo sentimos! No tienes permiso para acceder a este módulo');
         }
 
@@ -251,7 +251,7 @@ class SettingController extends Controller
     public function restoreCompanyDataStore(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
-        if (!$role || !$role->hasPermissionTo('backup_database')) {
+        if (!$role || !\App\Helpers\RolePermission::check('backup_database')) {
             return redirect()->back()->with('not_permitted', '¡Lo sentimos! No tienes permiso para acceder a este módulo');
         }
 

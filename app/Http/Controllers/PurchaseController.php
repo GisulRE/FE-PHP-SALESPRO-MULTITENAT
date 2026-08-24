@@ -34,7 +34,7 @@ class PurchaseController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('purchases-index')) {
+        if (\App\Helpers\RolePermission::check('purchases-index')) {
             if (Auth::user()->role_id > 2 && config('staff_access') == 'own') {
                 $lims_purchase_list = Purchase::orderBy('id', 'desc')->where('user_id', Auth::id())->get();
             } else {
@@ -263,7 +263,7 @@ class PurchaseController extends Controller
     public function create()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('purchases-add')) {
+        if (\App\Helpers\RolePermission::check('purchases-add')) {
             $lims_supplier_list = Supplier::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_tax_list = Tax::where('is_active', true)->get();
@@ -559,7 +559,7 @@ class PurchaseController extends Controller
     public function purchaseByCsv()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('purchases-add')) {
+        if (\App\Helpers\RolePermission::check('purchases-add')) {
             $lims_supplier_list = Supplier::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_tax_list = Tax::where('is_active', true)->get();
@@ -757,7 +757,7 @@ class PurchaseController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('purchases-edit')) {
+        if (\App\Helpers\RolePermission::check('purchases-edit')) {
             $lims_supplier_list = Supplier::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_tax_list = Tax::where('is_active', true)->get();
@@ -1286,7 +1286,7 @@ class PurchaseController extends Controller
     public function destroy($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('purchases-delete')) {
+        if (\App\Helpers\RolePermission::check('purchases-delete')) {
             $lims_purchase_data = Purchase::find($id);
             $lims_product_purchase_data = ProductPurchase::where('purchase_id', $id)->get();
             $lims_payment_data = Payment::where('purchase_id', $id)->get();

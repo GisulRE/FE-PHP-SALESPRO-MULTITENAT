@@ -25,7 +25,7 @@ class BillerController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('billers-index')) {
+        if (\App\Helpers\RolePermission::check('billers-index')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -46,7 +46,7 @@ class BillerController extends Controller
         $lims_customer_list = Customer::where('is_active', true)->get();
         $lims_warehouse_list = Warehouse::where('is_active', true)->get();
         $sucursales = SiatSucursal::where('estado', true)->get();
-        if ($role->hasPermissionTo('billers-add'))
+        if (\App\Helpers\RolePermission::check('billers-add'))
             return view('biller.create', compact('lims_account_list', 'lims_customer_list', 'lims_warehouse_list', 'sucursales'));
         else
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
@@ -131,7 +131,7 @@ class BillerController extends Controller
         if (sizeof($lims_customer_list) == 0) {
             $lims_customer_list = Customer::where('is_active', true)->get();
         }
-        if ($role->hasPermissionTo('billers-edit')) {
+        if (\App\Helpers\RolePermission::check('billers-edit')) {
             return view('biller.edit', compact('lims_biller_data', 'lims_account_list', 'lims_customer_list', 'lims_warehouse_list', 'sucursales', 'p_ventas', 'lims_warehouse_selects'));
         } else
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');

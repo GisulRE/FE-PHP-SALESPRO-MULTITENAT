@@ -11,7 +11,7 @@ class PrinterController extends Controller
     public function index()
     {
         //$role = Role::find(Auth::user()->role_id);
-        //if($role->hasPermissionTo('payroll')){
+        //if(\App\Helpers\RolePermission::check('payroll')){
             $lims_printers_list = PrinterConfig::all();
             $lims_categories_list = Category::where('is_active', true)->get();
             return view('setting.printer_setting', compact('lims_printers_list', 'lims_categories_list'));

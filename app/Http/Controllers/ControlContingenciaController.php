@@ -36,7 +36,7 @@ class ControlContingenciaController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('contingencia_siat')) {
+        if (\App\Helpers\RolePermission::check('contingencia_siat')) {
             $fecha_actual = new Carbon();
             $c_contingencias = ControlContingencia::orderBy('fecha_inicio_evento', 'DESC')->get();
 

@@ -132,7 +132,7 @@ class SaleController extends Controller
             $user = Auth::user();
             $role = $user ? Role::find($user->role_id) : null;
             $is_admin = $user && ($user->role_id <= 2 || ($role && in_array(strtolower($role->name ?? ''), ['admin', 'superadmin', 'administrador', 'owner'])));
-            $has_permission = $is_admin || ($role && method_exists($role, 'hasPermissionTo') && $role->hasPermissionTo('sales-index'));
+            $has_permission = $is_admin || ($role && method_exists($role, 'hasPermissionTo') && \App\Helpers\RolePermission::check('sales-index'));
 
             if ($has_permission) {
                 $all_permission = [];
@@ -192,7 +192,7 @@ class SaleController extends Controller
         );
 
         $role = Role::find(Auth::user()->role_id);
-        $has_all_permission = ($role && $role->hasPermissionTo('sales-index-all')) || Auth::user()->role_id <= 2;
+        $has_all_permission = ($role && \App\Helpers\RolePermission::check('sales-index-all')) || Auth::user()->role_id <= 2;
 
         $baseQuery = Sale::query();
         if (!$has_all_permission) {
@@ -565,7 +565,7 @@ class SaleController extends Controller
 
         $role = Role::find(Auth::user()->role_id);
 
-        if ($role->hasPermissionTo('sales-add')) {
+        if (\App\Helpers\RolePermission::check('sales-add')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -1009,7 +1009,7 @@ class SaleController extends Controller
                 }
                 
                 $role = Role::find(Auth::user()->role_id);
-                if ($role->hasPermissionTo('presale-edit') && $product_sale['employee_id'] == null) {
+                if (\App\Helpers\RolePermission::check('presale-edit') && $product_sale['employee_id'] == null) {
                     // Solo buscar si el presale_id del ítem es un entero válido
                     if (is_numeric($presale[$i]) && (int)$presale[$i] > 0) {
                         $lims_presale_data = PreSale::where('status', 1)->find((int)$presale[$i]);
@@ -1075,7 +1075,7 @@ class SaleController extends Controller
 
             $role = Role::find(Auth::user()->role_id);
             /** Update PreSale */
-            if ($role->hasPermissionTo('presale-edit')) {
+            if (\App\Helpers\RolePermission::check('presale-edit')) {
                 // Sanitizar presale_id: solo procesar si es un entero válido > 0
                 if (is_numeric($presale_id_val) && (int)$presale_id_val > 0 && $lims_sale_data->sale_status == '1') {
                     $lims_presale_data = PreSale::find((int)$presale_id_val);
@@ -2904,7 +2904,7 @@ class SaleController extends Controller
     public function posSale()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('sales-add')) {
+        if (\App\Helpers\RolePermission::check('sales-add')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -3050,7 +3050,7 @@ class SaleController extends Controller
     public function posSaleV2()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('sales-add')) {
+        if (\App\Helpers\RolePermission::check('sales-add')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -3587,7 +3587,7 @@ class SaleController extends Controller
     public function saleByCsv()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('sales-add')) {
+        if (\App\Helpers\RolePermission::check('sales-add')) {
             $lims_customer_list = Customer::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
@@ -3775,7 +3775,7 @@ class SaleController extends Controller
     public function createSale($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('sales-edit')) {
+        if (\App\Helpers\RolePermission::check('sales-edit')) {
             $lims_biller_list = Biller::where('is_active', true)->get();
             $lims_customer_list = Customer::where('is_active', true)->get();
             $lims_customer_group_all = CustomerGroup::where('is_active', true)->get();
@@ -3806,7 +3806,7 @@ class SaleController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('sales-edit')) {
+        if (\App\Helpers\RolePermission::check('sales-edit')) {
             $lims_customer_list = Customer::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
@@ -4834,7 +4834,7 @@ class SaleController extends Controller
     public function show($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('sales-edit')) {
+        if (\App\Helpers\RolePermission::check('sales-edit')) {
             $lims_sale_data = Sale::find($id);
             
             if (!$lims_sale_data) {
@@ -5579,7 +5579,7 @@ class SaleController extends Controller
 
         $usuarios = User::select('id', 'name')->where('is_active', true)->get();
         $sucursales = SiatSucursal::where('estado', true)->get();
-        if ($role->hasPermissionTo('sales-list-booksale')) {
+        if (\App\Helpers\RolePermission::check('sales-list-booksale')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -5694,7 +5694,7 @@ class SaleController extends Controller
                 } else if ($list_facturas[$i]['pago'] != null && $list_facturas[$i]['estado'] != 'B') {
                     $op['options'] .= '<button type="button" class="revertir-factura-modal btn btn-secondary" style="background-color: darkorange;" data-id = "' . $list_facturas[$i]['cuf'] . '" title="Revertir Pago"><i class="fa fa-exchange"></i></button>';
                 }
-                if ($role->hasPermissionTo('sales-delete') && ($list_facturas[$i]['pago'] == null && $list_facturas[$i]['estado'] != 'B')) {
+                if (\App\Helpers\RolePermission::check('sales-delete') && ($list_facturas[$i]['pago'] == null && $list_facturas[$i]['estado'] != 'B')) {
                     $op['options'] .= '<button type="button" class="anular-factura-modal btn btn-danger" data-id = "' . $list_facturas[$i]['cuf'] . '" data-ptoventa = "' . $list_facturas[$i]['codigoPuntoVenta'] . '" data-sucursal = "' . $list_facturas[$i]['codigoSucursal'] . '" data-toggle="modal" data-target="#anular-factura-modal" title="Anular Factura"><i class="fa fa-trash"></i></button>';
                 }
                 $op['options'] .= '<button type="button" class="reenviar-factura-modal btn btn-success" data-id = "' . $list_facturas[$i]['cuf'] . '" data-toggle="modal" data-target="#reenviar-factura-modal" title="Reenviar Factura"><i class="fa fa-whatsapp"></i></button>';

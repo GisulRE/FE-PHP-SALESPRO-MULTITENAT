@@ -40,7 +40,7 @@ class ReturnController extends Controller
         $fecha_actual = date('Y-m-d');
         $sucursales = SiatSucursal::where('estado', true)->get();
         $lims_motivos = SiatParametricaVario::select('id', 'codigo_clasificador', 'descripcion')->where('tipo_clasificador', 'motivoAnulacion')->get();
-        if ($role->hasPermissionTo('returns-index')) {
+        if (\App\Helpers\RolePermission::check('returns-index')) {
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -124,7 +124,7 @@ class ReturnController extends Controller
             $lims_tipodocumentos = SiatParametricaVario::select('id', 'codigo_clasificador', 'descripcion')->where([['tipo_clasificador', 'tipoDocumentoIdentidad'], ['codigo_punto_venta', 0]])->get();
         }
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('returns-add')) {
+        if (\App\Helpers\RolePermission::check('returns-add')) {
             $lims_customer_list = Customer::select('id', 'name', 'phone_number')->where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
@@ -506,7 +506,7 @@ class ReturnController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('returns-edit')) {
+        if (\App\Helpers\RolePermission::check('returns-edit')) {
             $lims_customer_list = Customer::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();

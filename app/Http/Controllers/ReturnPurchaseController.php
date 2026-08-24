@@ -27,7 +27,7 @@ class ReturnPurchaseController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('purchase-return-index')){
+        if(\App\Helpers\RolePermission::check('purchase-return-index')){
             $all_permission = DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
@@ -48,7 +48,7 @@ class ReturnPurchaseController extends Controller
     public function create()
     {
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('purchase-return-add')){
+        if(\App\Helpers\RolePermission::check('purchase-return-add')){
             $lims_warehouse_list = Warehouse::where('is_active',true)->get();
             $lims_supplier_list = Supplier::where('is_active',true)->get();
             $lims_tax_list = Tax::where('is_active',true)->get();
@@ -356,7 +356,7 @@ class ReturnPurchaseController extends Controller
     public function edit($id)
     {
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('purchase-return-edit')){
+        if(\App\Helpers\RolePermission::check('purchase-return-edit')){
             $lims_supplier_list = Supplier::where('is_active',true)->get();
             $lims_warehouse_list = Warehouse::where('is_active',true)->get();
             $lims_account_list = Account::where('is_active',true)->get();

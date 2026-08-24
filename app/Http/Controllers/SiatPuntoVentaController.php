@@ -51,7 +51,7 @@ class SiatPuntoVentaController extends Controller
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('puntoventa_siat')) {
+        if (\App\Helpers\RolePermission::check('puntoventa_siat')) {
             $items = SiatPuntoVenta::orderBy('id')->get();
             $sucursales = SiatSucursal::where('estado', true)->get();
             return view('punto-venta.index', ['items' => $items, 'sucursales' => $sucursales]);
