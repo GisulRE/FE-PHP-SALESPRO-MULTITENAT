@@ -127,8 +127,8 @@
     function setClientePredeterminado() {
         var id_cliente_predeterminado = $("input[name='customer_id_hidden']").val();
         $('.invalid-feedback').hide();
-        $('.valid-feedback').hide();
-        $.get('sales/getcliente/' + id_cliente_predeterminado, function(data) {
+        if (!id_cliente_predeterminado) return;
+        $.get('{{ url("sales/getcliente") }}/' + id_cliente_predeterminado, function(data) {
             $("input[name='sales_razon_social']").val(data.name);
             $("input[name='sales_email']").val(data.email);
             $('select[name=sales_tipo_documento]').val(data.tipo_documento);
@@ -180,7 +180,8 @@
         $('.invalid-feedback').hide();
         $('.valid-feedback').hide();
         var cliente_id = $('#customer_id').val();
-        $.get('sales/getcliente/' + cliente_id, function(data) {
+        if (!cliente_id) return;
+        $.get('{{ url("sales/getcliente") }}/' + cliente_id, function(data) {
             $("#lims_customerSearch").val(data.name);
             $("input[name='sales_razon_social']").val(data.name);
             $("input[name='sales_email']").val(data.email);

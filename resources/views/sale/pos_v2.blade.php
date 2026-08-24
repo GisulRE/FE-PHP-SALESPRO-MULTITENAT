@@ -3734,7 +3734,8 @@
         function consultarClientePOS() {
             console.log("Cargando Cliente Visual...");
             var cliente_id = $('#customer_id').val();
-            $.get('sales/getcliente/' + cliente_id, function(data) {
+            if (!cliente_id) return;
+            $.get('{{ url("sales/getcliente") }}/' + cliente_id, function(data) {
                 $("input[name='sales_razon_social']").val(data.name);
                 $("input[name='sales_email']").val(data.email);
                 $("input[name='sales_valor_documento']").val(data.valor_documento);
@@ -4144,7 +4145,7 @@
             audio.play();
             const customerId = $('#customer_id').val();
             var customer = null;
-            $.get('sales/getcliente/' + customerId, function(data) {
+            $.get('{{ url("sales/getcliente") }}/' + customerId, function(data) {
                 customer = data;
                 $('input[name="sale_status"]').val(4);
                 //$('input[name="paid_amount"]').val(0);
@@ -4200,7 +4201,7 @@
             var customer = null;
             var audio = $("#mysoundclip2")[0];
             audio.play();
-            $.get('sales/getcliente/' + customerId, function(data) {
+            $.get('{{ url("sales/getcliente") }}/' + customerId, function(data) {
                 customer = data;
                 console.log(customer);
                 $.get('receivable/due/' + customer.id, function(res) {

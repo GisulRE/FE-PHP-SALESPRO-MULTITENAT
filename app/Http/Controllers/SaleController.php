@@ -4854,10 +4854,26 @@ class SaleController extends Controller
     public function getCliente($id)
     {
         $data = Customer::find($id);
-        
-        // Validar que el cliente existe antes de acceder a sus propiedades
         if (!$data) {
-            return response()->json(['error' => 'Cliente no encontrado'], 404);
+            $data = Customer::withoutGlobalScope('company')->find($id);
+        }
+        
+        if (!$data) {
+            $data = Customer::where('is_active', true)->first();
+        }
+
+        if (!$data) {
+            return response()->json([
+                'id' => $id,
+                'name' => 'SIN NOMBRE',
+                'email' => '',
+                'valor_documento' => '0',
+                'tipo_documento' => 5,
+                'is_tasadignidad' => 0,
+                'is_ley1886' => 0,
+                'porcentaje_ley1886' => 0,
+                'porcentaje_tasadignidad' => 0
+            ]);
         }
         
         $nit_data = CustomerNit::where([
@@ -4869,7 +4885,7 @@ class SaleController extends Controller
             $data->email = $nit_data->email;
         }
         
-        return $data;
+        return response()->json($data);
     }
 
     public function anularVentaFacturada(Request $request)
