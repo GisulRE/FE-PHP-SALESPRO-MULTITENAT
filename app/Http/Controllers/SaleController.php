@@ -128,34 +128,45 @@ class SaleController extends Controller
         $start_date = date('Y-m-d', strtotime(' -7 day'));
         $end_date = date('Y-m-d');
 
-        $user = Auth::user();
-        $role = $user ? Role::find($user->role_id) : null;
-        $is_admin = $user && ($user->role_id <= 2 || ($role && in_array(strtolower($role->name), ['admin', 'superadmin', 'administrador', 'owner'])));
-        $has_permission = $is_admin || ($role && method_exists($role, 'hasPermissionTo') && $role->hasPermissionTo('sales-index'));
+        try {
+            $user = Auth::user();
+            $role = $user ? Role::find($user->role_id) : null;
+            $is_admin = $user && ($user->role_id <= 2 || ($role && in_array(strtolower($role->name ?? ''), ['admin', 'superadmin', 'administrador', 'owner'])));
+            $has_permission = $is_admin || ($role && method_exists($role, 'hasPermissionTo') && $role->hasPermissionTo('sales-index'));
 
-        if ($has_permission) {
-            $all_permission = [];
-            if ($user && $user->role_id) {
-                $all_permission = DB::table('permissions')
-                    ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                    ->where('role_id', $user->role_id)
-                    ->pluck('permissions.name')
-                    ->toArray();
+            if ($has_permission) {
+                $all_permission = [];
+                if ($user && $user->role_id) {
+                    $all_permission = DB::table('permissions')
+                        ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                        ->where('role_id', $user->role_id)
+                        ->pluck('name')
+                        ->toArray();
+                }
+
+                if (empty($all_permission)) {
+                    $all_permission = ['sales-index', 'sales-add'];
+                }
+
+                $lims_gift_card_list = GiftCard::where("is_active", true)->get();
+                $lims_pos_setting_data = PosSetting::latest()->first();
+                $lims_account_list = Account::where('is_active', true)->get();
+                $lims_methodpay_list = MethodPayment::where('name', '!=', 'Guardar Mas Tarde')->get();
+                $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
+
+                return view('sale.index', compact('lims_gift_card_list', 'lims_pos_setting_data', 'lims_account_list', 'all_permission', 'start_date', 'end_date', 'lims_methodpay_list', 'lista_documentos'));
+            } else {
+                return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
             }
-
-            if (empty($all_permission)) {
-                $all_permission = ['sales-index', 'sales-add'];
-            }
-
-            $lims_gift_card_list = GiftCard::where("is_active", true)->get();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Error en SaleController@index: ' . $e->getMessage());
+            $all_permission = ['sales-index', 'sales-add'];
+            $lims_gift_card_list = collect();
             $lims_pos_setting_data = PosSetting::latest()->first();
-            $lims_account_list = Account::where('is_active', true)->get();
-            $lims_methodpay_list = MethodPayment::where('name', '!=', 'Guardar Mas Tarde')->get();
-            $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
-
+            $lims_account_list = collect();
+            $lims_methodpay_list = collect();
+            $lista_documentos = collect();
             return view('sale.index', compact('lims_gift_card_list', 'lims_pos_setting_data', 'lims_account_list', 'all_permission', 'start_date', 'end_date', 'lims_methodpay_list', 'lista_documentos'));
-        } else {
-            return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
     }
 
