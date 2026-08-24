@@ -38,10 +38,8 @@
 <script type="text/javascript" src="/public/vendor/datatable/dataTables.checkboxes.min.js" data-turbo-track="reload"></script>
 <script type="text/javascript" src="https://cdn.datatables.net/fixedheader/3.1.6/js/dataTables.fixedHeader.min.js" data-turbo-track="reload"></script>
 <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/dataTables.responsive.min.js" data-turbo-track="reload"></script>
-<script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/responsive.bootstrap.min.js" data-turbo-track="reload"></script>
-<script type="text/javascript" src="/public/js/sweetalert.min.js" data-turbo-track="reload"></script>
-<script src="https://js.pusher.com/7.2/pusher.min.js" data-turbo-track="reload"></script>
-<script type="text/javascript" src="/public/printjs/print.min.js" data-turbo-track="reload"></script>
-<script type="text/javascript" src="/public/js/turbo.min.js" data-turbo-track="reload"></script>
-<script type="text/javascript" src="/public/js/spa-turbo-adapter.js" data-turbo-track="reload"></script>
+<script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/responsive.bootstrap.min.js"></script>
+<script type="text/javascript" src="/public/js/sweetalert.min.js"></script>
+<script src="https://js.pusher.com/7.2/pusher.min.js"></script>
+<script type="text/javascript" src="/public/printjs/print.min.js"></script>
  
