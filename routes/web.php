@@ -13,6 +13,24 @@
 */
 
 Auth::routes();
+Route::get('/check-error-log', function () {
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "=== LARAVEL LOG (Ultimas 60 lineas) ===\n\n";
+    $logPath = storage_path('logs/laravel.log');
+    if (file_exists($logPath)) {
+        $lines = file($logPath);
+        $lastLines = array_slice($lines, -60);
+        echo implode("", $lastLines);
+    } else {
+        echo "No existe storage/logs/laravel.log\n";
+    }
+    echo "\n\n=== PHP & MEMORY ===\n";
+    echo "PHP Version: " . phpversion() . "\n";
+    echo "Memory limit: " . ini_get('memory_limit') . "\n";
+    echo "Permission cache store: " . config('permission.cache.store') . "\n";
+    exit;
+});
+
 Route::get('/logout', function () {
     Auth::logout();
     return redirect('/login');
