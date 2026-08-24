@@ -538,10 +538,10 @@ class SaleController extends Controller
                     $sale->shipping_cost,
                     $sale->grand_total,
                     $sale->paid_amount,
-                    $sale->sale_note,
-                    $sale->staff_note,
-                    $sale->user->name,
-                    $sale->user->email,
+                    $sale->sale_note ?? '',
+                    $sale->staff_note ?? '',
+                    $sale->user ? $sale->user->name : 'N/A',
+                    $sale->user ? $sale->user->email : '',
                     $warehouse->name,
                     $coupon_code,
                     $sale->coupon_discount,
@@ -558,10 +558,10 @@ class SaleController extends Controller
             "recordsFiltered" => intval($totalFiltered),
             "data" => $data,
             "start_date" => $start_date,
-            "end_date" => $end_date_temp,
+            "end_date" => $end_date,
         );
 
-        echo json_encode($json_data);
+        return response()->json($json_data);
     }
 
     public function create()
@@ -5220,12 +5220,12 @@ class SaleController extends Controller
             }
 
             if ($venta_facturada->estado_factura != null) {
-                $tipo_factura = $tipo_factura_lookup[$venta_facturada->codigo_documento_sector];
+                $tipo_factura = $tipo_factura_lookup[$venta_facturada->codigo_documento_sector ?? 1] ?? 'COM-VEN';
                 if ($venta_facturada->nro_factura != null) {
                     $texto_factura = '[FACT-' . $tipo_factura . '#' . $venta_facturada->nro_factura . '|' . $venta_facturada->estado_factura . ']';
                     $estado_factura .= $texto_factura;
                 } else {
-                    $texto_factura = '[FACT-' . '<div class="badge badge-info">Manual</div>' . '-' . $tipo_factura . '#' . $venta_facturada->nro_factura_manual . ' |' . $venta_facturada->estado_factura . ']';
+                    $texto_factura = '[FACT-' . '<div class="badge badge-info">Manual</div>' . '-' . $tipo_factura . '#' . ($venta_facturada->nro_factura_manual ?? '') . ' |' . $venta_facturada->estado_factura . ']';
                     $estado_factura .= $texto_factura;
                 }
             }
