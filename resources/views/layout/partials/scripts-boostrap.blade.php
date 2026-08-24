@@ -40,8 +40,8 @@
 </script>
 <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/dataTables.responsive.min.js">
 </script>
-<script type="text/javascript" src="/vendor/datatable/responsive.bootstrap.min.js"></script>
+<script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/responsive.bootstrap.min.js"></script>
 <script type="text/javascript" src="/public/js/sweetalert.min.js"></script>
 <script src="https://js.pusher.com/7.2/pusher.min.js"></script>
-<script type="text/javascript" src="/printjs/print.min.js"></script>
+<script type="text/javascript" src="/public/printjs/print.min.js"></script>
  

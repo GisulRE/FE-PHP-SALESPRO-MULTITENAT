@@ -1124,7 +1124,7 @@
                 "processing": true,
                 "serverSide": true,
                 "ajax": {
-                    url: "sales/sale-data",
+                    url: "{{ url('sales/sale-data') }}",
                     data: {
                         all_permission: all_permission,
                         start_date: start_date_get,

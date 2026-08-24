@@ -173,7 +173,8 @@ class SaleController extends Controller
     public function saleData(Request $request)
     {
         ini_set('memory_limit', '512M');
-        $start_date = $request->input('start_date');
+        try {
+            $start_date = $request->input('start_date');
         $end_date = $request->input('end_date');
 
         if (empty($start_date) || $start_date === 'undefined' || $start_date === 'null') {
@@ -561,7 +562,17 @@ class SaleController extends Controller
             "end_date" => $end_date,
         );
 
-        return response()->json($json_data);
+            return response()->json($json_data);
+        } catch (\Throwable $e) {
+            \Log::error('Error en saleData: ' . $e->getMessage() . ' en ' . $e->getFile() . ':' . $e->getLine());
+            return response()->json([
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => 0,
+                "recordsFiltered" => 0,
+                "data" => [],
+                "error" => $e->getMessage()
+            ]);
+        }
     }
 
     public function create()
