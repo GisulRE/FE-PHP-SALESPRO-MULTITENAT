@@ -22,37 +22,8 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $user    = Auth::user();
-        $role_id = $user ? $user->role_id : null;
-
-        Log::info('[CategoryController@index] Intentando acceder', [
-            'user_id'  => $user ? $user->id   : null,
-            'user_name'=> $user ? $user->name  : null,
-            'role_id'  => $role_id,
-            'is_active'=> $user ? $user->is_active : null,
-        ]);
-
-        $role = Role::find($role_id);
-
-        if (!$role) {
-            Log::error('[CategoryController@index] Rol NO encontrado en BD, se bloquea acceso', [
-                'user_id' => $user ? $user->id : null,
-                'role_id' => $role_id,
-            ]);
-            return redirect()->route('home')->with('not_permitted', 'Error: rol de usuario no encontrado. Contacte al administrador.');
-        }
-
-        $hasPermission = $role->hasPermissionTo('category');
-
-        Log::info('[CategoryController@index] Resultado de verificación de permiso', [
-            'user_id'       => $user->id,
-            'role_id'       => $role_id,
-            'role_name'     => $role->name,
-            'permiso_requerido' => 'category',
-            'tiene_permiso' => $hasPermission,
-        ]);
-
-        if ($hasPermission) {
+        $role = Role::find(Auth::user()->role_id);
+        if ($role && $role->hasPermissionTo('category')) {
             $lims_pos_setting_data = PosSetting::latest()->first();
             $lims_categories = Category::where('is_active', true)->pluck('name', 'id');
             if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
