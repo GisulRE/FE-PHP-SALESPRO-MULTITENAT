@@ -63,7 +63,7 @@ class KardexController extends Controller
 
 
             if (!empty($product_warehouse_qty)) {
-                DB::table('record')->insert([
+                \DB::table('record')->insert([
                     'transaction_id' => 0,
                     'warehouse_id' => $warehouse_id,
                     'product_id' => $product_id,
@@ -94,7 +94,7 @@ class KardexController extends Controller
         $warehouse_id = $request->warehouse_id;
 
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
 
             $products_warehouse_qties = Product_Warehouse::whereIn('product_id', $products_id_list)
                 ->where('warehouse_id', $warehouse_id)
@@ -107,7 +107,7 @@ class KardexController extends Controller
                     ->where('warehouse_id', $warehouse_id)
                     ->first();
 
-                DB::table('record')->insert([
+                \DB::table('record')->insert([
                     'transaction_id' => 0,
                     'warehouse_id' => $warehouse_id,
                     'product_id' => $product_id,
@@ -120,13 +120,13 @@ class KardexController extends Controller
                 ]);
             }
 
-            DB::commit();
+            \DB::commit();
 
             $date = date('Y-m-d');
             $report_data_list = Kardex::whereDate('date', $date)->where('warehouse_id', $warehouse_id)->get();
             $message = ["success" => "Punto de control creado con exito"];
         } catch (\Throwable $th) {
-            DB::rollback();
+            \DB::rollback();
             $message = ["alert" => 'Error al crear el punto de control: ' . $th->getMessage()];
         }
 
@@ -194,8 +194,8 @@ class KardexController extends Controller
         }
 
         // Obtener saldo anterior
-        #$query_prev_balance->select(DB::raw('SUM(entrada) as total_entrada'), DB::raw('SUM(salida) as total_salida'));
-        $query_prev_balance->select(DB::raw('SUM(entrada) as total_entrada'), DB::raw('SUM(salida) as total_salida'), 'product', 'warehouse', 'cost', DB::raw('SUM(entrada) - SUM(salida) as saldo'));
+        #$query_prev_balance->select(\DB::raw('SUM(entrada) as total_entrada'), \DB::raw('SUM(salida) as total_salida'));
+        $query_prev_balance->select(\DB::raw('SUM(entrada) as total_entrada'), \DB::raw('SUM(salida) as total_salida'), 'product', 'warehouse', 'cost', \DB::raw('SUM(entrada) - SUM(salida) as saldo'));
 
         $prev_balance = $query_prev_balance->first();
 
@@ -211,7 +211,7 @@ class KardexController extends Controller
                 $product_name = $product->name;
                 $product_cost = $product->cost;
                 $warehouse_name = Warehouse::find($warehouse_id)->name;
-                $last_stock = DB::select('Select warehouse_qty_after from record where product_id = ? and warehouse_id = ? and action_taken_at < ? order by action_taken_at desc limit 1', [$product_id, $warehouse_id, $start_date]);
+                $last_stock = \DB::select('Select warehouse_qty_after from record where product_id = ? and warehouse_id = ? and action_taken_at < ? order by action_taken_at desc limit 1', [$product_id, $warehouse_id, $start_date]);
                 $prev_balance = (object) [
                     'entrada' => 0,
                     'salida' => 0,

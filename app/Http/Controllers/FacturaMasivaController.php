@@ -649,7 +649,7 @@ class FacturaMasivaController extends Controller
         $montoDescuentoLey1886 = 0;
         $montoDescuentoTarifaDignidad = 0;
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             foreach ($sheet_data as $key => $val) {
                 if ($key != 0 && $key > 0 && $val[0] != null) {
                     $data_row = array_combine($escapedHeader, $val);
@@ -757,10 +757,10 @@ class FacturaMasivaController extends Controller
                     $nroDocument = $val[0];
                 }
             }
-            DB::commit();
+            \DB::commit();
         } catch (\Throwable $th) {
             Log::error("Error Factura Masiva => " . $th);
-            DB::rollBack();
+            \DB::rollBack();
             $error_message = "Error: " . $th->getMessage();
         }
 

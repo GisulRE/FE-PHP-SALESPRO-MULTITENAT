@@ -37,11 +37,11 @@ class SettingController extends Controller
 
     public function emptyDatabase()
     {
-        $tables = DB::select('SHOW TABLES');
+        $tables = \DB::select('SHOW TABLES');
         $str = 'Tables_in_' . env('DB_DATABASE');
         foreach ($tables as $table) {
             if ($table->$str != 'accounts' && $table->$str != 'general_settings' && $table->$str != 'hrm_settings' && $table->$str != 'languages' && $table->$str != 'migrations' && $table->$str != 'password_resets' && $table->$str != 'permissions' && $table->$str != 'pos_setting' && $table->$str != 'roles' && $table->$str != 'role_has_permissions' && $table->$str != 'users') {
-                DB::table($table->$str)->truncate();
+                \DB::table($table->$str)->truncate();
             }
         }
         return redirect()->back()->with('message', 'Base de Datos Limpiado con éxito');
@@ -70,7 +70,7 @@ class SettingController extends Controller
         else
             $file_name = 'pos_database_backup_on_' . date('y-m-d') . '.sql';
 
-        $queryTables = DB::select(DB::raw('SHOW TABLES'));
+        $queryTables = \DB::select(\DB::raw('SHOW TABLES'));
         foreach ($queryTables as $table) {
             foreach ($table as $tName) {
                 $tables[] = $tName;
@@ -194,7 +194,7 @@ class SettingController extends Controller
         $dbName = config('database.connections.mysql.database');
 
         foreach ($insertsByTable as $table => $tableInfo) {
-            $dbColumns = DB::select(
+            $dbColumns = \DB::select(
                 "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA
                  FROM information_schema.COLUMNS
                  WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
@@ -292,8 +292,8 @@ class SettingController extends Controller
         $failed = 0;
         $errors = [];
 
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
-        DB::statement("SET SESSION sql_mode = ''");
+        \DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        \DB::statement("SET SESSION sql_mode = ''");
 
         try {
             foreach ($statements as $statement) {
@@ -310,7 +310,7 @@ class SettingController extends Controller
                 $preparedSql = $this->forceCompanyIdInInsert($trimmed, $companyId);
 
                 try {
-                    DB::unprepared($preparedSql);
+                    \DB::unprepared($preparedSql);
                     $executed++;
                 } catch (\Throwable $e) {
                     $failed++;
@@ -328,7 +328,7 @@ class SettingController extends Controller
                 }
             }
         } finally {
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            \DB::statement('SET FOREIGN_KEY_CHECKS=1');
             if ($tempToDelete && file_exists($tempToDelete)) {
                 @unlink($tempToDelete);
             }
@@ -402,7 +402,7 @@ class SettingController extends Controller
             }, explode(',', $columnSection));
         } else {
             $dbName = config('database.connections.mysql.database');
-            $dbColumns = DB::select(
+            $dbColumns = \DB::select(
                 'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION',
                 [$dbName, $tableName]
             );
@@ -419,7 +419,7 @@ class SettingController extends Controller
         static $autoIncrementColumnCache = [];
         if (!isset($autoIncrementColumnCache[$tableName])) {
             $autoIncrementColumnCache[$tableName] = [];
-            $autoIncrementColumns = DB::select(
+            $autoIncrementColumns = \DB::select(
                 'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND EXTRA LIKE "%auto_increment%"',
                 [$dbName, $tableName]
             );
@@ -797,7 +797,7 @@ class SettingController extends Controller
         $tipo_emision_list[1]['name'] = "Masivo";
         $lims_biller_list = Biller::where('is_active', true)->get();
         $lims_printer_list = PrinterConfig::where('status', true)->get();
-        $defaultCurrencyCode = DB::table('siat_parametricas_varios')
+        $defaultCurrencyCode = \DB::table('siat_parametricas_varios')
             ->where('tipo_clasificador', 'tipoMoneda')
             ->whereRaw('UPPER(descripcion) = ?', ['BOLIVIANO'])
             ->value('codigo_clasificador') ?? '1';
@@ -822,7 +822,7 @@ class SettingController extends Controller
     {
         $data = $request->all();
         $companyId = auth()->user()->company_id;
-        $defaultCurrencyCode = DB::table('siat_parametricas_varios')
+        $defaultCurrencyCode = \DB::table('siat_parametricas_varios')
             ->where('tipo_clasificador', 'tipoMoneda')
             ->whereRaw('UPPER(descripcion) = ?', ['BOLIVIANO'])
             ->value('codigo_clasificador') ?? '1';
@@ -874,7 +874,7 @@ class SettingController extends Controller
 
         $data = $request->all();
         $companyId = auth()->user()->company_id;
-        $defaultCurrencyCode = DB::table('siat_parametricas_varios')
+        $defaultCurrencyCode = \DB::table('siat_parametricas_varios')
             ->where('tipo_clasificador', 'tipoMoneda')
             ->whereRaw('UPPER(descripcion) = ?', ['BOLIVIANO'])
             ->value('codigo_clasificador') ?? '1';
@@ -1153,7 +1153,7 @@ class SettingController extends Controller
     static function db()
     {
         try {
-            $db = DB::connection()->getPdo();
+            $db = \DB::connection()->getPdo();
         } catch (PDOException $e) {
             self::fatal(
                 "An error occurred while connecting to the database. " .

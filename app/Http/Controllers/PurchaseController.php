@@ -41,7 +41,7 @@ class PurchaseController extends Controller
                 $lims_purchase_list = Purchase::orderBy('id', 'desc')->get();
             }
 
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -390,7 +390,7 @@ class PurchaseController extends Controller
     public function store(Request $request)
     {
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $data = $request->except('document');
             $data['user_id'] = Auth::id();
             $last_ref = Purchase::get()->last();
@@ -524,10 +524,10 @@ class PurchaseController extends Controller
                 }
             }
             Log::info("Detail Purchase created successfully");
-            DB::commit();
+            \DB::commit();
             return redirect('purchases')->with('message', 'Compra Creada con éxito');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("error save purchase: " . $th->getMessage());
             Log::error("Stack trace: " . $th->getTraceAsString());
             return redirect('purchases')->with('not_permitted', 'Fallo al crear Compra: ' . $th->getMessage());
@@ -573,7 +573,7 @@ class PurchaseController extends Controller
     public function importPurchase(Request $request)
     {
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             //get the file
             $upload = $request->file('file');
             $ext = pathinfo($upload->getClientOriginalName(), PATHINFO_EXTENSION);
@@ -732,10 +732,10 @@ class PurchaseController extends Controller
             $lims_purchase_data->save();
             Log::info(" Total Import Purchase: " . $lims_purchase_data->item);
             Log::info("Import Purchase created successfully");
-            DB::commit();
+            \DB::commit();
             return redirect('purchases')->with('message', 'Compras Importados con éxito');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("error save purchase: " . $th->getMessage());
             Log::error("error save purchase: " . $th->getLine());
             return redirect('purchases')->with('not_permitted', 'Fallo al importar Compra, Intente de nuevo!');
@@ -773,7 +773,7 @@ class PurchaseController extends Controller
     public function update(Request $request, $id)
     {       //return $request->all();
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $data = $request->except('document');
             $document = $request->document;
             if ($document) {
@@ -937,12 +937,12 @@ class PurchaseController extends Controller
                 $data['created_at'] = $lims_purchase_data->created_at;
             }
             $lims_purchase_data->update($data);
-            DB::commit();
+            \DB::commit();
 
             Log::info("Purchase updated successfully");
             return redirect('purchases')->with('message', 'Compra Actualizado con éxito');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("error update purchase: " . $th->getMessage());
             return redirect('purchases')->with('not_permitted', 'Fallo al actualizar Compra, Intente de nuevo!');
         }

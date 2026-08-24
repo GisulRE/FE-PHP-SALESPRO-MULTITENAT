@@ -106,11 +106,11 @@ class CashierController extends Controller
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
             $returns = (float) Returns::where('account_id', $account_id)->whereDate('created_at', '>=' , $startbef_date)
             ->whereDate('created_at', '<=' , $endafter_date)->sum('grand_total');
-            $return_purchase = (float) DB::table('return_purchases')->where('account_id', $account_id)
+            $return_purchase = (float) \DB::table('return_purchases')->where('account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('grand_total');
-            $expenses = (float) DB::table('expenses')->where('account_id', $account_id)
+            $expenses = (float) \DB::table('expenses')->where('account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
-            $payrolls = (float) DB::table('payrolls')->where('account_id', $account_id)
+            $payrolls = (float) \DB::table('payrolls')->where('account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');
             $sent_money_via_transfer = (float) MoneyTransfer::where('from_account_id', $account_id)
             ->whereDate('created_at', '>=' , $startbef_date)->whereDate('created_at', '<=' , $endafter_date)->sum('amount');

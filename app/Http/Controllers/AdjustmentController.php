@@ -22,7 +22,7 @@ class AdjustmentController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('adjustment')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -35,8 +35,8 @@ class AdjustmentController extends Controller
             else
                 $lims_adjustment_all = Adjustment::orderBy('id', 'desc')->get();
 
-            $warehouses = DB::table('warehouses')->pluck('name', 'id')->toArray();
-            $product_adjustments = DB::table('product_adjustments')
+            $warehouses = \DB::table('warehouses')->pluck('name', 'id')->toArray();
+            $product_adjustments = \DB::table('product_adjustments')
                 ->leftJoin('products', 'product_adjustments.product_id', '=', 'products.id')
                 ->select('product_adjustments.adjustment_id', 'products.code as adjustment_code', 'products.name as product_name', 'products.is_variant')
                 ->get()
@@ -49,7 +49,7 @@ class AdjustmentController extends Controller
 
     public function getProduct($id)
     {
-        $lims_product_warehouse_data = DB::table('products')
+        $lims_product_warehouse_data = \DB::table('products')
             ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
             ->leftJoin('product_variants', function ($join) {
                 $join->on('product_warehouse.product_id', '=', 'product_variants.product_id')
@@ -215,7 +215,7 @@ class AdjustmentController extends Controller
     public function store(Request $request)
     {
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $data = $request->except('document');
             if (isset ($data['stock_count_id'])) {
                 $lims_stock_count_data = StockCount::find($data['stock_count_id']);
@@ -282,11 +282,11 @@ class AdjustmentController extends Controller
                 $lims_product_variant_data = null;
                 ProductAdjustment::create($product_adjustment);
             }
-            DB::commit();
+            \DB::commit();
             Log::info("ProductAdjustment created successfully");
             return redirect('qty_adjustment')->with('message', 'Datos registrado con éxito');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("error save adjustment product: " . $th->getMessage());
             return redirect('qty_adjustment')->with('not_permitted', 'Fallo al crear Ajuste Producto, Intente de nuevo!');
         }
@@ -303,7 +303,7 @@ class AdjustmentController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $data = $request->except('document');
             $document = $request->document;
             if ($document) {
@@ -407,11 +407,11 @@ class AdjustmentController extends Controller
                     ProductAdjustment::create($product_adjustment);
             }
             $lims_adjustment_data->update($data);
-            DB::commit();
+            \DB::commit();
             Log::info("ProductAdjustment updated successfully");
             return redirect('qty_adjustment')->with('message', 'Datos actualizados con éxito');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("error save adjustment product: " . $th->getMessage());
             return redirect('qty_adjustment')->with('not_permitted', 'Fallo al actualizar Ajuste Producto, Intente de nuevo!');
         }

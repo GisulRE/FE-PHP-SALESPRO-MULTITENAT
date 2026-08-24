@@ -29,15 +29,15 @@ class HomeController extends Controller
         $end_date = date("Y-m-t");
         $yearly_sale_amount = [];
 
-        $general_setting = DB::table('general_settings')
+        $general_setting = \DB::table('general_settings')
             ->where('company_id', Auth::user()->company_id)
             ->latest()
             ->first();
         $staff_access = $general_setting->staff_access ?? 'admin';
         if (Auth::user()->role_id > 2 && $staff_access == 'own') {
             $revenue = (float) Sale::whereDate('created_at', '>=', $start_date)->where('user_id', Auth::id())->whereDate('created_at', '<=', $end_date)->sum('grand_total');
-            $cost = (float) DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->Join('sales', 'product_sales.sale_id', '=', 'sales.id')->whereDate('product_sales.created_at', '>=', $start_date)
-                ->whereDate('product_sales.created_at', '<=', $end_date)->where('sales.user_id', Auth::id())->sum(DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
+            $cost = (float) \DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->Join('sales', 'product_sales.sale_id', '=', 'sales.id')->whereDate('product_sales.created_at', '>=', $start_date)
+                ->whereDate('product_sales.created_at', '<=', $end_date)->where('sales.user_id', Auth::id())->sum(\DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
             $return = (float) Returns::whereDate('created_at', '>=', $start_date)->where('user_id', Auth::id())->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $purchase_return = (float) ReturnPurchase::whereDate('created_at', '>=', $start_date)->where('user_id', Auth::id())->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $revenue = $revenue - $return;
@@ -51,7 +51,7 @@ class HomeController extends Controller
             $recent_payment = Payment::orderBy('id', 'desc')->where('user_id', Auth::id())->take(5)->get();
         } else {
             $revenue = (float) Sale::whereBetween('date_sell', [$start_date, $end_date])->sum('grand_total');
-            $cost = (float) DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->whereBetween('product_sales.created_at', [$start_date, $end_date])->sum(DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
+            $cost = (float) \DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->whereBetween('product_sales.created_at', [$start_date, $end_date])->sum(\DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
             //$cost = Product_Sale::select('SUM(product_sales.qty*products.cost) total')->join('products', 'product_sales.product_id', 'products.id')->whereDate('product_sales.created_at', '>=' , $start_date)
             //->whereDate('product_sales.created_at', '<=' , $end_date)->first();
             $return = (float) Returns::whereBetween('created_at', [$start_date, $end_date])->sum('grand_total');
@@ -66,11 +66,11 @@ class HomeController extends Controller
             $recent_payment = Payment::orderBy('id', 'desc')->take(5)->get();
         }
 
-        $best_selling_qty = Product_Sale::select(DB::raw('product_id, sum(qty) as sold_qty'))->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(5)->get();
+        $best_selling_qty = Product_Sale::select(\DB::raw('product_id, sum(qty) as sold_qty'))->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(5)->get();
 
-        $yearly_best_selling_qty = Product_Sale::select(DB::raw('product_id, sum(qty) as sold_qty'))->whereDate('created_at', '>=', date("Y") . '-01-01')->whereDate('created_at', '<=', date("Y") . '-12-31')->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(5)->get();
+        $yearly_best_selling_qty = Product_Sale::select(\DB::raw('product_id, sum(qty) as sold_qty'))->whereDate('created_at', '>=', date("Y") . '-01-01')->whereDate('created_at', '<=', date("Y") . '-12-31')->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(5)->get();
 
-        $yearly_best_selling_price = Product_Sale::select(DB::raw('product_id, sum(total) as total_price'))->whereDate('created_at', '>=', date("Y") . '-01-01')->whereDate('created_at', '<=', date("Y") . '-12-31')->groupBy('product_id')->orderBy('total_price', 'desc')->take(5)->get();
+        $yearly_best_selling_price = Product_Sale::select(\DB::raw('product_id, sum(total) as total_price'))->whereDate('created_at', '>=', date("Y") . '-01-01')->whereDate('created_at', '<=', date("Y") . '-12-31')->groupBy('product_id')->orderBy('total_price', 'desc')->take(5)->get();
 
         //cash flow of last 6 months
         $start = strtotime(date('Y-m-01', strtotime('-6 month', strtotime(date('Y-m-d')))));
@@ -81,15 +81,15 @@ class HomeController extends Controller
             $end_date = date("Y-m-t", $start);
 
             if (Auth::user()->role_id > 2 && $staff_access == 'own') {
-                $recieved_amount = (float) DB::table('payments')->whereNotNull('sale_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('amount');
-                $sent_amount = (float) DB::table('payments')->whereNotNull('purchase_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('amount');
+                $recieved_amount = (float) \DB::table('payments')->whereNotNull('sale_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('amount');
+                $sent_amount = (float) \DB::table('payments')->whereNotNull('purchase_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('amount');
                 $return_amount = (float) Returns::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
                 $purchase_return_amount = (float) ReturnPurchase::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
                 $expense_amount = (float) Expense::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('amount');
                 $payroll_amount = (float) Payroll::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('amount');
             } else {
-                $recieved_amount = (float) DB::table('payments')->whereNotNull('sale_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-                $sent_amount = (float) DB::table('payments')->whereNotNull('purchase_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
+                $recieved_amount = (float) \DB::table('payments')->whereNotNull('sale_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
+                $sent_amount = (float) \DB::table('payments')->whereNotNull('purchase_id')->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
                 $return_amount = (float) Returns::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('grand_total');
                 $purchase_return_amount = (float) ReturnPurchase::whereBetween('created_at', [$start_date, $end_date])->sum('grand_total');
                 $expense_amount = (float) Expense::whereBetween('created_at', [$start_date, $end_date])->sum('amount');
@@ -119,7 +119,7 @@ class HomeController extends Controller
             $yearly_purchase_amount[] = number_format((float)$purchase_amount, 2, '.', '');
             $start = strtotime("+1 month", $start);
         }
-        $p_ready = DB::table('permissions')
+        $p_ready = \DB::table('permissions')
             ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
             ->where('role_id', Auth::user()->role_id)
             ->pluck('name')
@@ -133,15 +133,15 @@ class HomeController extends Controller
 
     public function dashboardFilter($start_date, $end_date)
     {
-        $general_setting = DB::table('general_settings')
+        $general_setting = \DB::table('general_settings')
             ->where('company_id', Auth::user()->company_id)
             ->latest()
             ->first();
         $staff_access = $general_setting->staff_access ?? 'admin';
         if (Auth::user()->role_id > 2 && $staff_access == 'own') {
             $revenue = (float) Sale::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
-            $cost = (float) DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->Join('sales', 'product_sales.sale_id', '=', 'sales.id')->whereDate('product_sales.created_at', '>=', $start_date)
-                ->whereDate('product_sales.created_at', '<=', $end_date)->where('sales.user_id', Auth::id())->sum(DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
+            $cost = (float) \DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->Join('sales', 'product_sales.sale_id', '=', 'sales.id')->whereDate('product_sales.created_at', '>=', $start_date)
+                ->whereDate('product_sales.created_at', '<=', $end_date)->where('sales.user_id', Auth::id())->sum(\DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
             $return = (float) Returns::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
             $purchase_return = (float) ReturnPurchase::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->where('user_id', Auth::id())->sum('grand_total');
             $revenue -= $return;
@@ -155,8 +155,8 @@ class HomeController extends Controller
             $data[4] = $cost;
         } else {
             $revenue = (float) Sale::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('grand_total');
-            $cost = (float) DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->whereDate('product_sales.created_at', '>=', $start_date)
-                ->whereDate('product_sales.created_at', '<=', $end_date)->sum(DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
+            $cost = (float) \DB::table('product_sales')->Join('products', 'product_sales.product_id', '=', 'products.id')->whereDate('product_sales.created_at', '>=', $start_date)
+                ->whereDate('product_sales.created_at', '<=', $end_date)->sum(\DB::raw('CAST(product_sales.qty AS DECIMAL(20,4)) * CAST(products.cost AS DECIMAL(20,4))'));
             $return = (float) Returns::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $purchase_return = (float) ReturnPurchase::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $revenue -= $return;

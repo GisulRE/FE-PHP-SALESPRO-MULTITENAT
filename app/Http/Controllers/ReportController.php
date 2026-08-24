@@ -72,7 +72,7 @@ class ReportController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('warehouse-stock-report')) {
-            $total_item = DB::table('product_warehouse')
+            $total_item = \DB::table('product_warehouse')
                 ->join('products', 'product_warehouse.product_id', '=', 'products.id')
                 ->where([
                     ['products.is_active', true],
@@ -80,8 +80,8 @@ class ReportController extends Controller
                 ])->count();
 
             $total_qty = Product::where('is_active', true)->sum('qty');
-            $total_price = DB::table('products')->where('is_active', true)->sum(DB::raw('CAST(price AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
-            $total_cost = DB::table('products')->where('is_active', true)->sum(DB::raw('CAST(cost AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
+            $total_price = \DB::table('products')->where('is_active', true)->sum(\DB::raw('CAST(price AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
+            $total_cost = \DB::table('products')->where('is_active', true)->sum(\DB::raw('CAST(cost AS DECIMAL(20,4)) * CAST(qty AS DECIMAL(20,4))'));
             if (Auth::user()->role_id > 2 && Auth::user()->biller_id) {
                 $lims_warehouse_list = app(BillerController::class)::warehouseAuthorizate(Auth::user()->biller_id);
             } else {
@@ -101,31 +101,31 @@ class ReportController extends Controller
             return redirect()->back();
         }
 
-        $total_item = DB::table('product_warehouse')
+        $total_item = \DB::table('product_warehouse')
             ->join('products', 'product_warehouse.product_id', '=', 'products.id')
             ->where([
                 ['products.is_active', true],
                 ['product_warehouse.qty', '>', 0],
                 ['product_warehouse.warehouse_id', $data['warehouse_id']],
             ])->count();
-        $total_qty = DB::table('product_warehouse')
+        $total_qty = \DB::table('product_warehouse')
             ->join('products', 'product_warehouse.product_id', '=', 'products.id')
             ->where([
                 ['products.is_active', true],
                 ['product_warehouse.warehouse_id', $data['warehouse_id']],
             ])->sum('product_warehouse.qty');
-        $total_price = DB::table('product_warehouse')
+        $total_price = \DB::table('product_warehouse')
             ->join('products', 'product_warehouse.product_id', '=', 'products.id')
             ->where([
                 ['products.is_active', true],
                 ['product_warehouse.warehouse_id', $data['warehouse_id']],
-            ])->sum(DB::raw('CAST(products.price AS DECIMAL(20,4)) * CAST(product_warehouse.qty AS DECIMAL(20,4))'));
-        $total_cost = DB::table('product_warehouse')
+            ])->sum(\DB::raw('CAST(products.price AS DECIMAL(20,4)) * CAST(product_warehouse.qty AS DECIMAL(20,4))'));
+        $total_cost = \DB::table('product_warehouse')
             ->join('products', 'product_warehouse.product_id', '=', 'products.id')
             ->where([
                 ['products.is_active', true],
                 ['product_warehouse.warehouse_id', $data['warehouse_id']],
-            ])->sum(DB::raw('CAST(products.cost AS DECIMAL(20,4)) * CAST(product_warehouse.qty AS DECIMAL(20,4))'));
+            ])->sum(\DB::raw('CAST(products.cost AS DECIMAL(20,4)) * CAST(product_warehouse.qty AS DECIMAL(20,4))'));
         if (Auth::user()->role_id > 2 && Auth::user()->biller_id) {
             $lims_warehouse_list = app(BillerController::class)::warehouseAuthorizate(Auth::user()->biller_id);
         } else {
@@ -497,7 +497,7 @@ class ReportController extends Controller
                 $start_date = date("Y-m", $start) . '-' . '01';
                 $end_date = date("Y-m", $start) . '-' . '31';
 
-                $best_selling_qty = Product_Sale::select(DB::raw('product_id, sum(qty) as sold_qty'))->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(1)->get();
+                $best_selling_qty = Product_Sale::select(\DB::raw('product_id, sum(qty) as sold_qty'))->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(1)->get();
                 if (!count($best_selling_qty)) {
                     $product[] = '';
                     $sold_qty[] = 0;
@@ -536,8 +536,8 @@ class ReportController extends Controller
             $start_date = date("Y-m", $start) . '-' . '01';
             $end_date = date("Y-m", $start) . '-' . '31';
 
-            $best_selling_qty = DB::table('sales')
-                ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')->select(DB::raw('product_sales.product_id, sum(product_sales.qty) as sold_qty'))->where('sales.warehouse_id', $data['warehouse_id'])->where('sales.company_id', Auth::user()->company_id)->whereDate('sales.created_at', '>=', $start_date)->whereDate('sales.created_at', '<=', $end_date)->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(1)->get();
+            $best_selling_qty = \DB::table('sales')
+                ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')->select(\DB::raw('product_sales.product_id, sum(product_sales.qty) as sold_qty'))->where('sales.warehouse_id', $data['warehouse_id'])->where('sales.company_id', Auth::user()->company_id)->whereDate('sales.created_at', '>=', $start_date)->whereDate('sales.created_at', '<=', $end_date)->groupBy('product_id')->orderBy('sold_qty', 'desc')->take(1)->get();
 
             if (!count($best_selling_qty)) {
                 $product[] = '';
@@ -590,7 +590,7 @@ class ReportController extends Controller
         $total_expense = Expense::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->count();
         $payroll = Payroll::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
         $total_payroll = Payroll::whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->count();
-        $total_item = DB::table('product_warehouse')
+        $total_item = \DB::table('product_warehouse')
             ->join('products', 'product_warehouse.product_id', '=', 'products.id')
             ->where([
                 ['products.is_active', true],
@@ -805,7 +805,7 @@ class ReportController extends Controller
                 }
             } else {
                 if ($product->is_variant) {
-                    $variant_id_all = DB::table('purchases')
+                    $variant_id_all = \DB::table('purchases')
                         ->join('product_purchases', 'purchases.id', '=', 'product_purchases.purchase_id')
                         ->distinct('variant_id')
                         ->where([
@@ -814,7 +814,7 @@ class ReportController extends Controller
                         ])->whereDate('purchases.created_at', '>=', $start_date)
                         ->whereDate('purchases.created_at', '<=', $end_date)
                         ->pluck('variant_id');
-                    $purchase_ref_all = DB::table('purchases')
+                    $purchase_ref_all = \DB::table('purchases')
                         ->join('product_purchases', 'purchases.id', '=', 'product_purchases.purchase_id')
                         ->distinct('variant_id')
                         ->where([
@@ -824,7 +824,7 @@ class ReportController extends Controller
                         ->whereDate('purchases.created_at', '<=', $end_date)
                         ->pluck('purchases.reference_no');
                 } else {
-                    $lims_product_purchase_data = DB::table('purchases')
+                    $lims_product_purchase_data = \DB::table('purchases')
                         ->join('product_purchases', 'purchases.id', '=', 'product_purchases.purchase_id')->where([
                                 ['product_purchases.product_id', $product->id],
                                 ['purchases.warehouse_id', $warehouse_id],
@@ -899,7 +899,7 @@ class ReportController extends Controller
                 }
             } else {
                 if ($product->is_variant) {
-                    $variant_id_all = DB::table('sales')
+                    $variant_id_all = \DB::table('sales')
                         ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')
                         ->distinct('variant_id')
                         ->where([
@@ -909,7 +909,7 @@ class ReportController extends Controller
                         ->whereDate('sales.created_at', '<=', $end_date)
                         ->pluck('variant_id');
                 } else {
-                    $lims_product_sale_data = DB::table('sales')
+                    $lims_product_sale_data = \DB::table('sales')
                         ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')->where([
                                 ['product_sales.product_id', $product->id],
                                 ['sales.warehouse_id', $warehouse_id],
@@ -1040,7 +1040,7 @@ class ReportController extends Controller
                 }
             } else {
                 if ($product->is_variant) {
-                    $variant_id_all = DB::table('sales')
+                    $variant_id_all = \DB::table('sales')
                         ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')
                         ->distinct('variant_id')
                         ->where([
@@ -1050,7 +1050,7 @@ class ReportController extends Controller
                         ->whereDate('sales.date_sell', '<=', $end_date)
                         ->pluck('variant_id');
                 } else {
-                    $lims_product_sale_data = DB::table('sales')
+                    $lims_product_sale_data = \DB::table('sales')
                         ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')->where([
                                 ['product_sales.product_id', $product->id],
                                 ['product_sales.category_id', $category_id],
@@ -1409,7 +1409,7 @@ class ReportController extends Controller
                 }
             } else {
                 if ($product->is_variant) {
-                    $variant_id_all = DB::table('sales')
+                    $variant_id_all = \DB::table('sales')
                         ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')
                         ->distinct('variant_id')
                         ->where([
@@ -1420,7 +1420,7 @@ class ReportController extends Controller
                         ->whereDate('sales.created_at', '<=', $end_date)
                         ->pluck('variant_id');
                 } else {
-                    $lims_product_sale_data = DB::table('sales')
+                    $lims_product_sale_data = \DB::table('sales')
                         ->join('product_sales', 'sales.id', '=', 'product_sales.sale_id')->where([
                                 ['product_sales.product_id', $product->id],
                                 ['product_sales.category_id', $category_id],
@@ -3152,7 +3152,7 @@ class ReportController extends Controller
         $account_list = Account::where('is_active', true)
             ->whereBetween('id', [$account_ini, $account_fin])->pluck('id');
         if ($sucursal > -1) {
-            $resumen = DB::table('product_sales')
+            $resumen = \DB::table('product_sales')
                 ->select('accounts.id', 'accounts.account_no', 'accounts.name', 'product_sales.total')
                 ->join('sales', 'sales.id', 'product_sales.sale_id')
                 ->leftJoin('customer_sales', 'customer_sales.sale_id', 'sales.id')
@@ -3164,7 +3164,7 @@ class ReportController extends Controller
                 ->groupBy('accounts.id', 'product_sales.total')
                 ->orderBy('accounts.account_no', 'ASC')->get();
         } else {
-            $resumen = DB::table('product_sales')
+            $resumen = \DB::table('product_sales')
                 ->select('accounts.id', 'accounts.account_no', 'accounts.name', 'product_sales.total')
                 ->join('sales', 'sales.id', 'product_sales.sale_id')
                 ->join('products', 'products.id', 'product_sales.product_id')

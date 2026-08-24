@@ -28,7 +28,7 @@ class DeliveryController extends Controller
     public function create($id){
     	$lims_delivery_data = Delivery::where('sale_id', $id)->first();
     	if($lims_delivery_data){
-    		$customer_sale = DB::table('sales')->join('customers', 'sales.customer_id', '=', 'customers.id')->where('sales.id', $id)->select('sales.reference_no','customers.name')->get();
+    		$customer_sale = \DB::table('sales')->join('customers', 'sales.customer_id', '=', 'customers.id')->where('sales.id', $id)->select('sales.reference_no','customers.name')->get();
 
     		$delivery_data[] = $lims_delivery_data->reference_no;
     		$delivery_data[] = $customer_sale[0]->reference_no;
@@ -40,7 +40,7 @@ class DeliveryController extends Controller
     		$delivery_data[] = $lims_delivery_data->note;
     	}
     	else{
-    		$customer_sale = DB::table('sales')->join('customers', 'sales.customer_id', '=', 'customers.id')->where('sales.id', $id)->select('sales.reference_no','customers.name', 'customers.address', 'customers.city', 'customers.country')->get();
+    		$customer_sale = \DB::table('sales')->join('customers', 'sales.customer_id', '=', 'customers.id')->where('sales.id', $id)->select('sales.reference_no','customers.name', 'customers.address', 'customers.city', 'customers.country')->get();
 
     		$delivery_data[] = 'dr-' . date("Ymd") . '-'. date("his");
     		$delivery_data[] = $customer_sale[0]->reference_no;
@@ -103,7 +103,7 @@ class DeliveryController extends Controller
     public function edit($id)
     {
     	$lims_delivery_data = Delivery::find($id);
-    	$customer_sale = DB::table('sales')->join('customers', 'sales.customer_id', '=', 'customers.id')->where('sales.id', $lims_delivery_data->sale_id)->select('sales.reference_no','customers.name')->get();
+    	$customer_sale = \DB::table('sales')->join('customers', 'sales.customer_id', '=', 'customers.id')->where('sales.id', $lims_delivery_data->sale_id)->select('sales.reference_no','customers.name')->get();
 
     	$delivery_data[] = $lims_delivery_data->reference_no;
 		$delivery_data[] = $customer_sale[0]->reference_no;

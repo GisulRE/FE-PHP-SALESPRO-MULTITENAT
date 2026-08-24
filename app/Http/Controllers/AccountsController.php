@@ -189,10 +189,10 @@ class AccountsController extends Controller
             foreach ($lims_account_list as $account) {
                 $payment_recieved = (float) Payment::whereNotNull('sale_id')->where('account_id', $account->id)->sum('amount');
                 $payment_sent = (float) Payment::whereNotNull('purchase_id')->where('account_id', $account->id)->sum('amount');
-                $returns = (float) DB::table('returns')->where('account_id', $account->id)->sum('grand_total');
-                $return_purchase = (float) DB::table('return_purchases')->where('account_id', $account->id)->sum('grand_total');
-                $expenses = (float) DB::table('expenses')->where('account_id', $account->id)->sum('amount');
-                $payrolls = (float) DB::table('payrolls')->where('account_id', $account->id)->sum('amount');
+                $returns = (float) \DB::table('returns')->where('account_id', $account->id)->sum('grand_total');
+                $return_purchase = (float) \DB::table('return_purchases')->where('account_id', $account->id)->sum('grand_total');
+                $expenses = (float) \DB::table('expenses')->where('account_id', $account->id)->sum('amount');
+                $payrolls = (float) \DB::table('payrolls')->where('account_id', $account->id)->sum('amount');
                 $sent_money_via_transfer = (float) MoneyTransfer::where('from_account_id', $account->id)->sum('amount');
                 $recieved_money_via_transfer = (float) MoneyTransfer::where('to_account_id', $account->id)->sum('amount');
                 $adjustment_account_ing = (float) AdjustmentAccount::where([['account_id', $account->id], ['is_active', true], ['type_adjustment', 'ING']])->sum('amount');
@@ -1109,11 +1109,11 @@ class AccountsController extends Controller
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
                     $returns = (float) Returns::where('account_id', $cash_account_id)->where('biller_id', $biller->id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-                    $return_purchase = (float) DB::table('return_purchases')->where('account_id', $cash_account_id)
+                    $return_purchase = (float) \DB::table('return_purchases')->where('account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-                    $expenses = (float) DB::table('expenses')->where('account_id', $cash_account_id)
+                    $expenses = (float) \DB::table('expenses')->where('account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-                    $payrolls = (float) DB::table('payrolls')->where('account_id', $cash_account_id)
+                    $payrolls = (float) \DB::table('payrolls')->where('account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
                     $sent_money_via_transfer = (float) MoneyTransfer::where('from_account_id', $cash_account_id)
                         ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
@@ -1136,9 +1136,9 @@ class AccountsController extends Controller
                     ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
                 $devolucion = Returns::whereIn('account_id', $lims_account_list)->where('biller_id', $biller->id)->whereDate('created_at', '>=', $start_date)
                     ->whereDate('created_at', '<=', $end_date)->sum('grand_total');
-                $gastos = DB::table('expenses')->whereIn('account_id', $lims_account_list)
+                $gastos = \DB::table('expenses')->whereIn('account_id', $lims_account_list)
                     ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-                $nominas = DB::table('payrolls')->whereIn('account_id', $lims_account_list)
+                $nominas = \DB::table('payrolls')->whereIn('account_id', $lims_account_list)
                     ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
                 $transferencias = MoneyTransfer::whereIn('from_account_id', $lims_account_list)
                     ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
@@ -1245,7 +1245,7 @@ class AccountsController extends Controller
 
             $ventas = (float) Payment::whereNotNull('sale_id')->where([['account_id', $account_id], ['paying_method', 'Efectivo']])
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-            $compra_retornada = (float) DB::table('return_purchases')->where('account_id', $account_id)
+            $compra_retornada = (float) \DB::table('return_purchases')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('grand_total');
             $tranferencia_recibida = (float) MoneyTransfer::where('to_account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
@@ -1256,9 +1256,9 @@ class AccountsController extends Controller
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
             $devolucion = (float) Returns::where('account_id', $account_id)->whereDate('created_at', '>=', $start_date)
                 ->whereDate('created_at', '<=', $end_date)->sum('grand_total');
-            $gastos = (float) DB::table('expenses')->where('account_id', $account_id)
+            $gastos = (float) \DB::table('expenses')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
-            $nominas = (float) DB::table('payrolls')->where('account_id', $account_id)
+            $nominas = (float) \DB::table('payrolls')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
             $transferencias = (float) MoneyTransfer::where('from_account_id', $account_id)
                 ->whereDate('created_at', '>=', $start_date)->whereDate('created_at', '<=', $end_date)->sum('amount');
@@ -1277,11 +1277,11 @@ class AccountsController extends Controller
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
             $returns = (float) Returns::where('account_id', $account_id)->whereDate('created_at', '>=', $startbef_date)
                 ->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-            $return_purchase = (float) DB::table('return_purchases')->where('account_id', $account_id)
+            $return_purchase = (float) \DB::table('return_purchases')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('grand_total');
-            $expenses = (float) DB::table('expenses')->where('account_id', $account_id)
+            $expenses = (float) \DB::table('expenses')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
-            $payrolls = (float) DB::table('payrolls')->where('account_id', $account_id)
+            $payrolls = (float) \DB::table('payrolls')->where('account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');
             $sent_money_via_transfer = (float) MoneyTransfer::where('from_account_id', $account_id)
                 ->whereDate('created_at', '>=', $startbef_date)->whereDate('created_at', '<=', $endafter_date)->sum('amount');

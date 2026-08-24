@@ -61,7 +61,7 @@ class ProductController extends Controller
 
         if ($hasPermission) {
             $lims_category_list = Category::select('id', 'name')->where('is_active', true)->get();
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -492,7 +492,7 @@ class ProductController extends Controller
             $lims_tax_list = Tax::where('is_active', true)->get();
             $lims_product_data = Product::where('id', $id)->first();
             $lims_product_variant_data = $lims_product_data->variant()->orderBy('position')->get();
-            $lims_product_asocciated = DB::table('product_associated')
+            $lims_product_asocciated = \DB::table('product_associated')
                 ->select('products.id', 'products.code', 'products.name', 'products.price')
                 ->where('product_courtesy_id', $id)
                 ->join('products', 'product_associated.product_associated_id', '=', 'products.id')
@@ -541,7 +541,7 @@ class ProductController extends Controller
             'file' => 'nullable|image|mimes:jpeg,jpg,png,gif'
         ]);
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $data = $request->except('image', 'file');
             $lims_product_data = Product::findOrFail($request->input('id'));
             $data = $request->except('image', 'file');
@@ -663,10 +663,10 @@ class ProductController extends Controller
                     ]);
                 }
             }
-            DB::commit();
+            \DB::commit();
             \Session::flash('edit_message', 'Producto actualizado con éxito');
         } catch (Exception $e) {
-            DB::rollBack();
+            \DB::rollBack();
             log::error("error updating product: " . $e->getMessage());
             \Session::flash('not_permitted', 'Error al Editar Producto, Error: ' . $e->getMessage());
             return array('not_permitted' => 'Error al Editar Producto, Error: ' . $e->getMessage());
@@ -799,7 +799,7 @@ class ProductController extends Controller
         $lims_product_data = Product::select('id', 'is_variant')->find($id);
         if ($lims_product_data->is_variant) {
             $lims_product_variant_warehouse_data = Product_Warehouse::where('product_id', $lims_product_data->id)->orderBy('warehouse_id')->get();
-            $lims_product_warehouse_data = Product_Warehouse::select('warehouse_id', DB::raw('sum(qty) as qty'), DB::raw('sum(blocked_qty) as blocked_qty'))->where('product_id', $id)->groupBy('warehouse_id')->get();
+            $lims_product_warehouse_data = Product_Warehouse::select('warehouse_id', \DB::raw('sum(qty) as qty'), \DB::raw('sum(blocked_qty) as blocked_qty'))->where('product_id', $id)->groupBy('warehouse_id')->get();
             foreach ($lims_product_variant_warehouse_data as $key => $product_variant_warehouse_data) {
                 $lims_warehouse_data = Warehouse::find($product_variant_warehouse_data->warehouse_id);
                 $lims_variant_data = Variant::find($product_variant_warehouse_data->variant_id);
@@ -892,7 +892,7 @@ class ProductController extends Controller
             return redirect('products')->with('not_permitted', "Error al Importar Productos:  $error_message");
         }
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             Log::info("start product imported...");
 
             foreach ($sheet_data as $key => $val) {
@@ -1010,9 +1010,9 @@ class ProductController extends Controller
                 }
             }
             Log::info("end product imported successfully");
-            DB::commit();
+            \DB::commit();
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("Error Importacion Masiva de Productos => " . $th);
             $error_message = "Error: " . $th->getMessage();
             return redirect('products')->with('not_permitted', "Error al Importar Productos:  $error_message");
@@ -1298,7 +1298,7 @@ class ProductController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             Log::info("start product update import...");
             $subtotal = null;
             $contador_error = 0;
@@ -1355,9 +1355,9 @@ class ProductController extends Controller
                 }
             }
             Log::info("end product update import successfully");
-            DB::commit();
+            \DB::commit();
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("Error Importacion Masiva de Actualización de Productos => " . $th);
             $error_message = "Error: " . $th->getMessage();
             $result = array(

@@ -137,7 +137,7 @@ class SaleController extends Controller
             if ($has_permission) {
                 $all_permission = [];
                 if ($user && $user->role_id) {
-                    $all_permission = DB::table('permissions')
+                    $all_permission = \DB::table('permissions')
                         ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                         ->where('role_id', $user->role_id)
                         ->pluck('name')
@@ -566,7 +566,7 @@ class SaleController extends Controller
         $role = Role::find(Auth::user()->role_id);
 
         if ($role->hasPermissionTo('sales-add')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -719,7 +719,7 @@ class SaleController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $data = $request->all();
             $data['user_id'] = Auth::id();
             $data['date_sell'] = $dateSell->format('Y-m-d H:i:s');
@@ -889,7 +889,7 @@ class SaleController extends Controller
                                 $qtytotal = $qty[$i] * $qty_list[$key];
                                 $child_data->save();
                                 $child_warehouse_data->save();
-                                DB::table('record')->insert([
+                                \DB::table('record')->insert([
                                     'transaction_id' => $lims_sale_data->id,
                                     'warehouse_id' => $data['warehouse_id'],
                                     'product_id' => $child_id,
@@ -1477,7 +1477,7 @@ class SaleController extends Controller
                 $numberInWords = $numberTransformer->toWords($lims_sale_data->grand_total);
                 $is_preview_mode = true; // Indica que es vista previa, no debe auto-imprimir ni redirigir
                 $print_html = view('sale.invoice', compact('lims_sale_data', 'lims_product_sale_data', 'lims_biller_data', 'lims_warehouse_data', 'lims_customer_data', 'lims_payment_data', 'numberInWords', 'cadenaCentavos', 'is_preview_mode'))->render();
-                DB::commit();
+                \DB::commit();
                 return response()->json(['status' => true, 'sale_id' => $lims_sale_data->id, 'print_html' => $print_html, 'message' => $message]);
             }
 
@@ -1505,7 +1505,7 @@ class SaleController extends Controller
                     $fecha_hora_actual = new Carbon();
                     if ($nit_data != null) {
                         // Existe alguna coincidencia en la base de datos
-                        DB::table('customer_nit')
+                        \DB::table('customer_nit')
                             ->where('tipo_documento', $sales_tipo_doc)
                             ->where('valor_documento', $sales_val_doc)
                             ->update([
@@ -1516,7 +1516,7 @@ class SaleController extends Controller
                             ]);
                     } else {
 
-                        DB::table('customer_nit')->insert(
+                        \DB::table('customer_nit')->insert(
                             [
                                 'tipo_documento' => $sales_tipo_doc,
                                 'valor_documento' => $sales_val_doc,
@@ -1685,7 +1685,7 @@ class SaleController extends Controller
                 // En modo AJAX pero SIN factura SIAT: retornamos gen_invoice de Nota de Venta
                 if ($is_ajax && empty($data['bandera_factura_hidden'])) {
                     $update_p_venta->save();
-                    DB::commit();
+                    \DB::commit();
                     $print_url = url('sales/gen_invoice/' . $lims_sale_data->id);
                     $print_html = '<iframe src="' . $print_url . '" style="width:100%; height:500px; border:none;"></iframe>';
                     return response()->json([
@@ -1712,7 +1712,7 @@ class SaleController extends Controller
                         }
                         if ($respuesta['status']) {
                             $update_p_venta->save();
-                            DB::commit();
+                            \DB::commit();
                             $print_url = url('sales/imprimir_factura/' . $lims_sale_data->id);
                             if ($is_ajax) {
                                 $print_html = '<iframe src="' . $print_url . '" style="width:100%; height:500px; border:none;"></iframe>';
@@ -1726,7 +1726,7 @@ class SaleController extends Controller
                             }
                             return redirect($print_url)->with('message', $respuesta['mensaje']);
                         } else {
-                            DB::commit();
+                            \DB::commit();
                             $message .= " Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error SIAT') . ")";
                             return redirect('sales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
                         }
@@ -1762,7 +1762,7 @@ class SaleController extends Controller
                                 $update_p_venta->correlativo_factura = (int) $respuesta['nro_factura_central'] + 1;
                             }
                             $update_p_venta->save();
-                            DB::commit();
+                            \DB::commit();
 
                             $print_url = url('sales/imprimir_factura/' . $lims_sale_data->id);
                             if ($is_ajax) {
@@ -1777,14 +1777,14 @@ class SaleController extends Controller
                             }
                             return redirect($print_url)->with('message', $respuesta['mensaje']);
                         } else {
-                            DB::commit();
+                            \DB::commit();
                             $message .= " Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error SIAT') . ")";
                             return redirect('sales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
                         }
                     }
                 }
             }
-            DB::commit();
+            \DB::commit();
             // Respuesta AJAX para flujo no-SIAT
             if ($is_ajax) {
                 $print_url = url('sales/gen_invoice/' . $lims_sale_data->id);
@@ -1812,7 +1812,7 @@ class SaleController extends Controller
                 return redirect()->to('sales');
             }
         } catch (\Throwable $e) {
-            DB::rollback();
+            \DB::rollback();
 
             $error_message = 'Falló al registrar la venta';
 
@@ -1854,7 +1854,7 @@ class SaleController extends Controller
     public function finalizeAjax(Request $request)
     {
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
 
             $sale_id = $request->input('sale_id');
             Log::info('POS finalizeAjax: inicio de paso 3', [
@@ -1913,7 +1913,7 @@ class SaleController extends Controller
                 $nit_data = CustomerNit::where('tipo_documento', $tipo_documento_val)
                     ->where('valor_documento', $data['sales_valor_documento'] ?? '')->first();
                 if ($nit_data) {
-                    DB::table('customer_nit')
+                    \DB::table('customer_nit')
                         ->where('tipo_documento', $tipo_documento_val)
                         ->where('valor_documento', $data['sales_valor_documento'])
                         ->update([
@@ -1923,7 +1923,7 @@ class SaleController extends Controller
                             'updated_at'            => $fecha_hora_actual,
                         ]);
                 } else {
-                    DB::table('customer_nit')->insert([
+                    \DB::table('customer_nit')->insert([
                         'tipo_documento'        => $tipo_documento_val,
                         'valor_documento'       => $data['sales_valor_documento'] ?? '',
                         'complemento_documento' => $text_complemento_documento,
@@ -1964,7 +1964,7 @@ class SaleController extends Controller
             $biller_id_val = $data['biller_id'] ?? $lims_sale_data->biller_id;
             $data_biller   = Biller::find($biller_id_val);
             if (!$data_biller) {
-                DB::rollback();
+                \DB::rollback();
                 return response()->json(['status' => false, 'message' => 'Biller no encontrado (id: ' . $biller_id_val . ')']);
             }
             $data_p_venta = SiatPuntoVenta::where([
@@ -1981,7 +1981,7 @@ class SaleController extends Controller
             ]);
 
             if (!$data_p_venta) {
-                DB::rollback();
+                \DB::rollback();
                 return response()->json(['status' => false, 'message' => 'Punto de venta SIAT no encontrado para sucursal ' . $data_biller->sucursal]);
             }
             $update_p_venta = SiatPuntoVenta::where([
@@ -2070,7 +2070,7 @@ class SaleController extends Controller
             if (($data['codigo_emision_hidden'] ?? 0) == 3) {
                 // Modo masivo: no genera DFe en línea
                 $update_p_venta->save();
-                DB::commit();
+                \DB::commit();
                 return response()->json([
                     'status'    => true,
                     'sale_id'   => $sale_id,
@@ -2142,7 +2142,7 @@ class SaleController extends Controller
                     $update_p_venta->correlativo_factura = (int) $respuesta['nro_factura_central'] + 1;
                 }
                 $update_p_venta->save();
-                DB::commit();
+                \DB::commit();
                 return response()->json([
                     'status'    => true,
                     'sale_id'   => $sale_id,
@@ -2153,14 +2153,14 @@ class SaleController extends Controller
 
             // DFe falló: revertir CustomerSale pero mantener la venta
             $obj_cliente->delete();
-            DB::rollback();
+            \DB::rollback();
             return response()->json([
                 'status'  => false,
                 'message' => ($respuesta['mensaje'] ?? 'Error al generar la factura'),
             ]);
 
         } catch (\Throwable $e) {
-            DB::rollback();
+            \DB::rollback();
             \Log::error('POS finalizeAjax: excepción no controlada', [
                 'sale_id' => $request->input('sale_id'),
                 'message' => $e->getMessage(),
@@ -2905,7 +2905,7 @@ class SaleController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('sales-add')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -3051,7 +3051,7 @@ class SaleController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('sales-add')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -3196,7 +3196,7 @@ class SaleController extends Controller
     {
         $data = [];
         if (($category_id != 0) && ($brand_id != 0)) {
-            $lims_product_list = DB::table('products')
+            $lims_product_list = \DB::table('products')
                 ->join('categories', 'products.category_id', '=', 'categories.id')
                 ->where([
                     ['products.is_active', true],
@@ -3209,7 +3209,7 @@ class SaleController extends Controller
                         ['brand_id', $brand_id],
                     ])->select('products.name', 'products.code', 'products.image')->orderBy('products.name', 'asc')->get();
         } elseif (($category_id != 0) && ($brand_id == 0)) {
-            $lims_product_list = DB::table('products')
+            $lims_product_list = \DB::table('products')
                 ->join('categories', 'products.category_id', '=', 'categories.id')
                 ->where([
                     ['products.is_active', true],
@@ -5426,13 +5426,13 @@ class SaleController extends Controller
             $output = '';
             $query = $request->get('query');
             if ($query != '') {
-                $data = DB::table('customer_nit')
+                $data = \DB::table('customer_nit')
                     ->where('valor_documento', 'like', '%' . $query . '%')
                     ->orWhere('complemento_documento', 'like', '%' . $query . '%')
                     ->orderBy('valor_documento', 'desc')
                     ->get();
             } else {
-                $data = DB::table('customer_nit')
+                $data = \DB::table('customer_nit')
                     ->orderBy('valor_documento', 'desc')
                     ->get();
             }
@@ -5580,7 +5580,7 @@ class SaleController extends Controller
         $usuarios = User::select('id', 'name')->where('is_active', true)->get();
         $sucursales = SiatSucursal::where('estado', true)->get();
         if ($role->hasPermissionTo('sales-list-booksale')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')

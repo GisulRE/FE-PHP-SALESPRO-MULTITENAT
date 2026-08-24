@@ -51,7 +51,7 @@ class EmployeeController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('employees-index')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -377,7 +377,7 @@ class EmployeeController extends Controller
                 ];
             }
 
-            DB::transaction(function () use ($employee, $day, $normalized) {
+            \DB::transaction(function () use ($employee, $day, $normalized) {
                 EmployeeReservationSchedule::where('employee_id', $employee->id)
                     ->where('day_of_week', $day)
                     ->delete();
@@ -484,7 +484,7 @@ class EmployeeController extends Controller
             }
         }
 
-        DB::transaction(function () use ($employee, $normalized) {
+        \DB::transaction(function () use ($employee, $normalized) {
             EmployeeReservationSchedule::where('employee_id', $employee->id)->delete();
             if (!empty($normalized)) {
                 EmployeeReservationSchedule::insert($normalized);

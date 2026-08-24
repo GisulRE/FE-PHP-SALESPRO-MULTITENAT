@@ -21,13 +21,13 @@ class CompanyDataImportController extends Controller
 {
     protected function buildQueueOverview()
     {
-        $pendingByQueue = DB::table('jobs')
-            ->select('queue', DB::raw('COUNT(*) as total'), DB::raw('SUM(CASE WHEN attempts > 0 THEN 1 ELSE 0 END) as with_attempts'))
+        $pendingByQueue = \DB::table('jobs')
+            ->select('queue', \DB::raw('COUNT(*) as total'), \DB::raw('SUM(CASE WHEN attempts > 0 THEN 1 ELSE 0 END) as with_attempts'))
             ->groupBy('queue')
             ->orderBy('queue')
             ->get();
 
-        $pendingJobs = DB::table('jobs')
+        $pendingJobs = \DB::table('jobs')
             ->select('id', 'queue', 'attempts', 'created_at', 'available_at')
             ->orderBy('id', 'asc')
             ->limit(25)
@@ -35,8 +35,8 @@ class CompanyDataImportController extends Controller
 
         return [
             'default_driver' => config('queue.default'),
-            'pending_total' => (int) DB::table('jobs')->count(),
-            'failed_total' => (int) DB::table('failed_jobs')->count(),
+            'pending_total' => (int) \DB::table('jobs')->count(),
+            'failed_total' => (int) \DB::table('failed_jobs')->count(),
             'import_jobs' => [
                 'queued' => (int) ImportJob::where('status', 'queued')->count(),
                 'running' => (int) ImportJob::where('status', 'running')->count(),
@@ -477,7 +477,7 @@ class CompanyDataImportController extends Controller
 
         $queuedDeleted = 0;
         if ($mode === 'hard') {
-            $queuedDeleted = DB::table('jobs')
+            $queuedDeleted = \DB::table('jobs')
                 ->where('queue', 'imports')
                 ->where('payload', 'like', '%importJobId";i:'.$importJob->id.';%')
                 ->delete();

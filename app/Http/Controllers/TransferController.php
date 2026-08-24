@@ -27,7 +27,7 @@ class TransferController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('transfers-index')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -187,7 +187,7 @@ class TransferController extends Controller
                     return redirect()->back()->with('not_permitted', 'No puedes crear transferencias desde otros almacenes.');
                 }
             }
-            DB::beginTransaction();
+            \DB::beginTransaction();
 
             $data = $request->except('document');
             $data['user_id'] = Auth::id();
@@ -333,7 +333,7 @@ class TransferController extends Controller
                 ]);
             }
 
-            DB::commit();
+            \DB::commit();
 
             $originWarehouse = $lims_transfer_data->fromWarehouse;
             $destinationWarehouse = $lims_transfer_data->toWarehouse;
@@ -358,7 +358,7 @@ class TransferController extends Controller
 
             return redirect('transfers')->with('message', 'Transferencia creada con éxito');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("error save transfer: " . $th->getMessage());
             return redirect('transfers')->with('not_permitted', 'Fallo al crear Transferencia.');
         }
@@ -390,7 +390,7 @@ class TransferController extends Controller
 
         if ($role->hasPermissionTo('transfers-index')) {
 
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -431,7 +431,7 @@ class TransferController extends Controller
         $all_permission = [];
 
         if ($role->hasPermissionTo('transfers-index')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -468,7 +468,7 @@ class TransferController extends Controller
                 }
             }
 
-            DB::beginTransaction();
+            \DB::beginTransaction();
 
             $transfer->status = 1;
             $transfer->save();
@@ -520,11 +520,11 @@ class TransferController extends Controller
                 ]);
             }
 
-            DB::commit();
+            \DB::commit();
             return redirect()->back()->with('message', "Transferencia aprobada correctamente por {$user->name}.");
 
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("Error aprobar transferencia: " . $th->getMessage());
             return redirect()->back()->with('not_permitted', 'Error al aprobar la transferencia.');
         }
@@ -553,7 +553,7 @@ class TransferController extends Controller
                 }
             }
 
-            DB::beginTransaction();
+            \DB::beginTransaction();
 
             $transfer->status = 4;
             $transfer->save();
@@ -590,11 +590,11 @@ class TransferController extends Controller
                 }
             }
 
-            DB::commit();
+            \DB::commit();
             return redirect()->back()->with('message', "Transferencia rechazada correctamente por {$user->name}.");
 
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("Error rechazar transferencia: " . $th->getMessage());
             return redirect()->back()->with('not_permitted', 'Error al rechazar la transferencia.');
         }
@@ -696,7 +696,7 @@ class TransferController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
 
             $lims_transfer_data = Transfer::create($data);
 
@@ -771,10 +771,10 @@ class TransferController extends Controller
             $lims_transfer_data->grand_total = $lims_transfer_data->total_cost + $lims_transfer_data->shipping_cost;
             $lims_transfer_data->save();
 
-            DB::commit();
+            \DB::commit();
             return redirect('transfers')->with('message', 'Transferencia importada con éxito');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("Error importar transferencia CSV: " . $th->getMessage());
             return redirect()->back()->with('not_permitted', 'Error al importar: ' . $th->getMessage());
         }
@@ -795,7 +795,7 @@ class TransferController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $data = $request->except('document');
             //return dd($data);
             $document = $request->document;
@@ -950,12 +950,12 @@ class TransferController extends Controller
                     ProductTransfer::create($product_transfer);
             }
             $lims_transfer_data->update($data);
-            DB::commit();
+            \DB::commit();
             Log::info("Transfer updated successfully");
 
             return redirect('transfers')->with('message', 'Transferencia Actualizado con éxito');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("error update transfer: " . $th->getMessage());
             Log::error("error transfer: " . $th);
             return redirect('transfers')->with('not_permitted', 'Fallo al actualizar Transferencia, Intente de nuevo!');
@@ -965,7 +965,7 @@ class TransferController extends Controller
     public function deleteBySelection(Request $request)
     {
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $transfer_id = $request['transferIdArray'];
             foreach ($transfer_id as $id) {
                 $lims_transfer_data = Transfer::find($id);
@@ -1008,11 +1008,11 @@ class TransferController extends Controller
                 }
                 $lims_transfer_data->delete();
             }
-            DB::commit();
+            \DB::commit();
             Log::info("Transfers deleted successfully");
             return 'Transferencias eliminados con éxito!';
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("error delete transfer: " . $th->getMessage());
             return 'Fallo al eliminar Transferencias, Intente de nuevo!';
         }
@@ -1021,7 +1021,7 @@ class TransferController extends Controller
     public function destroy($id)
     {
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $lims_transfer_data = Transfer::find($id);
             $lims_product_transfer_data = ProductTransfer::where('transfer_id', $id)->get();
             foreach ($lims_product_transfer_data as $product_transfer_data) {
@@ -1061,11 +1061,11 @@ class TransferController extends Controller
                 $product_transfer_data->delete();
             }
             $lims_transfer_data->delete();
-            DB::commit();
+            \DB::commit();
             Log::info("Transfer deleted successfully");
             return redirect('transfers')->with('not_permitted', 'Transferencia eliminado con éxito');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("error delete transfer: " . $th->getMessage());
             return redirect('transfers')->with('not_permitted', 'Fallo al eliminar Transferencia, Intente de nuevo!');
         }

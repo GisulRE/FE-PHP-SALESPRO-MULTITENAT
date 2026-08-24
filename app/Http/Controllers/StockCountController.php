@@ -23,7 +23,7 @@ class StockCountController extends Controller
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_brand_list = Brand::where('is_active', true)->get();
             $lims_category_list = Category::where('is_active', true)->get();
-            $general_setting = DB::table('general_settings')
+            $general_setting = \DB::table('general_settings')
                 ->where('company_id', Auth::user()->company_id)
                 ->latest()
                 ->first();
@@ -43,7 +43,7 @@ class StockCountController extends Controller
     {
         $data = $request->all();
         if( isset($data['brand_id']) && isset($data['category_id']) ){
-            $lims_product_list = DB::table('products')->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
+            $lims_product_list = \DB::table('products')->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
             ->whereIn('products.category_id', $data['category_id'] )->whereIn('products.brand_id', $data['brand_id'] )
             ->where([ ['products.is_active', true], ['product_warehouse.warehouse_id', $data['warehouse_id']] ])->select('products.id', 'products.name', 'products.code', 'product_warehouse.qty', 'product_warehouse.variant_id')->get();
 
@@ -51,21 +51,21 @@ class StockCountController extends Controller
             $data['brand_id'] = implode(",", $data['brand_id']);
         }
         elseif( isset($data['category_id']) ){
-            $lims_product_list = DB::table('products')->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
+            $lims_product_list = \DB::table('products')->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
             ->whereIn('products.category_id', $data['category_id'])->where([ ['products.is_active', true], ['product_warehouse.warehouse_id', $data['warehouse_id']] ])
             ->select('products.id', 'products.name', 'products.code', 'product_warehouse.qty', 'product_warehouse.variant_id')->get();
 
             $data['category_id'] = implode(",", $data['category_id']);
         }
         elseif( isset($data['brand_id']) ){
-            $lims_product_list = DB::table('products')->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
+            $lims_product_list = \DB::table('products')->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
             ->whereIn('products.brand_id', $data['brand_id'])->where([ ['products.is_active', true], ['product_warehouse.warehouse_id', $data['warehouse_id']] ])
             ->select('products.id', 'products.name', 'products.code', 'product_warehouse.qty', 'product_warehouse.variant_id')->get();
 
             $data['brand_id'] = implode(",", $data['brand_id']);
         }
         else{
-            $lims_product_list = DB::table('products')->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
+            $lims_product_list = \DB::table('products')->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
             ->where([ ['products.is_active', true], ['product_warehouse.warehouse_id', $data['warehouse_id']] ])
             ->select('products.id', 'products.name', 'products.code', 'product_warehouse.qty', 'product_warehouse.variant_id')->get();
         }

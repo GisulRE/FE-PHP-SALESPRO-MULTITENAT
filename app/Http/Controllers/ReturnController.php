@@ -41,7 +41,7 @@ class ReturnController extends Controller
         $sucursales = SiatSucursal::where('estado', true)->get();
         $lims_motivos = SiatParametricaVario::select('id', 'codigo_clasificador', 'descripcion')->where('tipo_clasificador', 'motivoAnulacion')->get();
         if ($role->hasPermissionTo('returns-index')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -244,7 +244,7 @@ class ReturnController extends Controller
     {
         $data = $request->except('document');
         try {
-            DB::beginTransaction();
+            \DB::beginTransaction();
             $data['reference_no'] = 'NCD-' . date("Ymd") . '-' . date("his");
             $data['user_id'] = Auth::id();
             $lims_account_data = Account::where('is_default', true)->first();
@@ -392,7 +392,7 @@ class ReturnController extends Controller
                     $list_return[] = $item_return;
                 }
             }
-            DB::commit();
+            \DB::commit();
             $message = 'Retorno de Venta creado con éxito';
             if (isset($data['cuf'])) {
                 $factura['nombreRazonSocial'] = $data['nombreRazonSocial'];
@@ -421,7 +421,7 @@ class ReturnController extends Controller
             }
             return redirect('return-sale')->with('message', $message);
         } catch (\Exception $e) {
-            DB::rollBack();
+            \DB::rollBack();
             Log::error("Error Retorno Venta => " . $e->getMessage());
             $message = 'Error: ' . $e->getMessage();
             return redirect('return-sale')->with('not_permitted', $message);
@@ -905,7 +905,7 @@ class ReturnController extends Controller
         $sucursalCode = (int) $sucursal;
         $companyId = Auth::user()->company_id ?? null;
 
-        $query = DB::table('puntos_venta')
+        $query = \DB::table('puntos_venta')
             ->select('codigo_punto_venta', 'nombre_punto_venta')
             ->where('sucursal', $sucursalCode)
             ->whereNull('deleted_at')

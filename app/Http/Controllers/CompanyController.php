@@ -17,7 +17,7 @@ class CompanyController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('users-index')) {
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -115,7 +115,7 @@ class CompanyController extends Controller
     {
         $adminUserData = null;
 
-        DB::transaction(function () use ($company, &$adminUserData) {
+        \DB::transaction(function () use ($company, &$adminUserData) {
             $adminUserData = $this->createCompanyAdminUser($company);
             $accountId = $this->createDefaultAccount($company);
             $this->createSecondaryAccount($company);
@@ -192,7 +192,7 @@ class CompanyController extends Controller
             return null;
         }
 
-        $exists = DB::table('accounts')
+        $exists = \DB::table('accounts')
             ->where('company_id', $company->id)
             ->where('name', 'Caja Principal')
             ->first();
@@ -222,7 +222,7 @@ class CompanyController extends Controller
             $data['company_id'] = $company->id;
         }
 
-        return DB::table('accounts')->insertGetId($data);
+        return \DB::table('accounts')->insertGetId($data);
     }
 
     private function createSecondaryAccount(Company $company): ?int
@@ -231,7 +231,7 @@ class CompanyController extends Controller
             return null;
         }
 
-        $exists = DB::table('accounts')
+        $exists = \DB::table('accounts')
             ->where('company_id', $company->id)
             ->where('name', 'Banco Principal')
             ->first();
@@ -261,7 +261,7 @@ class CompanyController extends Controller
             $data['company_id'] = $company->id;
         }
 
-        return DB::table('accounts')->insertGetId($data);
+        return \DB::table('accounts')->insertGetId($data);
     }
 
     private function createDefaultWarehouse(Company $company, ?int $sucursalId = null, int $sucursalCode = 0): ?int
@@ -270,7 +270,7 @@ class CompanyController extends Controller
             return null;
         }
 
-        $exists = DB::table('warehouses')
+        $exists = \DB::table('warehouses')
             ->where('company_id', $company->id)
             ->where('name', 'Almacen Principal')
             ->first();
@@ -285,7 +285,7 @@ class CompanyController extends Controller
             }
 
             if (count($warehouseUpdate) > 1) {
-                DB::table('warehouses')
+                \DB::table('warehouses')
                     ->where('id', $exists->id)
                     ->update($warehouseUpdate);
             }
@@ -311,7 +311,7 @@ class CompanyController extends Controller
             $warehouseInsert['sucursal_siat'] = (string) $sucursalCode;
         }
 
-        return DB::table('warehouses')->insertGetId($warehouseInsert);
+        return \DB::table('warehouses')->insertGetId($warehouseInsert);
     }
 
     private function findSucursalIdByCode(Company $company, int $sucursalCode = 0): ?int
@@ -320,7 +320,7 @@ class CompanyController extends Controller
             return null;
         }
 
-        $query = DB::table('sucursal_siat')->where('sucursal', (string) $sucursalCode);
+        $query = \DB::table('sucursal_siat')->where('sucursal', (string) $sucursalCode);
 
         if (Schema::hasColumn('sucursal_siat', 'company_id')) {
             $query->where('company_id', $company->id);
@@ -337,7 +337,7 @@ class CompanyController extends Controller
             return null;
         }
 
-        $exists = DB::table('customers')
+        $exists = \DB::table('customers')
             ->where('company_id', $company->id)
             ->where('name', 'Cliente General')
             ->first();
@@ -348,7 +348,7 @@ class CompanyController extends Controller
 
         $groupId = 1;
         if (Schema::hasTable('customer_groups')) {
-            $group = DB::table('customer_groups')->orderBy('id')->first();
+            $group = \DB::table('customer_groups')->orderBy('id')->first();
             if ($group) {
                 $groupId = $group->id;
             }
@@ -395,7 +395,7 @@ class CompanyController extends Controller
             $data['company_id'] = $company->id;
         }
 
-        return DB::table('customers')->insertGetId($data);
+        return \DB::table('customers')->insertGetId($data);
     }
 
     private function createDefaultSupplier(Company $company): ?int
@@ -404,7 +404,7 @@ class CompanyController extends Controller
             return null;
         }
 
-        $exists = DB::table('suppliers')
+        $exists = \DB::table('suppliers')
             ->where('company_id', $company->id)
             ->where('name', 'Proveedor General')
             ->first();
@@ -434,7 +434,7 @@ class CompanyController extends Controller
             $data['company_id'] = $company->id;
         }
 
-        return DB::table('suppliers')->insertGetId($data);
+        return \DB::table('suppliers')->insertGetId($data);
     }
 
     private function createDefaultSucursal(Company $company, ?int $userId): int
@@ -443,7 +443,7 @@ class CompanyController extends Controller
             return 0;
         }
 
-        $existingSucursal = DB::table('sucursal_siat')
+        $existingSucursal = \DB::table('sucursal_siat')
             ->where('id_empresa', $company->id)
             ->where('sucursal', '0')
             ->first();
@@ -473,7 +473,7 @@ class CompanyController extends Controller
             $insertSucursal['company_id'] = $company->id;
         }
 
-        DB::table('sucursal_siat')->insert($insertSucursal);
+        \DB::table('sucursal_siat')->insert($insertSucursal);
 
         return 0;
     }
@@ -488,7 +488,7 @@ class CompanyController extends Controller
             return;
         }
 
-        $sucursalExists = DB::table('sucursal_siat')
+        $sucursalExists = \DB::table('sucursal_siat')
             ->where('id_empresa', $company->id)
             ->where('sucursal', (string) $sucursalCode)
             ->exists();
@@ -497,7 +497,7 @@ class CompanyController extends Controller
             $sucursalCode = $this->createDefaultSucursal($company, $userId);
         }
 
-        $exists = DB::table('puntos_venta')
+        $exists = \DB::table('puntos_venta')
             ->where('id_empresa', $company->id)
             ->where('sucursal', $sucursalCode)
             ->where('codigo_punto_venta', '0')
@@ -536,7 +536,7 @@ class CompanyController extends Controller
             $insertPuntoVenta['company_id'] = $company->id;
         }
 
-        DB::table('puntos_venta')->insert($insertPuntoVenta);
+        \DB::table('puntos_venta')->insert($insertPuntoVenta);
     }
 
     private function createDefaultBiller(Company $company, ?int $accountId, ?int $warehouseId, ?int $customerId): void
@@ -546,7 +546,7 @@ class CompanyController extends Controller
         }
 
         $billerName = 'Facturador ' . $company->name;
-        $exists = DB::table('billers')
+        $exists = \DB::table('billers')
             ->where('company_id', $company->id)
             ->where('name', $billerName)
             ->exists();
@@ -559,7 +559,7 @@ class CompanyController extends Controller
             return;
         }
 
-        DB::table('billers')->insert([
+        \DB::table('billers')->insert([
             'name' => $billerName,
             'company_name' => $company->name,
             'vat_number' => null,

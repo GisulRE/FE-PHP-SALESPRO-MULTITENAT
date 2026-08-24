@@ -28,7 +28,7 @@ class ReturnPurchaseController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('purchase-return-index')){
-            $all_permission = DB::table('permissions')
+            $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', Auth::user()->role_id)
                 ->pluck('name')
@@ -61,7 +61,7 @@ class ReturnPurchaseController extends Controller
 
     public function getProduct($id)
     {
-        $lims_product_warehouse_data = DB::table('products')
+        $lims_product_warehouse_data = \DB::table('products')
             ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
             ->select('products.code', 'products.name', 'products.type', 'product_warehouse.qty')
             ->where([
@@ -71,7 +71,7 @@ class ReturnPurchaseController extends Controller
             ->whereNull('product_warehouse.variant_id')
             ->get();
 
-        $lims_product_with_variant_warehouse_data = DB::table('products')
+        $lims_product_with_variant_warehouse_data = \DB::table('products')
             ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
             ->select('products.id', 'products.code', 'products.name', 'products.type', 'product_warehouse.qty', 'product_warehouse.variant_id')
             ->where([
