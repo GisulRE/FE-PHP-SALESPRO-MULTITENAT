@@ -128,14 +128,17 @@ class SaleController extends Controller
         $start_date = date('Y-m-d', strtotime(' -7 day'));
         $end_date = date('Y-m-d');
         $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('sales-index')) {
-            $permissions = Role::findByName($role->name)->permissions;
-            foreach ($permissions as $permission) {
-                $all_permission[] = $permission->name;
-            }
+        $is_admin = Auth::user()->role_id <= 2 || ($role && in_array(strtolower($role->name), ['admin', 'superadmin', 'administrador', 'owner']));
+        if ($is_admin || ($role && $role->hasPermissionTo('sales-index'))) {
+            $all_permission = DB::table('permissions')
+                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                ->where('role_id', Auth::user()->role_id)
+                ->pluck('name')
+                ->toArray();
 
             if (empty($all_permission)) {
-                $all_permission[] = 'dummy text';
+                $all_permission[] = 'sales-index';
+                $all_permission[] = 'sales-add';
             }
 
             $lims_gift_card_list = GiftCard::where("is_active", true)->get();
