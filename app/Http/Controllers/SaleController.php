@@ -184,6 +184,10 @@ class SaleController extends Controller
         }
         $end_date_full = $end_date . " 23:59:59";
 
+        $req_permissions = is_array($request->input('all_permission')) 
+            ? $request->input('all_permission') 
+            : (is_array(session('permissions')) ? session('permissions') : ['sales-index', 'sales-add', 'sales-edit', 'sales-delete']);
+
         $columns = array(
             1 => 'created_at',
             2 => 'reference_no',
@@ -401,7 +405,7 @@ class SaleController extends Controller
                                 <li>
                                     <button type="button" class="btn btn-link view"><i class="fa fa-eye"></i> ' . trans('file.View') . '</button>
                                 </li>';
-                if (in_array("sales-edit", $request['all_permission']) && $venta_facturada == null) {
+                if (in_array("sales-edit", $req_permissions) && $venta_facturada == null) {
                     if ($sale->sale_status != 3) {
                         $nestedData['options'] .= '<li>
                             <a href="' . route('sales.edit', $sale->id) . '" class="btn btn-link"><i class="dripicons-document-edit"></i> ' . trans('file.edit') . '</a>
@@ -450,7 +454,7 @@ class SaleController extends Controller
                         </li>';
                     }
 
-                    if (in_array("sales-delete", $request['all_permission']) && ($venta_facturada->estado_factura == 'VIGENTE' || $venta_facturada->estado_factura == 'FACTURADA')) {
+                    if (in_array("sales-delete", $req_permissions) && ($venta_facturada->estado_factura == 'VIGENTE' || $venta_facturada->estado_factura == 'FACTURADA')) {
                         // Vigente: mostrar botón anular
                         $nestedData['options'] .=
                             '<li>
@@ -463,7 +467,7 @@ class SaleController extends Controller
                             </ul>
                         </div>';
                 } else {
-                    if (in_array("sales-delete", $request['all_permission'])) {
+                    if (in_array("sales-delete", $req_permissions)) {
                         $nestedData['options'] .= \Form::open(["route" => ["sales.destroy", $sale->id], "method" => "DELETE"]) . '
                                     <li>
                                         <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' . trans("file.delete") . '</button>
