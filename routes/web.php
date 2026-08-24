@@ -15,19 +15,66 @@
 Auth::routes();
 Route::get('/check-error-log', function () {
     header('Content-Type: text/plain; charset=utf-8');
-    echo "=== LARAVEL LOG (Ultimas 60 lineas) ===\n\n";
-    $logPath = storage_path('logs/laravel.log');
-    if (file_exists($logPath)) {
-        $lines = file($logPath);
-        $lastLines = array_slice($lines, -60);
+    echo "=== ARCHIVOS DE LOG EN storage/logs ===\n";
+    $logFiles = glob(storage_path('logs/*.log'));
+    if (!empty($logFiles)) {
+        rsort($logFiles);
+        foreach ($logFiles as $lf) {
+            echo "-> " . basename($lf) . " (" . round(filesize($lf) / 1024, 2) . " KB)\n";
+        }
+        
+        $latestLog = $logFiles[0];
+        echo "\n=== ULTIMAS 100 LINEAS DE " . basename($latestLog) . " ===\n\n";
+        $lines = file($latestLog);
+        $lastLines = array_slice($lines, -100);
         echo implode("", $lastLines);
     } else {
-        echo "No existe storage/logs/laravel.log\n";
+        echo "No se encontraron archivos .log en storage/logs/\n";
     }
-    echo "\n\n=== PHP & MEMORY ===\n";
+
+    echo "\n\n=== PRUEBA DE CONEXION Y TABLA SALES ===\n";
+    try {
+        $driver = \DB::getDriverName();
+        $count = \DB::table('sales')->count();
+        $first = \DB::table('sales')->latest()->first();
+        echo "Motor BD: {$driver}\n";
+        echo "Total registros en tabla 'sales': {$count}\n";
+        if ($first) {
+            echo "Ultimo registro id: {$first->id} | reference: {$first->reference_no}\n";
+        }
+    } catch (\Throwable $e) {
+        echo "ERROR EN CONSULTA DB SALES: " . $e->getMessage() . "\n";
+    }
+
+    echo "\n\n=== PHP & MEMORIA ===\n";
     echo "PHP Version: " . phpversion() . "\n";
     echo "Memory limit: " . ini_get('memory_limit') . "\n";
     echo "Permission cache store: " . config('permission.cache.store') . "\n";
+    exit;
+});
+
+Route::get('/debug-sale-data', function () {
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "=== TEST DIRECTO DE SaleController@saleData ===\n\n";
+    try {
+        $controller = app(\App\Http\Controllers\SaleController::class);
+        $request = \Illuminate\Http\Request::create('/sales/sale-data', 'POST', [
+            'start_date' => date('Y-m-d', strtotime('-30 day')),
+            'end_date' => date('Y-m-d'),
+            'length' => 10,
+            'start' => 0,
+            'draw' => 1
+        ]);
+        $response = $controller->saleData($request);
+        echo "HTTP Status: " . $response->getStatusCode() . "\n";
+        echo "Respuesta Content:\n" . substr($response->getContent(), 0, 1000) . "\n...";
+    } catch (\Throwable $e) {
+        echo "EXCEPCION CAPTURADA:\n";
+        echo "Tipo: " . get_class($e) . "\n";
+        echo "Mensaje: " . $e->getMessage() . "\n";
+        echo "Archivo: " . $e->getFile() . ":" . $e->getLine() . "\n\n";
+        echo "Trace:\n" . $e->getTraceAsString() . "\n";
+    }
     exit;
 });
 
