@@ -124,28 +124,34 @@ class SaleController extends Controller
 
     public function index()
     {
-        ini_set('memory_limit', '512M');
+        @ini_set('memory_limit', '512M');
         $start_date = date('Y-m-d', strtotime(' -7 day'));
         $end_date = date('Y-m-d');
-        $role = Role::find(Auth::user()->role_id);
-        $is_admin = Auth::user()->role_id <= 2 || ($role && in_array(strtolower($role->name), ['admin', 'superadmin', 'administrador', 'owner']));
-        if ($is_admin || ($role && $role->hasPermissionTo('sales-index'))) {
-            $all_permission = DB::table('permissions')
-                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                ->where('role_id', Auth::user()->role_id)
-                ->pluck('name')
-                ->toArray();
+
+        $user = Auth::user();
+        $role = $user ? Role::find($user->role_id) : null;
+        $is_admin = $user && ($user->role_id <= 2 || ($role && in_array(strtolower($role->name), ['admin', 'superadmin', 'administrador', 'owner'])));
+        $has_permission = $is_admin || ($role && method_exists($role, 'hasPermissionTo') && $role->hasPermissionTo('sales-index'));
+
+        if ($has_permission) {
+            $all_permission = [];
+            if ($user && $user->role_id) {
+                $all_permission = DB::table('permissions')
+                    ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                    ->where('role_id', $user->role_id)
+                    ->pluck('permissions.name')
+                    ->toArray();
+            }
 
             if (empty($all_permission)) {
-                $all_permission[] = 'sales-index';
-                $all_permission[] = 'sales-add';
+                $all_permission = ['sales-index', 'sales-add'];
             }
 
             $lims_gift_card_list = GiftCard::where("is_active", true)->get();
             $lims_pos_setting_data = PosSetting::latest()->first();
             $lims_account_list = Account::where('is_active', true)->get();
             $lims_methodpay_list = MethodPayment::where('name', '!=', 'Guardar Mas Tarde')->get();
-            $lista_documentos = SiatParametricaVario::select('id', 'codigo_clasificador', 'descripcion')->where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
+            $lista_documentos = SiatParametricaVario::where('tipo_clasificador', 'tipoDocumentoIdentidad')->get();
 
             return view('sale.index', compact('lims_gift_card_list', 'lims_pos_setting_data', 'lims_account_list', 'all_permission', 'start_date', 'end_date', 'lims_methodpay_list', 'lista_documentos'));
         } else {
