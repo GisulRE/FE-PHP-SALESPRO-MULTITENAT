@@ -1,19 +1,34 @@
 @php
     $permissions = session('permissions');
-    if ((empty($permissions) || !is_array($permissions)) && Auth::check()) {
-        $p_list = \DB::table('permissions')
-            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-            ->where('role_id', Auth::user()->role_id)
-            ->pluck('name')
-            ->toArray();
-        $permissions = $p_list;
-        session()->put('permissions', $permissions);
+    $user = Auth::user();
+    $is_admin = false;
+
+    if ($user) {
+        $user_role = \App\Roles::find($user->role_id);
+        if ($user->role_id <= 2 || ($user_role && in_array(strtolower($user_role->name), ['admin', 'superadmin', 'administrador', 'owner']))) {
+            $is_admin = true;
+        }
     }
-    $permissions = is_array($permissions) ? $permissions : [];
-    $role = \App\Roles::find(Auth::user()->role_id);
-    $blocked_modules = [];
-    if ($role && $role->blocked_modules) {
-        $blocked_modules = json_decode($role->blocked_modules, true) ?? [];
+
+    if ($is_admin) {
+        $permissions = \DB::table('permissions')->pluck('name')->toArray();
+        $blocked_modules = [];
+    } else {
+        if ((empty($permissions) || !is_array($permissions)) && Auth::check()) {
+            $p_list = \DB::table('permissions')
+                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                ->where('role_id', Auth::user()->role_id)
+                ->pluck('name')
+                ->toArray();
+            $permissions = $p_list;
+            session()->put('permissions', $permissions);
+        }
+        $permissions = is_array($permissions) ? $permissions : [];
+        $role = \App\Roles::find(Auth::user()->role_id);
+        $blocked_modules = [];
+        if ($role && $role->blocked_modules) {
+            $blocked_modules = json_decode($role->blocked_modules, true) ?? [];
+        }
     }
 @endphp
 
