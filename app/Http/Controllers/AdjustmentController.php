@@ -20,31 +20,29 @@ class AdjustmentController extends Controller
 {
     public function index()
     {
-        $role = Role::find(Auth::user()->role_id);
-        if ($role->hasPermissionTo('adjustment')) {
-            $all_permission = \DB::table('permissions')
-                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                ->where('role_id', Auth::user()->role_id)
-                ->pluck('name')
-                ->toArray();
-            if (empty($all_permission))
-                $all_permission[] = 'dummy text';
+        $user = Auth::user();
+        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $hasPermission = ($user && $user->role_id <= 2) || in_array('adjustment', $permissions);
 
-            if (Auth::user()->role_id > 2)
-                $lims_adjustment_all = Adjustment::orderBy('id', 'desc')->where('user_id', Auth::id())->get();
-            else
-                $lims_adjustment_all = Adjustment::orderBy('id', 'desc')->get();
+        if ($hasPermission) {
+            $all_permission = !empty($permissions) ? $permissions : ['adjustment', 'qty_adjustment-add', 'qty_adjustment-edit', 'qty_adjustment-delete'];
+
+            $lims_adjustment_all = Adjustment::orderBy('id', 'desc')->get();
 
             $warehouses = \DB::table('warehouses')->pluck('name', 'id')->toArray();
+            $adjustmentIds = $lims_adjustment_all->pluck('id')->toArray();
+
             $product_adjustments = \DB::table('product_adjustments')
                 ->leftJoin('products', 'product_adjustments.product_id', '=', 'products.id')
                 ->select('product_adjustments.adjustment_id', 'products.code as adjustment_code', 'products.name as product_name', 'products.is_variant')
+                ->whereIn('product_adjustments.adjustment_id', $adjustmentIds)
                 ->get()
                 ->groupBy('adjustment_id');
 
             return view('adjustment.index', compact('lims_adjustment_all', 'all_permission', 'warehouses', 'product_adjustments'));
-        } else
+        } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
     }
 
     public function getProduct($id)
