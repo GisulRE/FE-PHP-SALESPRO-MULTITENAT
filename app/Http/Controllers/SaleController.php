@@ -469,12 +469,14 @@ class SaleController extends Controller
                         </div>';
                 } else {
                     if (in_array("sales-delete", $req_permissions)) {
-                        $nestedData['options'] .= \Form::open(["route" => ["sales.destroy", $sale->id], "method" => "DELETE"]) . '
+                        $nestedData['options'] .= '<form action="' . route('sales.destroy', $sale->id) . '" method="POST" style="display:inline">' . csrf_field() . method_field('DELETE') . '
                                     <li>
                                         <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' . trans("file.delete") . '</button>
-                                    </li>' . \Form::close() . '
+                                    </li></form>
                                 </ul>
                             </div>';
+                    } else {
+                        $nestedData['options'] .= '</ul></div>';
                     }
                 }
                 //////////////////////////////////////
