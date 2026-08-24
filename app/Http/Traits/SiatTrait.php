@@ -64,67 +64,56 @@ trait SiatTrait
 
     public function getToken()
     {
-        $pos_setting = PosSetting::latest()->first();
+        $company_id = Session::get('login_company_id') ?? (auth()->check() ? auth()->user()->company_id : null);
+        
+        if ($company_id && \Illuminate\Support\Facades\Cache::has('siat_token_' . $company_id)) {
+            $cachedToken = \Illuminate\Support\Facades\Cache::get('siat_token_' . $company_id);
+            Session::put('auth_siat', true);
+            Session::put('token_siat', $cachedToken);
+            return;
+        }
+
+        $pos_setting = $company_id 
+            ? PosSetting::where('company_id', $company_id)->first() 
+            : null;
+        if (!$pos_setting) {
+            $pos_setting = PosSetting::latest()->first();
+        }
 
         $user_siat = optional($pos_setting)->user_siat ?? '';
         $pass_siat = optional($pos_setting)->pass_siat ?? '';
         $url_siat = optional($pos_setting)->url_siat ?? '';
 
-        Log::info('[getToken] Inicio obtención de token SIAT', [
-            'url_siat'   => $url_siat ?: 'NO CONFIGURADA',
-            'user_siat'  => $user_siat ?: 'NO CONFIGURADO',
-            'pass_siat'  => $pass_siat ? 'configurada (' . strlen($pass_siat) . ' chars)' : 'NO CONFIGURADA',
-        ]);
-
         if (!$user_siat || !$pass_siat || !$url_siat) {
-            Log::error('[getToken] Credenciales SIAT incompletas en PosSetting — no se puede generar token', [
-                'user_siat_vacio' => empty($user_siat),
-                'pass_siat_vacio' => empty($pass_siat),
-                'url_siat_vacio'  => empty($url_siat),
-            ]);
             Session::put('auth_siat', false);
             return;
         }
 
         $url_token = $url_siat . '/TokenRest/v1/token';
-        Log::info('[getToken] Llamando endpoint de token', ['url' => $url_token]);
 
         try {
-            $response = Http::timeout(3)->post($url_token, [
+            $response = Http::timeout(2)->post($url_token, [
                 'dataPassword' => $pass_siat,
                 'dataUser' => $user_siat,
             ]);
         } catch (\Throwable $th) {
-            Log::warning('[getToken] Excepción de conexión al obtener token SIAT', [
-                'url'     => $url_token,
-                'error'   => $th->getMessage(),
-                'file'    => $th->getFile(),
-                'line'    => $th->getLine(),
-            ]);
             Session::put('auth_siat', false);
             return;
         }
 
         $http_status = $response->status();
-        Log::info('[getToken] HTTP status: ' . $http_status);
 
         Session::put('auth_siat', true);
-        //entre 200 y 299
         if ($response->successful()) {
             $token_siat = $response->json();
             if (empty($token_siat['token'])) {
-                Log::error('[getToken] Respuesta 200 pero sin campo "token" en la respuesta', ['body' => $token_siat]);
                 Session::put('auth_siat', false);
                 return;
             }
             Session::put('token_siat', $token_siat['token']);
-            Log::info('[getToken] Token SIAT obtenido correctamente', [
-                'token_length' => strlen($token_siat['token']),
-            ]);
-            $this->writeSiatDebug('TOKEN_GENERATED', [
-                'url' => $url_siat,
-                'has_token' => !empty($token_siat['token']),
-            ]);
+            if ($company_id) {
+                \Illuminate\Support\Facades\Cache::put('siat_token_' . $company_id, $token_siat['token'], now()->addMinutes(60));
+            }
             return;
         }
         //error >500

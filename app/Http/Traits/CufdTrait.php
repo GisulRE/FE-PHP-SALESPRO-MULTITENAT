@@ -257,23 +257,31 @@ trait CufdTrait
     // función/tarea para renovar los CUFD de los puntos de venta
     public function tareaRenovarCufd()
     {
-        $items = SiatPuntoVenta::where("is_siat", true)->where("is_active", true)->get();
+        $company_id = Session::get('login_company_id') ?? (auth()->check() ? auth()->user()->company_id : null);
+        $cacheKey = 'cufd_checked_' . ($company_id ?? 'default') . '_' . date('Y-m-d_H');
 
-        //iterar todos los puntos de ventas.
+        if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+            return;
+        }
+
+        $query = SiatPuntoVenta::where("is_siat", true)->where("is_active", true);
+        if ($company_id && \Illuminate\Support\Facades\Schema::hasColumn('siat_punto_venta', 'company_id')) {
+            $query->where('company_id', $company_id);
+        }
+        $items = $query->get();
+
         foreach ($items as $item) {
             if ($item->modo_contingencia) {
-                // No renovar el CUFD mientras el punto de venta esté en contingencia:
-                // el CUFD queda congelado hasta "Registrar Evento".
                 continue;
             }
             if ($item->codigo_cuis) {
-                if ($this->estaVigenteCUFD($item)) { //verifica si está vigente boolean
-                    Log::info("CUFD esta vigente para PV: ".$item->codigo_punto_venta);
-                } else {
+                if (!$this->estaVigenteCUFD($item)) {
                     $this->taskRenovarCUFD($item);
                 }
             }
         }
+
+        \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->addMinutes(30));
     }
 
     public function taskRenovarCUFD($p_venta)
