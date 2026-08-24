@@ -41,10 +41,11 @@ class PurchaseController extends Controller
                 $lims_purchase_list = Purchase::orderBy('id', 'desc')->get();
             }
 
-            $permissions = Role::findByName($role->name)->permissions;
-            foreach ($permissions as $permission) {
-                $all_permission[] = $permission->name;
-            }
+            $all_permission = DB::table('permissions')
+                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                ->where('role_id', Auth::user()->role_id)
+                ->pluck('name')
+                ->toArray();
 
             if (empty($all_permission)) {
                 $all_permission[] = 'dummy text';

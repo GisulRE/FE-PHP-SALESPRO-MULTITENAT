@@ -76,10 +76,11 @@ class RoleController extends Controller
     {
         if (Auth::user()->role_id <= 2) {
             $lims_role_data = Roles::find($id);
-            $permissions = Role::findByName($lims_role_data->name)->permissions;
-            foreach ($permissions as $permission) {
-                $all_permission[] = $permission->name;
-            }
+            $all_permission = DB::table('permissions')
+                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                ->where('role_id', $id)
+                ->pluck('name')
+                ->toArray();
 
             if (empty($all_permission)) {
                 $all_permission[] = 'dummy text';

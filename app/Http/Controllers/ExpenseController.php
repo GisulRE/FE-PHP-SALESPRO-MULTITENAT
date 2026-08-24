@@ -16,9 +16,11 @@ class ExpenseController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('expenses-index')){
-            $permissions = Role::findByName($role->name)->permissions;
-            foreach ($permissions as $permission)
-                $all_permission[] = $permission->name;
+            $all_permission = DB::table('permissions')
+                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                ->where('role_id', Auth::user()->role_id)
+                ->pluck('name')
+                ->toArray();
             if(empty($all_permission))
                 $all_permission[] = 'dummy text';
             $lims_account_list = Account::where('is_active', true)->get();

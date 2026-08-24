@@ -61,9 +61,11 @@ class ProductController extends Controller
 
         if ($hasPermission) {
             $lims_category_list = Category::select('id', 'name')->where('is_active', true)->get();
-            $permissions = Role::findByName($role->name)->permissions;
-            foreach ($permissions as $permission)
-                $all_permission[] = $permission->name;
+            $all_permission = DB::table('permissions')
+                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                ->where('role_id', Auth::user()->role_id)
+                ->pluck('name')
+                ->toArray();
             if (empty($all_permission))
                 $all_permission[] = 'dummy text';
             return view('product.index', compact('all_permission', 'lims_category_list'));
