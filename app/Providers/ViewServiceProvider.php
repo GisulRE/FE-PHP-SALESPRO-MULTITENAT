@@ -12,39 +12,49 @@ class ViewServiceProvider extends ServiceProvider
 {
   public function boot()
   {
-    View::composer('*', function ($view) {
+    View::composer(['layout.partials.navbar', 'layout.main'], function ($view) {
+      static $cachedData = null;
+
+      if ($cachedData !== null) {
+        $view->with($cachedData);
+        return;
+      }
+
       $pendingTransfersCount = 0;
       $pendingTransfers = collect();
 
       if (Auth::check()) {
-        $user = Auth::user();
-        $role = Role::find($user->role_id);
+        try {
+          $user = Auth::user();
+          $permissions = is_array(session('permissions')) ? session('permissions') : [];
+          $canAcceptTransfers = ($user->role_id <= 2) || in_array('accept-transfers', $permissions);
 
-        // Evitar excepción de Spatie si la permisión no existe aún
-        $permExists = Permission::where('name', 'accept-transfers')->where('guard_name', 'web')->exists();
-
-        if ($role && $permExists && $role->hasPermissionTo('accept-transfers')) {
-
-          if ($user->role_id <= 2) {
-            $pendingTransfers = Transfer::where('status', 2)->get();
-          } else {
-            $warehouseId = optional($user->biller)->warehouse_id;
-
-            if ($warehouseId) {
-              $pendingTransfers = Transfer::where('status', 2)
-                ->where('to_warehouse_id', $warehouseId)
-                ->get();
+          if ($canAcceptTransfers) {
+            if ($user->role_id <= 2) {
+              $pendingTransfers = \App\Transfer::where('status', 2)->latest()->take(10)->get();
+            } else {
+              $warehouseId = optional($user->biller)->warehouse_id;
+              if ($warehouseId) {
+                $pendingTransfers = \App\Transfer::where('status', 2)
+                  ->where('to_warehouse_id', $warehouseId)
+                  ->latest()
+                  ->take(10)
+                  ->get();
+              }
             }
+            $pendingTransfersCount = $pendingTransfers->count();
           }
-
-          $pendingTransfersCount = $pendingTransfers->count();
+        } catch (\Throwable $e) {
+          // safe fallback
         }
       }
 
-      $view->with([
+      $cachedData = [
         'pendingTransfersCount' => $pendingTransfersCount,
         'pendingTransfers' => $pendingTransfers,
-      ]);
+      ];
+
+      $view->with($cachedData);
     });
   }
 }
