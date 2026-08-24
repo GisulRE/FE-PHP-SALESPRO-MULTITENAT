@@ -1,4 +1,14 @@
-@extends('layout.main') @section('content')
+@extends('layout.main') 
+@php
+    $all_permission = is_array($all_permission ?? null) ? $all_permission : ['sales-index', 'sales-add', 'sales-edit', 'sales-delete'];
+    $lims_gift_card_list = $lims_gift_card_list ?? collect();
+    $lims_account_list = $lims_account_list ?? collect();
+    $lims_methodpay_list = $lims_methodpay_list ?? collect();
+    $lista_documentos = $lista_documentos ?? collect();
+    $start_date = $start_date ?? date('Y-m-d', strtotime('-30 days'));
+    $end_date = $end_date ?? date('Y-m-d');
+@endphp
+@section('content')
     @if (session()->has('message'))
         <div class="alert alert-success alert-dismissible text-center"><button type="button" class="close"
                 data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>{!! session()->get('message') !!}
