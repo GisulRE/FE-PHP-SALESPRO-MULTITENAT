@@ -301,6 +301,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('sales/download-factura-pdf/{venta_id}', 'SaleController@downloadFacturaPdf')->name('sales.download-factura-pdf');
 	Route::get('sales/get_estado_p_venta/{biller_id}', 'SaleController@estadoContingenciaPuntoVenta')->name('estado_punto_venta_contingencia');
 	Route::post('sales/activar_modo_contingencia/{biller_id}', 'SaleController@activarModoContingenciaPOS')->name('activar_modo_contingencia_pos');
+	Route::post('sales/toggle_modo_contingencia/{biller_id}', 'SaleController@toggleModoContingencia')->name('toggle_modo_contingencia');
 	Route::get('sales/get_estado_sin', 'SaleController@getEstadoServiciosSiat')->name('estado_servicios_sin');
 	Route::post('sales/anular_factura', 'SaleController@anularVentaFacturada')->name('sales.anular_factura');
 	Route::post('sales/get_customer_phone', 'SaleController@getCustomerPhone')->name('sales.get_customer_phone');

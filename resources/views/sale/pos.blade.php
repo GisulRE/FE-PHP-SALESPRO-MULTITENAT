@@ -6512,59 +6512,49 @@
             }
         }
 
-        function activarModoContingenciaPOS() {
+        function toggleModoPOS(modoOffline) {
             var id = $('select[name=biller_id]').val();
-            var codigo_documento_sector = $('input[name="bandera_codigo_documento_sector_hidden"]').val();
-            var url_data = '{{ route('activar_modo_contingencia_pos', ':id') }}';
+            var url_data = '{{ route('toggle_modo_contingencia', ':id') }}';
             url_data = url_data.replace(':id', id);
 
-            $("#spinner-contigencia-div").show();
-            $("#submit-btn").addClass("disabled noselect");
+            $(\"#spinner-contigencia-div\").show();
+            $(\"#submit-btn\").addClass(\"disabled noselect\");
+
             $.ajax({
                 url: url_data,
                 type: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                },
-                data: {
-                    codigo_documento_sector: codigo_documento_sector,
-                    codigo_evento: 4,
-                },
+                headers: { 'X-CSRF-TOKEN': $('meta[name=\"csrf-token\"]').attr('content') },
+                data: { modo: modoOffline },
                 success: function(data) {
                     if (data.estado == true) {
-                        bandera_puntoventa_contingencia = true;
-                        Swal.fire('Modo Contingencia', data.mensaje, 'success');
-                        mostrarLabelContingencia();
+                        bandera_puntoventa_contingencia = data.modo_contingencia;
+                        sincronizarSwitchModoPOS();
+                        if (data.modo_contingencia) {
+                            $('#label_contingencia').show();
+                            Swal.fire('Modo Offline', data.mensaje, 'warning');
+                        } else {
+                            $('#label_contingencia').hide();
+                            Swal.fire('Modo Online', data.mensaje, 'success');
+                        }
                     } else {
-                        Swal.fire('Modo Contingencia', data.mensaje, 'warning');
-                        bandera_puntoventa_contingencia = false;
+                        Swal.fire('Error', data.mensaje, 'error');
                         sincronizarSwitchModoPOS();
                     }
                 },
                 error: function() {
-                    Swal.fire('Error', 'No se pudo activar modo contingencia.', 'error');
-                    bandera_puntoventa_contingencia = false;
+                    Swal.fire('Error', 'No se pudo cambiar el modo.', 'error');
                     sincronizarSwitchModoPOS();
                 },
                 complete: function() {
-                    $("#spinner-contigencia-div").hide();
-                    $("#submit-btn").removeClass("disabled noselect");
+                    $(\"#spinner-contigencia-div\").hide();
+                    $(\"#submit-btn\").removeClass(\"disabled noselect\");
                 }
             });
         }
 
         $(document).on('change', '#toggle-event-mode', function() {
-            var modoOnline = $(this).prop('checked');
-            if (modoOnline) {
-                return;
-            }
-
-            if (bandera_puntoventa_contingencia === true) {
-                sincronizarSwitchModoPOS();
-                return;
-            }
-
-            activarModoContingenciaPOS();
+            var modoOffline = !$(this).prop('checked'); // checked = Online, unchecked = Offline
+            toggleModoPOS(modoOffline);
         });
 
         function consultarMinimoFechaManualCafc() {

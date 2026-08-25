@@ -5319,6 +5319,49 @@ class SaleController extends Controller
         return (bool) $data_p_venta->modo_contingencia;
     }
 
+    /**
+     * Cambia directamente el modo_contingencia del punto de venta en la BD.
+     * El switch Online/Offline del POS llama a este endpoint.
+     * @param  Request $request  { modo: true|false }
+     * @param  int     $biller_id
+     */
+    public function toggleModoContingencia(Request $request, $biller_id)
+    {
+        try {
+            $data_biller = Biller::select('id', 'sucursal', 'punto_venta_siat')->where('id', $biller_id)->first();
+            if (!$data_biller) {
+                return response()->json(['estado' => false, 'mensaje' => 'No se encontró el facturador.']);
+            }
+
+            $modoOffline = filter_var($request->input('modo', false), FILTER_VALIDATE_BOOLEAN);
+
+            $data_p_venta = SiatPuntoVenta::where([
+                'sucursal' => $data_biller->sucursal,
+                'codigo_punto_venta' => $data_biller->punto_venta_siat,
+            ])->first();
+
+            if (!$data_p_venta) {
+                return response()->json(['estado' => false, 'mensaje' => 'No se encontró el punto de venta SIAT.']);
+            }
+
+            $data_p_venta->modo_contingencia = $modoOffline;
+            $data_p_venta->usuario_alta = Auth::id();
+            $data_p_venta->save();
+
+            $modo = $modoOffline ? 'Offline (Contingencia)' : 'Online';
+            Log::info("toggleModoContingencia: Biller {$biller_id} => {$modo}");
+
+            return response()->json([
+                'estado' => true,
+                'modo_contingencia' => $modoOffline,
+                'mensaje' => "Modo cambiado a {$modo}.",
+            ]);
+        } catch (\Throwable $th) {
+            Log::error('toggleModoContingencia error: ' . $th->getMessage());
+            return response()->json(['estado' => false, 'mensaje' => 'Error al cambiar el modo.']);
+        }
+    }
+
     public function activarModoContingenciaPOS(Request $request, $biller_id)
     {
         try {
