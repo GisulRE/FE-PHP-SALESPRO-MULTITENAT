@@ -7,6 +7,7 @@ use App\Customer;
 use App\CustomerCompany;
 use App\CustomerGroup;
 use App\Deposit;
+use App\Http\Traits\CufdTrait;
 use App\Http\Traits\SiatTrait;
 use App\PosSetting;
 use App\SiatParametricaVario;
@@ -24,7 +25,7 @@ use App\Services\WhatsAppService;
 
 class CustomerController extends Controller
 {
-    use SiatTrait;
+    use SiatTrait, CufdTrait;
 
     public function index()
     {

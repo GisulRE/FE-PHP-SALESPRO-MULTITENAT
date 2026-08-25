@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use App\PosSetting;
 use App\GeneralSetting;
 use Illuminate\Http\Request;
+use App\Http\Traits\CufdTrait;
 use App\Http\Traits\SiatTrait;
 use App\AutorizacionFacturacion;
 use Illuminate\Support\Facades\Log;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Auth;
 
 class AutorizacionFacturacionController extends Controller
 {
-    use SiatTrait;
+    use SiatTrait, CufdTrait;
 
     public function index()
     {

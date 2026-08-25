@@ -7,6 +7,7 @@ use App\Biller;
 use App\Customer;
 use App\CustomerGroup;
 use App\CustomerSale;
+use App\Http\Traits\CufdTrait;
 use App\Http\Traits\SiatTrait;
 use App\Product;
 use App\Product_Sale;
@@ -32,7 +33,7 @@ use Spatie\Permission\Models\Role;
 
 class ReturnController extends Controller
 {
-    use SiatTrait;
+    use SiatTrait, CufdTrait;
 
     public function index()
     {
