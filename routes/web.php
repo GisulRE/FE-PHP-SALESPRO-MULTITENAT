@@ -38,10 +38,16 @@ Route::get('/check-error-log', function () {
             echo "-> " . basename($lf) . " (" . round(filesize($lf) / 1024, 2) . " KB)\n";
         }
         
-        $latestLog = $logFiles[0];
-        echo "\n=== ULTIMAS 100 LINEAS DE " . basename($latestLog) . " ===\n\n";
+        $laravelLogs = glob(storage_path('logs/laravel-*.log'));
+        if (!empty($laravelLogs)) {
+            rsort($laravelLogs);
+            $latestLog = $laravelLogs[0];
+        } else {
+            $latestLog = $logFiles[0];
+        }
+        echo "\n=== ULTIMAS 150 LINEAS DE " . basename($latestLog) . " ===\n\n";
         $lines = file($latestLog);
-        $lastLines = array_slice($lines, -100);
+        $lastLines = array_slice($lines, -150);
         echo implode("", $lastLines);
     } else {
         echo "No se encontraron archivos .log en storage/logs/\n";
