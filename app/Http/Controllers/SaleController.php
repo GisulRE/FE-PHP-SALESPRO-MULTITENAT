@@ -5301,12 +5301,37 @@ class SaleController extends Controller
     public function estadoContingenciaPuntoVenta($biller_id)
     {
         $data_biller = Biller::select('id', 'sucursal', 'punto_venta_siat')->where('id', $biller_id)->first();
-        $data_p_venta = SiatPuntoVenta::select('modo_contingencia')->where([
+        if (!$data_biller) {
+            return false;
+        }
+
+        $data_p_venta = SiatPuntoVenta::select('id', 'modo_contingencia', 'sucursal', 'codigo_punto_venta')->where([
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
 
-        return $data_p_venta->modo_contingencia;
+        if (!$data_p_venta) {
+            return false;
+        }
+
+        // Si modo_contingencia está activo en BD, verificar que realmente
+        // exista un ControlContingencia EN_PROCESO. Si no existe, auto-corregir.
+        if ($data_p_venta->modo_contingencia) {
+            $contingenciaActiva = ControlContingencia::where([
+                'sucursal' => $data_biller->sucursal,
+                'codigo_punto_venta' => $data_biller->punto_venta_siat,
+                'estado' => 'EN_PROCESO',
+            ])->exists();
+
+            if (!$contingenciaActiva) {
+                // No hay contingencia activa: corregir el estado en BD
+                $data_p_venta->modo_contingencia = false;
+                $data_p_venta->save();
+                return false;
+            }
+        }
+
+        return (bool) $data_p_venta->modo_contingencia;
     }
 
     public function activarModoContingenciaPOS(Request $request, $biller_id)

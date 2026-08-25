@@ -118,7 +118,24 @@ class ControlContingenciaController extends Controller
         Log::info('ControlContingenciaController@registrarEvento - Creando evento significativo para control contingencia id: ' . $id);
         try {
             $data_c_contingencia = ControlContingencia::where('id', $id)->first();
-            $data_p_venta = SiatPuntoVenta::where('sucursal', $data_c_contingencia->sucursal)->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)->first();
+            if (!$data_c_contingencia) {
+                Log::warning('ControlContingenciaController@registrarEvento - No se encontró el registro de contingencia id: ' . $id);
+                Session::flash('not_permitted', 'No se encontró el registro de contingencia.');
+                return redirect('contingencia');
+            }
+
+            $data_p_venta = SiatPuntoVenta::where('sucursal', $data_c_contingencia->sucursal)
+                ->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)
+                ->first() ?? SiatPuntoVenta::withoutGlobalScope('company')
+                ->where('sucursal', $data_c_contingencia->sucursal)
+                ->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)
+                ->first();
+
+            if (!$data_p_venta) {
+                Log::warning('ControlContingenciaController@registrarEvento - No se encontró punto de venta para contingencia id: ' . $id);
+                Session::flash('not_permitted', 'No se encontró el punto de venta asociado a la contingencia.');
+                return redirect('contingencia');
+            }
 
             // El CUFD guardado al crear la contingencia puede haberse renovado (una o varias veces)
             // entre ese momento y el click en "Registrar Evento". Se debe usar el CUFD realmente
@@ -147,9 +164,43 @@ class ControlContingenciaController extends Controller
     public function registrarEventoAuto($id_biller)
     {
         $estado = false;
-        $data_biller = Biller::find($id_biller);
-        $data_c_contingencia = ControlContingencia::where([['codigo_punto_venta', $data_biller->punto_venta_siat], ['estado', 'EN_PROCESO']])->first();
-        $data_p_venta = SiatPuntoVenta::where('sucursal', $data_c_contingencia->sucursal)->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)->first();
+        $data_biller = Biller::find($id_biller) ?? Biller::withoutGlobalScope('company')->find($id_biller);
+        if (!$data_biller) {
+            return array("estado" => false, "mensaje" => "No se encontró el facturador seleccionado.");
+        }
+
+        $data_c_contingencia = ControlContingencia::where([
+            ['codigo_punto_venta', $data_biller->punto_venta_siat],
+            ['estado', 'EN_PROCESO']
+        ])->first();
+
+        if (!$data_c_contingencia) {
+            // Si no hay contingencia en proceso, asegurarse de que el punto de venta vuelva a modo Online
+            $data_p_venta = SiatPuntoVenta::where('sucursal', $data_biller->sucursal)
+                ->where('codigo_punto_venta', $data_biller->punto_venta_siat)
+                ->first() ?? SiatPuntoVenta::withoutGlobalScope('company')
+                ->where('sucursal', $data_biller->sucursal)
+                ->where('codigo_punto_venta', $data_biller->punto_venta_siat)
+                ->first();
+
+            if ($data_p_venta) {
+                $data_p_venta->modo_contingencia = false;
+                $data_p_venta->save();
+            }
+
+            return array("estado" => true, "mensaje" => "No hay eventos de contingencia pendientes. Modo Online activo.");
+        }
+
+        $data_p_venta = SiatPuntoVenta::where('sucursal', $data_c_contingencia->sucursal)
+            ->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)
+            ->first() ?? SiatPuntoVenta::withoutGlobalScope('company')
+            ->where('sucursal', $data_c_contingencia->sucursal)
+            ->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)
+            ->first();
+
+        if (!$data_p_venta) {
+            return array("estado" => false, "mensaje" => "No se encontró la configuración SIAT del punto de venta.");
+        }
 
         // Ver comentario equivalente en registrarEvento(): usar el CUFD realmente activo
         // en este momento, no el valor congelado desde la creación de la contingencia.
@@ -394,12 +445,24 @@ class ControlContingenciaController extends Controller
     public function cerrarModoContingencia($id)
     {
         $data_c_contingencia = ControlContingencia::where('id', $id)->first();
-        $data_p_venta = SiatPuntoVenta::where('sucursal', $data_c_contingencia->sucursal)->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)->first();
+        if (!$data_c_contingencia) {
+            Session::flash('not_permitted', 'No se encontró el registro de contingencia.');
+            return redirect('contingencia');
+        }
 
-        $user = Auth::user()->id;
-        $data_p_venta->usuario_alta = $user;
-        $data_p_venta->modo_contingencia = false;
-        $data_p_venta->save();
+        $data_p_venta = SiatPuntoVenta::where('sucursal', $data_c_contingencia->sucursal)
+            ->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)
+            ->first() ?? SiatPuntoVenta::withoutGlobalScope('company')
+            ->where('sucursal', $data_c_contingencia->sucursal)
+            ->where('codigo_punto_venta', $data_c_contingencia->codigo_punto_venta)
+            ->first();
+
+        $user = Auth::user()->id ?? 1;
+        if ($data_p_venta) {
+            $data_p_venta->usuario_alta = $user;
+            $data_p_venta->modo_contingencia = false;
+            $data_p_venta->save();
+        }
 
         $data_c_contingencia->usuario_modificacion = $user;
         $data_c_contingencia->estado = 'CERRADO';
