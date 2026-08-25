@@ -1525,7 +1525,7 @@
                                 <div id="btn_modeOnline" class="d-flex align-items-center mr-3" style="display:none;">
                                     <div class="mode-toggle-container">
                                         <small id="text_modo_pos" class="mode-label">Modo: Online</small>
-                                        <input id="toggle-event-mode" type="checkbox" data-toggle="toggle"
+                                        <input id="toggle-event-mode" type="checkbox" checked data-toggle="toggle"
                                             data-on="Online" data-off="Offline" data-onstyle="success"
                                             data-offstyle="danger" data-size="sm" data-width="72">
                                     </div>
@@ -6516,13 +6516,22 @@
         
         var _toggleInicializando = false;
 
+        function _toastModo(icono, titulo) {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: icono,
+                title: titulo,
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true,
+            });
+        }
+
         function toggleModoPOS(modoOffline) {
             var id = $('select[name=biller_id]').val();
             var url_data = '{{ route('toggle_modo_contingencia', ':id') }}';
             url_data = url_data.replace(':id', id);
-
-            $("#spinner-contigencia-div").show();
-            $("#submit-btn").addClass("disabled noselect");
 
             $.ajax({
                 url: url_data,
@@ -6537,27 +6546,23 @@
                         _toggleInicializando = false;
                         if (data.modo_contingencia) {
                             $('#label_contingencia').show();
-                            Swal.fire('Modo Offline', data.mensaje, 'warning');
+                            _toastModo('warning', 'Modo Offline activado');
                         } else {
                             $('#label_contingencia').hide();
-                            Swal.fire('Modo Online', data.mensaje, 'success');
+                            _toastModo('success', 'Modo Online activado');
                         }
                     } else {
-                        Swal.fire('Error', data.mensaje, 'error');
+                        _toastModo('error', data.mensaje || 'Error al cambiar modo');
                         _toggleInicializando = true;
                         sincronizarSwitchModoPOS();
                         _toggleInicializando = false;
                     }
                 },
                 error: function() {
-                    Swal.fire('Error', 'No se pudo cambiar el modo.', 'error');
+                    _toastModo('error', 'No se pudo cambiar el modo');
                     _toggleInicializando = true;
                     sincronizarSwitchModoPOS();
                     _toggleInicializando = false;
-                },
-                complete: function() {
-                    $("#spinner-contigencia-div").hide();
-                    $("#submit-btn").removeClass("disabled noselect");
                 }
             });
         }
