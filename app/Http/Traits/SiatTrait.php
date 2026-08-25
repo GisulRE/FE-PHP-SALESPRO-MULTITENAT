@@ -1287,38 +1287,32 @@ trait SiatTrait
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
-        $this->asegurarCufdVigente($data_p_venta);
 
-        $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
-            ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
-            ->where('estado', true)
-            ->orderBy('fecha_registro', 'desc')
-            ->first();
+        $modo_centralizado = ($pos_setting->cufd_centralizado ?? 0) == 1;
+        $data_siat_cufd = null;
 
-        if (!$data_siat_cufd) {
+        if (!$modo_centralizado) {
+            $this->asegurarCufdVigente($data_p_venta);
+
             $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
                 ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                ->where('estado', true)
                 ->orderBy('fecha_registro', 'desc')
                 ->first();
-        }
 
-        if (!$data_siat_cufd) {
-            try {
-                $this->renovarVigenciaxPuntoVenta($data_p_venta);
-            } catch (\Throwable $ex) {
-                Log::warning('No se pudo renovar CUFD para offline: ' . $ex->getMessage());
+            if (!$data_siat_cufd) {
+                $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                    ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                    ->orderBy('fecha_registro', 'desc')
+                    ->first();
             }
-            $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
-                ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
-                ->orderBy('fecha_registro', 'desc')
-                ->first();
-        }
 
-        if (!$data_siat_cufd) {
-            return [
-                'mensaje' => 'Error SIAT: No existe un CUFD registrado para este punto de venta. Por favor sincronice o renueve el CUFD antes de facturar en modo offline.',
-                'status' => false
-            ];
+            if (!$data_siat_cufd) {
+                return [
+                    'mensaje' => 'Error SIAT: No existe un CUFD registrado para este punto de venta. Por favor sincronice o renueve el CUFD antes de facturar en modo offline.',
+                    'status' => false
+                ];
+            }
         }
 
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
@@ -1805,38 +1799,32 @@ trait SiatTrait
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
-        $this->asegurarCufdVigente($data_p_venta);
 
-        $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
-            ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
-            ->where('estado', true)
-            ->orderBy('fecha_registro', 'desc')
-            ->first();
+        $modo_centralizado = ($pos_setting->cufd_centralizado ?? 0) == 1;
+        $data_siat_cufd = null;
 
-        if (!$data_siat_cufd) {
+        if (!$modo_centralizado) {
+            $this->asegurarCufdVigente($data_p_venta);
+
             $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
                 ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                ->where('estado', true)
                 ->orderBy('fecha_registro', 'desc')
                 ->first();
-        }
 
-        if (!$data_siat_cufd) {
-            try {
-                $this->renovarVigenciaxPuntoVenta($data_p_venta);
-            } catch (\Throwable $ex) {
-                Log::warning('No se pudo renovar CUFD para alquiler offline: ' . $ex->getMessage());
+            if (!$data_siat_cufd) {
+                $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                    ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                    ->orderBy('fecha_registro', 'desc')
+                    ->first();
             }
-            $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
-                ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
-                ->orderBy('fecha_registro', 'desc')
-                ->first();
-        }
 
-        if (!$data_siat_cufd) {
-            return [
-                'mensaje' => 'Error SIAT: No existe un CUFD registrado para este punto de venta. Por favor sincronice o renueve el CUFD antes de facturar en modo offline.',
-                'status' => false
-            ];
+            if (!$data_siat_cufd) {
+                return [
+                    'mensaje' => 'Error SIAT: No existe un CUFD registrado para este punto de venta. Por favor sincronice o renueve el CUFD antes de facturar en modo offline.',
+                    'status' => false
+                ];
+            }
         }
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
