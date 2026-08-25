@@ -4956,9 +4956,9 @@ Descripción: " . $data_response['descripcion'];
         $data_leyenda = $this->pickRandomLeyenda($leyendas);
         $rawFechaFactura = $factura['fechaEmision'] ?? null;
         if (!empty($rawFechaFactura)) {
-            $fechaemision = date("Y-m-d H:i:s", strtotime($rawFechaFactura));
+            $fechaemision = date("Y/m/d H:i:s.000", strtotime($rawFechaFactura));
         } else {
-            $fechaemision = date("Y-m-d H:i:s");
+            $fechaemision = date("Y/m/d H:i:s.000");
         }
         $list_items = [];
         foreach ($factura["detalle"] as $item) {
