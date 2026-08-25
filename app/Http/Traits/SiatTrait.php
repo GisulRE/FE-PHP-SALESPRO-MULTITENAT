@@ -4918,6 +4918,15 @@ Descripción: " . $data_response['descripcion'];
             ->first();
 
         if (!$data_siat_cufd) {
+            $data_siat_cufd = SiatCufd::withoutGlobalScope('company')
+                ->where('sucursal', $data_p_venta->sucursal)
+                ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                ->where('estado', true)
+                ->orderBy('fecha_registro', 'desc')
+                ->first();
+        }
+
+        if (!$data_siat_cufd) {
             Log::error("generaNotaFiscal - No se encontró CUFD vigente para sucursal={$data_p_venta->sucursal} codigoPuntoVenta={$data_p_venta->codigo_punto_venta}");
             return ['status' => false, 'mensaje' => 'No se encontró un CUFD vigente para la sucursal ' . $data_p_venta->sucursal . ' y punto de venta ' . $data_p_venta->codigo_punto_venta . '. Debe renovar el CUFD.'];
         }

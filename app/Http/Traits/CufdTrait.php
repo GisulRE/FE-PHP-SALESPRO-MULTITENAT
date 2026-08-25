@@ -184,6 +184,14 @@ trait CufdTrait
     public function estaVigenteCUFD($p_venta)
     {
         $registro = SiatCufd::where('sucursal', $p_venta->sucursal)->where('codigo_punto_venta', $p_venta->codigo_punto_venta)->where('estado', true)->first();
+        if ($registro == null) {
+            $registro = SiatCufd::withoutGlobalScope('company')
+                ->where('sucursal', $p_venta->sucursal)
+                ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
+                ->where('estado', true)
+                ->first();
+        }
+
         // en caso 0, no exista, retorna false
         if ($registro == null) {
             return false;
@@ -199,9 +207,11 @@ trait CufdTrait
             // Si el punto de venta no se encuentra en modo contingencia, el estado cambia y se renueva el CUFD.
             if ($p_venta->modo_contingencia == false) {
                 //al no estar vigente, el estado pasa a false.
-                $cufd_update = SiatCufd::find($registro->id);
-                $cufd_update->estado = false;
-                $cufd_update->save();
+                $cufd_update = SiatCufd::withoutGlobalScope('company')->find($registro->id);
+                if ($cufd_update) {
+                    $cufd_update->estado = false;
+                    $cufd_update->save();
+                }
                 return false;
             } else {
                 // el punto de venta está modo contingencia, por tanto, se mantiene su CUFD sin renovar.
@@ -375,7 +385,7 @@ trait CufdTrait
             'codigo_punto_venta' => $p_venta,
         ]);
         try {
-            $response = Http::timeout(3)->withHeaders([
+            $response = Http::timeout(15)->withHeaders([
                 'Authorization' => $bearer,
             ])->post($url);
         } catch (\Throwable $th) {
@@ -563,6 +573,14 @@ trait CufdTrait
             return array('status' => false, 'mensaje' => 'No se encontró el punto de venta.');
         }
 
+        if (empty($p_venta->codigo_cuis)) {
+            $resCuis = $this->obtenerCuis($p_venta->codigo_punto_venta, $p_venta->sucursal);
+            if (!empty($resCuis['status']) && !empty($resCuis['data']['codigo'])) {
+                $p_venta->codigo_cuis = $resCuis['data']['codigo'];
+                $p_venta->save();
+            }
+        }
+
         $this->writeCufdDebug('CUFD renovarVigenciaxPuntoVenta: inicio', [
             'sucursal' => $p_venta->sucursal,
             'codigo_punto_venta' => $p_venta->codigo_punto_venta,
@@ -586,7 +604,8 @@ trait CufdTrait
         $fecha_vigencia = new Carbon($item['fechaVigencia']);
 
         // Ver comentario equivalente en taskRenovarCUFD(): evitar múltiples CUFD activos a la vez.
-        SiatCufd::where('sucursal', $p_venta->sucursal)
+        SiatCufd::withoutGlobalScope('company')
+            ->where('sucursal', $p_venta->sucursal)
             ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
             ->where('estado', true)
             ->update(['estado' => false]);
