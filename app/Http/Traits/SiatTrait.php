@@ -1288,7 +1288,39 @@ trait SiatTrait
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
         $this->asegurarCufdVigente($data_p_venta);
-        $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
+
+        $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+            ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+            ->where('estado', true)
+            ->orderBy('fecha_registro', 'desc')
+            ->first();
+
+        if (!$data_siat_cufd) {
+            $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                ->orderBy('fecha_registro', 'desc')
+                ->first();
+        }
+
+        if (!$data_siat_cufd) {
+            try {
+                $this->renovarVigenciaxPuntoVenta($data_p_venta);
+            } catch (\Throwable $ex) {
+                Log::warning('No se pudo renovar CUFD para offline: ' . $ex->getMessage());
+            }
+            $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                ->orderBy('fecha_registro', 'desc')
+                ->first();
+        }
+
+        if (!$data_siat_cufd) {
+            return [
+                'mensaje' => 'Error SIAT: No existe un CUFD registrado para este punto de venta. Por favor sincronice o renueve el CUFD antes de facturar en modo offline.',
+                'status' => false
+            ];
+        }
+
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
@@ -1383,7 +1415,7 @@ trait SiatTrait
                 ->where('is_active', true)
                 ->first();
 
-            $codigo_cafc = $data_credencial_cafc->codigo_cafc;
+            $codigo_cafc = $data_credencial_cafc ? $data_credencial_cafc->codigo_cafc : "";
             $nro_literal_factura = $data_cliente->nro_factura_manual;
             $fecha_emision = $data_cliente->fecha_manual;
         } else {
@@ -1397,18 +1429,18 @@ trait SiatTrait
 
         // Construir data_body base - Individual Offline
         $data_body = [
-            'codigoControl' => $data_siat_cufd->codigo_control,
+            'codigoControl' => $data_siat_cufd->codigo_control ?? '',
             'codigoDocumento' => $data_cliente->codigo_documento_sector,
-            'codigoPuntoVenta' => $data_siat_cufd->codigo_punto_venta,
+            'codigoPuntoVenta' => $data_p_venta->codigo_punto_venta,
             'cuis' => $data_p_venta->codigo_cuis,
             'nit' => $pos_setting->nit_emisor,
-            'sucursal' => $data_siat_cufd->sucursal,
+            'sucursal' => $data_p_venta->sucursal,
             'formatoFactura' => $tipo_impresion,
             'adicionales' => $listAdicionales,
             'factura' => [
                 'nitEmisor' => $pos_setting->nit_emisor,
                 'razonSocialEmisor' => $pos_setting->razon_social_emisor,
-                'direccion' => $data_siat_cufd->direccion,
+                'direccion' => $data_siat_cufd->direccion ?? ($data_sucursal->direccion ?? ''),
                 'fechaEmision' => $fecha_emision,
                 'leyenda' => $data_leyenda->descripcion_leyenda,
                 'montoGiftCard' => number_format($data_gift_card->amount, 2, '.', ''),
@@ -1774,7 +1806,38 @@ trait SiatTrait
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
         $this->asegurarCufdVigente($data_p_venta);
-        $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
+
+        $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+            ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+            ->where('estado', true)
+            ->orderBy('fecha_registro', 'desc')
+            ->first();
+
+        if (!$data_siat_cufd) {
+            $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                ->orderBy('fecha_registro', 'desc')
+                ->first();
+        }
+
+        if (!$data_siat_cufd) {
+            try {
+                $this->renovarVigenciaxPuntoVenta($data_p_venta);
+            } catch (\Throwable $ex) {
+                Log::warning('No se pudo renovar CUFD para alquiler offline: ' . $ex->getMessage());
+            }
+            $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                ->orderBy('fecha_registro', 'desc')
+                ->first();
+        }
+
+        if (!$data_siat_cufd) {
+            return [
+                'mensaje' => 'Error SIAT: No existe un CUFD registrado para este punto de venta. Por favor sincronice o renueve el CUFD antes de facturar en modo offline.',
+                'status' => false
+            ];
+        }
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
 
@@ -1871,18 +1934,18 @@ trait SiatTrait
         }
         // Construir data_body base - Alquiler Offline
         $data_body = [
-            'codigoControl' => $data_siat_cufd->codigo_control,
+            'codigoControl' => $data_siat_cufd->codigo_control ?? '',
             'codigoDocumento' => $data_cliente->codigo_documento_sector,
-            'codigoPuntoVenta' => $data_siat_cufd->codigo_punto_venta,
+            'codigoPuntoVenta' => $data_p_venta->codigo_punto_venta,
             'cuis' => $data_p_venta->codigo_cuis,
             'nit' => $pos_setting->nit_emisor,
-            'sucursal' => $data_siat_cufd->sucursal,
+            'sucursal' => $data_p_venta->sucursal,
             'formatoFactura' => $tipo_impresion,
             'adicionales' => $listAdicionales,
             'factura' => [
                 'nitEmisor' => $pos_setting->nit_emisor,
                 'razonSocialEmisor' => $pos_setting->razon_social_emisor,
-                'direccion' => $data_siat_cufd->direccion,
+                'direccion' => $data_siat_cufd->direccion ?? ($data_sucursal->direccion ?? ''),
                 'fechaEmision' => $fecha_emision,
                 'leyenda' => $data_leyenda->descripcion_leyenda,
                 'montoGiftCard' => number_format($data_gift_card->amount, 2, '.', ''),
