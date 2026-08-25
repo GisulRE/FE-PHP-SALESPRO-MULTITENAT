@@ -25,6 +25,7 @@ use App\Warehouse;
 use Auth;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Log;
@@ -39,8 +40,17 @@ class ReturnController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         $fecha_actual = date('Y-m-d');
-        $sucursales = SiatSucursal::where('estado', true)->get();
-        $lims_motivos = SiatParametricaVario::select('id', 'codigo_clasificador', 'descripcion')->where('tipo_clasificador', 'motivoAnulacion')->get();
+        
+        $sucursales = Cache::remember('siat_sucursales_activas', 300, function () {
+            return SiatSucursal::where('estado', true)->select('sucursal', 'nombre')->get();
+        });
+        
+        $lims_motivos = Cache::remember('siat_motivos_anulacion', 3600, function () {
+            return SiatParametricaVario::select('id', 'codigo_clasificador', 'descripcion')
+                ->where('tipo_clasificador', 'motivoAnulacion')
+                ->get();
+        });
+
         if ($role->hasPermissionTo('returns-index')) {
             $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
@@ -50,10 +60,20 @@ class ReturnController extends Controller
             if (empty($all_permission))
                 $all_permission[] = 'dummy text';
 
-            if (Auth::user()->role_id > 2 && config('staff_access') == 'own')
-                $lims_return_all = Returns::with('biller', 'customer', 'warehouse', 'user')->orderBy('id', 'desc')->orderBy('id', 'desc')->where('user_id', Auth::id())->get();
-            else
-                $lims_return_all = Returns::with('biller', 'customer', 'warehouse', 'user')->orderBy('id', 'desc')->get();
+            $query = Returns::with([
+                'biller:id,name,company_name,email,phone_number,address,city',
+                'customer:id,name,phone_number,address,city',
+                'warehouse:id,name',
+                'user:id,name,email'
+            ])
+            ->select('id', 'reference_no', 'warehouse_id', 'biller_id', 'customer_id', 'user_id', 'total_tax', 'total_discount', 'total_price', 'order_tax', 'order_tax_rate', 'grand_total', 'return_note', 'staff_note', 'is_active', 'customer_sale_id', 'created_at')
+            ->orderBy('id', 'desc');
+
+            if (Auth::user()->role_id > 2 && config('staff_access') == 'own') {
+                $query->where('user_id', Auth::id());
+            }
+
+            $lims_return_all = $query->take(300)->get();
             return view('return.index', compact('lims_return_all', 'all_permission', 'fecha_actual', 'sucursales', 'lims_motivos'));
         } else
             return redirect()->back()->with('not_permitted', 'Lo siento! Usted no tiene acceso a este modulo');
@@ -479,21 +499,28 @@ class ReturnController extends Controller
 
     public function productReturnData($id)
     {
-        $product_return = [];
-        $lims_product_return_data = ProductReturn::where('return_id', $id)->get();
+        $lims_product_return_data = ProductReturn::with([
+            'product:id,name,code,is_variant',
+            'unit:id,unit_code'
+        ])->where('return_id', $id)->get();
+
+        $product_return = [[], [], [], [], [], [], []];
         foreach ($lims_product_return_data as $key => $product_return_data) {
-            $product = Product::find($product_return_data->product_id);
-            if ($product_return_data->sale_unit_id != 0) {
-                $unit_data = Unit::find($product_return_data->sale_unit_id);
-                $unit = $unit_data->unit_code;
-            } else
-                $unit = '';
-            if ($product_return_data->variant_id) {
-                $lims_product_variant_data = ProductVariant::select('item_code')->FindExactProduct($product_return_data->product_id, $product_return_data->variant_id)->first();
-                $product->code = $lims_product_variant_data->item_code;
+            $product_name = $product_return_data->product ? $product_return_data->product->name : 'N/A';
+            $product_code = $product_return_data->product ? $product_return_data->product->code : 'N/A';
+
+            if ($product_return_data->variant_id && $product_return_data->product_id) {
+                $lims_product_variant_data = ProductVariant::select('item_code')
+                    ->FindExactProduct($product_return_data->product_id, $product_return_data->variant_id)
+                    ->first();
+                if ($lims_product_variant_data) {
+                    $product_code = $lims_product_variant_data->item_code;
+                }
             }
 
-            $product_return[0][$key] = $product->name . ' [' . $product->code . ']';
+            $unit = $product_return_data->unit ? $product_return_data->unit->unit_code : '';
+
+            $product_return[0][$key] = $product_name . ' [' . $product_code . ']';
             $product_return[1][$key] = $product_return_data->qty;
             $product_return[2][$key] = $unit;
             $product_return[3][$key] = $product_return_data->tax;

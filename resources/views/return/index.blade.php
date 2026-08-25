@@ -32,23 +32,49 @@
                         <th>{{ trans('file.Biller') }}</th>
                         <th>{{ trans('file.customer') }}</th>
                         <th>{{ trans('file.Warehouse') }}</th>
-                        <th>{{ trans('file.grand total') }}</th>
+                        <th class="text-right">{{ trans('file.grand total') }}</th>
                         <th>{{ trans('file.status') }}</th>
                         <th class="not-exported">{{ trans('file.action') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($lims_return_all as $key => $return)
-                        <tr class="return-link"
-                            data-return='["{{ date($general_setting->date_format, strtotime($return->created_at->toDateString())) }}", "{{ $return->reference_no }}", "{{ $return->warehouse->name }}", "{{ $return->biller->name }}", "{{ $return->biller->company_name }}","{{ $return->biller->email }}", "{{ $return->biller->phone_number }}", "{{ $return->biller->address }}", "{{ $return->biller->city }}", "{{ $return->customer->name }}", "{{ $return->customer->phone_number }}", "{{ $return->customer->address }}", "{{ $return->customer->city }}", "{{ $return->id }}", "{{ $return->total_tax }}", "{{ $return->total_discount }}", "{{ $return->total_price }}", "{{ $return->order_tax }}", "{{ $return->order_tax_rate }}", "{{ $return->grand_total }}", "{{ $return->return_note }}", "{{ $return->staff_note }}", "{{ $return->user->name }}", "{{ $return->user->email }}"]'>
+                        @php
+                            $returnData = [
+                                date($general_setting->date_format, strtotime($return->created_at->toDateString())),
+                                (string) $return->reference_no,
+                                (string) ($return->warehouse->name ?? 'N/A'),
+                                (string) ($return->biller->name ?? 'N/A'),
+                                (string) ($return->biller->company_name ?? ''),
+                                (string) ($return->biller->email ?? ''),
+                                (string) ($return->biller->phone_number ?? ''),
+                                (string) ($return->biller->address ?? ''),
+                                (string) ($return->biller->city ?? ''),
+                                (string) ($return->customer->name ?? 'N/A'),
+                                (string) ($return->customer->phone_number ?? ''),
+                                (string) ($return->customer->address ?? ''),
+                                (string) ($return->customer->city ?? ''),
+                                (int) $return->id,
+                                number_format((float)$return->total_tax, 2, '.', ','),
+                                number_format((float)$return->total_discount, 2, '.', ','),
+                                number_format((float)$return->total_price, 2, '.', ','),
+                                number_format((float)$return->order_tax, 2, '.', ','),
+                                (float) $return->order_tax_rate,
+                                number_format((float)$return->grand_total, 2, '.', ','),
+                                (string) ($return->return_note ?? ''),
+                                (string) ($return->staff_note ?? ''),
+                                (string) ($return->user->name ?? 'N/A'),
+                                (string) ($return->user->email ?? '')
+                            ];
+                        @endphp
+                        <tr class="return-link" data-return="{{ json_encode($returnData) }}">
                             <td>{{ $key }}</td>
-                            <td>{{ date($general_setting->date_format, strtotime($return->created_at->toDateString())) . ' ' . $return->created_at->toTimeString() }}
-                            </td>
-                            <td>{{ $return->reference_no }}</td>
-                            <td>{{ $return->biller->name }}</td>
-                            <td>{{ $return->customer->name }}</td>
-                            <td>{{ $return->warehouse->name }}</td>
-                            <td class="grand-total">{{ $return->grand_total }}</td>
+                            <td>{{ date($general_setting->date_format, strtotime($return->created_at->toDateString())) . ' ' . $return->created_at->toTimeString() }}</td>
+                            <td><strong>{{ $return->reference_no }}</strong></td>
+                            <td>{{ $return->biller->name ?? 'N/A' }}</td>
+                            <td>{{ $return->customer->name ?? 'N/A' }}</td>
+                            <td>{{ $return->warehouse->name ?? 'N/A' }}</td>
+                            <td class="grand-total text-right font-weight-bold">{{ number_format((float)$return->grand_total, 2, '.', ',') }}</td>
                             @if ($return->is_active)
                                 <td>
                                     <div class="badge badge-success">Activo</div>
@@ -122,6 +148,7 @@
                     <th></th>
                     <th></th>
                     <th></th>
+                    <th class="text-right"></th>
                     <th></th>
                     <th></th>
                 </tfoot>
@@ -381,13 +408,14 @@
             return false;
         }
 
-        $("tr.return-link td:not(:first-child, :last-child)").on("click", function() {
-            var returns = $(this).parent().data('return');
+        $(document).off('click', 'tr.return-link td:not(:first-child, :last-child)').on('click', 'tr.return-link td:not(:first-child, :last-child)', function() {
+            var returns = $(this).closest('tr').data('return');
             returnDetails(returns);
         });
 
-        $(".view").on("click", function() {
-            var returns = $(this).parent().parent().parent().parent().parent().data('return');
+        $(document).off('click', '.view').on('click', '.view', function(e) {
+            e.preventDefault();
+            var returns = $(this).closest('tr').data('return');
             returnDetails(returns);
         });
 
@@ -417,7 +445,7 @@
             },
             'columnDefs': [{
                     "orderable": false,
-                    'targets': [0, 7]
+                    'targets': [0, 8]
                 },
                 {
                     'render': function(data, type, row, meta) {
@@ -530,17 +558,21 @@
 
 
         function datatable_sum(dt_selector, is_calling_first) {
+            var colIdx = 6;
+            var total = 0;
             if (dt_selector.rows('.selected').any() && is_calling_first) {
                 var rows = dt_selector.rows('.selected').indexes();
-
-                $(dt_selector.column(6).footer()).html(dt_selector.cells(rows, 6, {
-                    page: 'current'
-                }).data().sum().toFixed(2));
+                dt_selector.cells(rows, colIdx, { page: 'current' }).data().each(function(val) {
+                    var num = typeof val === 'string' ? parseFloat(val.replace(/[^\d.-]/g, '')) : (typeof val === 'number' ? val : 0);
+                    if (!isNaN(num)) total += num;
+                });
             } else {
-                $(dt_selector.column(6).footer()).html(dt_selector.cells(rows, 6, {
-                    page: 'current'
-                }).data().sum().toFixed(2));
+                dt_selector.column(colIdx, { page: 'current' }).data().each(function(val) {
+                    var num = typeof val === 'string' ? parseFloat(val.replace(/[^\d.-]/g, '')) : (typeof val === 'number' ? val : 0);
+                    if (!isNaN(num)) total += num;
+                });
             }
+            $(dt_selector.column(colIdx).footer()).html(total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         }
 
         function returnDetails(returns) {
