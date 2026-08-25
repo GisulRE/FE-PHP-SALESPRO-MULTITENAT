@@ -1421,62 +1421,38 @@ trait SiatTrait
             $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
         }
 
-        // Construir data_body base - Individual Offline
+        // Construir data_body según la especificación del nuevo endpoint gestionado
         $data_body = [
-            'codigoControl' => $data_siat_cufd->codigo_control ?? '',
-            'codigoDocumento' => $data_cliente->codigo_documento_sector,
-            'codigoPuntoVenta' => $data_p_venta->codigo_punto_venta,
-            'cuis' => $data_p_venta->codigo_cuis,
-            'nit' => $pos_setting->nit_emisor,
-            'sucursal' => $data_p_venta->sucursal,
-            'formatoFactura' => $tipo_impresion,
-            'adicionales' => $listAdicionales,
+            'nit' => (int) $pos_setting->nit_emisor,
+            'codigoDocumento' => (string) $data_cliente->codigo_documento_sector,
+            'sucursal' => (int) $data_p_venta->sucursal,
+            'codigoPuntoVenta' => (int) $data_p_venta->codigo_punto_venta,
             'factura' => [
-                'nitEmisor' => $pos_setting->nit_emisor,
-                'razonSocialEmisor' => $pos_setting->razon_social_emisor,
-                'direccion' => $data_siat_cufd->direccion ?? ($data_sucursal->direccion ?? ''),
-                'fechaEmision' => $fecha_emision,
-                'leyenda' => $data_leyenda->descripcion_leyenda,
-                'montoGiftCard' => number_format($data_gift_card->amount, 2, '.', ''),
-                'montoTotal' => number_format($totalVenta, 2, '.', ''),
-                'montoTotalMoneda' => number_format($totalVenta, 2, '.', ''),
-                'montoTotalSujetoIva' => number_format(($totalVenta - $data_gift_card->amount), 2, '.', ''),
-                "codigoMetodoPago" => $data_cliente->tipo_metodo_pago,
-                "municipio" => $data_sucursal->ciudad_municipio,
-
-                "nombreRazonSocial" => $data_cliente->razon_social,
-                "numeroDocumento" => $data_cliente->valor_documento,
-                "numeroFactura" => $nro_literal_factura,
-                "numeroTarjeta" => $nro_tarjeta,
-                "telefono" => $data_sucursal->telefono,
-                "tipoCambio" => 1,
-                "usuario" => $data_cliente->usuario,
-                "cafc" => $codigo_cafc,
-                "codigoCliente" => $data_cliente->codigofijo,
-                "email" => $data_cliente->email,
-
-                "periodoFacturado" => $data_cliente->glosa_periodo_facturado,
-                "codigoDocumentoSector" => $data_cliente->codigo_documento_sector,
-                "codigoExcepcion" => $data_cliente->codigo_excepcion,
-                "codigoMoneda" => 1,
-                "codigoPuntoVenta" => $data_siat_cufd->codigo_punto_venta,
-                "codigoSucursal" => $data_siat_cufd->sucursal,
-                "codigoTipoDocumentoIdentidad" => max(1, (int) $data_cliente->tipo_documento),
-                "complemento" => $complemento,
-                "cuf" => "",
-                "cufd" => "",
-                "descuentoAdicional" => number_format($data_venta->order_discount, 2, '.', ''),
-                "detalle" => $data_product_sales,
-            ]
+                'nombreRazonSocial' => (string) $data_cliente->razon_social,
+                'codigoTipoDocumentoIdentidad' => max(1, (int) $data_cliente->tipo_documento),
+                'numeroDocumento' => (string) $data_cliente->valor_documento,
+                'complemento' => (string) $complemento,
+                'codigoCliente' => (string) $data_cliente->codigofijo,
+                'codigoMetodoPago' => max(1, (int) $data_cliente->tipo_metodo_pago),
+                'numeroTarjeta' => $nro_tarjeta,
+                'montoTotal' => (float) number_format($totalVenta, 2, '.', ''),
+                'codigoMoneda' => 1,
+                'email' => (string) ($data_cliente->email ?? ''),
+                'codigoSucursal' => (int) $data_p_venta->sucursal,
+                'codigoPuntoVenta' => (int) $data_p_venta->codigo_punto_venta,
+                'montoGiftCard' => (float) number_format($data_gift_card->amount, 2, '.', ''),
+                'montoTotalMoneda' => (float) number_format($totalVenta, 2, '.', ''),
+                'montoTotalSujetoIva' => (float) number_format(($totalVenta - $data_gift_card->amount), 2, '.', ''),
+                'descuentoAdicional' => (float) number_format($data_venta->order_discount, 2, '.', ''),
+                'tipoCambio' => 1,
+                'usuario' => (string) ($data_cliente->usuario ?? (Auth::user() ? Auth::user()->name : 'admin')),
+                'cafc' => (string) $codigo_cafc,
+                'codigoDocumentoSector' => (int) $data_cliente->codigo_documento_sector,
+                'codigoExcepcion' => (int) ($data_cliente->codigo_excepcion ?? 0),
+                'detalle' => $data_product_sales,
+            ],
+            'adicionales' => $listAdicionales ?? [],
         ];
-        
-        // Solo enviar CUFD cuando NO esté en modo centralizado - Individual Offline
-        if (($pos_setting->cufd_centralizado ?? 0) == 0) {
-            $data_body['cufd'] = $data_siat_cufd->codigo_cufd;
-            log::info('CUFD incluido en request (modo estándar) - Individual Offline');
-        } else {
-            log::info('CUFD NO incluido en request (modo centralizado - flag activa) - Individual Offline');
-        }
 
         $response = Http::withHeaders([
             'Authorization' => $bearer,
@@ -1488,25 +1464,32 @@ trait SiatTrait
         $respuesta = array();
 
         if ($response->successful()) {
-
-            $update_customer_sale = CustomerSale::where('sale_id', $data_cliente->sale_id)->first();
             $data_json = $response->json();
-            //$update_customer_sale->codigo_recepcion = $data_json['codigo_recepcion'];
-            $update_customer_sale->cuf = $data_json['cuf'];
-            $update_customer_sale->codigo_cufd = $data_siat_cufd->codigo_cufd;
-            $update_customer_sale->xml = $data_json['xmlfactura'];
-            if ($pos_setting->codigo_emision == 1) {
-                // emisión en línea
-                $update_customer_sale->estado_factura = "CONTINGENCIA";
-                $msj = "Venta Facturada correctamente en modo Contingencia";
+            $update_customer_sale = CustomerSale::where('sale_id', $data_cliente->sale_id)->first();
+            if ($update_customer_sale) {
+                $update_customer_sale->cuf = $data_json['cuf'] ?? '';
+                $update_customer_sale->codigo_cufd = $data_json['CUFD'] ?? $data_json['cufd'] ?? '';
+                $update_customer_sale->xml = $data_json['xmlfactura'] ?? '';
+                if (!empty($data_json['nro_factura'])) {
+                    $update_customer_sale->nro_factura = $data_json['nro_factura'];
+                }
+                if ($pos_setting->codigo_emision == 1) {
+                    $update_customer_sale->estado_factura = "CONTINGENCIA";
+                    $msj = "Venta Facturada correctamente en modo Contingencia";
+                } else {
+                    $update_customer_sale->estado_factura = "MASIVO";
+                    $msj = "Venta Facturada correctamente en modo Masivo";
+                }
+                $update_customer_sale->save();
             } else {
-                // emisión masiva
-                $update_customer_sale->estado_factura = "MASIVO";
-                $msj = "Venta Facturada correctamente en modo Masivo";
+                $msj = "Venta Facturada correctamente en modo Contingencia";
             }
-            $update_customer_sale->save();
 
-            $respuesta = array('mensaje' => $msj, 'status' => true);
+            $respuesta = array(
+                'mensaje' => $msj,
+                'status' => true,
+                'nro_factura_central' => $data_json['nro_factura'] ?? null
+            );
         } else {
             $error = $response->json();
             $titulo_error = $error['status'];
@@ -1652,84 +1635,61 @@ trait SiatTrait
             $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
         }
 
-        // Construir data_body base
+        // Construir data_body según la especificación del nuevo endpoint gestionado
         $data_body = [
-            'codigoControl' => $data_siat_cufd->codigo_control,
-            'codigoDocumento' => $data_cliente->codigo_documento_sector,
-            'codigoPuntoVenta' => $data_siat_cufd->codigo_punto_venta,
-            'cuis' => $data_p_venta->codigo_cuis,
-            'nit' => $pos_setting->nit_emisor,
-            'sucursal' => $data_siat_cufd->sucursal,
-            'formatoFactura' => $tipo_impresion,
-            'adicionales' => $listAdicionales,
+            'nit' => (int) $pos_setting->nit_emisor,
+            'codigoDocumento' => (string) $data_cliente->codigo_documento_sector,
+            'sucursal' => (int) $data_p_venta->sucursal,
+            'codigoPuntoVenta' => (int) $data_p_venta->codigo_punto_venta,
             'factura' => [
-                'nitEmisor' => $pos_setting->nit_emisor,
-                'razonSocialEmisor' => $pos_setting->razon_social_emisor,
-                'direccion' => $data_siat_cufd->direccion,
-                'fechaEmision' => $fecha_emision,
-                'leyenda' => $data_leyenda->descripcion_leyenda,
-                'montoGiftCard' => number_format($data_gift_card->amount, 2, '.', ''),
-                'montoTotal' => number_format(($data_venta->grand_total + $data_cliente->tasa_aseo + $data_cliente->tasa_alumbrado + $data_cliente->otras_tasas + $data_cliente->ajuste_sujeto_iva + $data_cliente->otros_pagos_no_sujeto_iva), 2, '.', ''),
-                'montoTotalMoneda' => number_format(($data_venta->grand_total + $data_cliente->tasa_aseo + $data_cliente->tasa_alumbrado + $data_cliente->otras_tasas + $data_cliente->ajuste_sujeto_iva + $data_cliente->otros_pagos_no_sujeto_iva), 2, '.', ''),
-                'montoTotalSujetoIva' => number_format(($data_venta->grand_total - $data_gift_card->amount + $data_cliente->ajuste_sujeto_iva), 2, '.', ''),
-                "codigoMetodoPago" => $data_cliente->tipo_metodo_pago,
-                "municipio" => $data_sucursal->ciudad_municipio,
-                "nombreRazonSocial" => $data_cliente->razon_social,
-                "numeroDocumento" => $data_cliente->valor_documento,
-                "numeroFactura" => $nro_literal_factura,
-                "numeroTarjeta" => $nro_tarjeta,
-                "telefono" => $data_sucursal->telefono,
-                "tipoCambio" => 1,
-                "usuario" => $data_cliente->usuario,
-                "cafc" => $codigo_cafc,
-                "codigoCliente" => $data_cliente->codigofijo,
-                "email" => $data_cliente->email,
-                "periodoFacturado" => $periodoFacturado !== '' ? $periodoFacturado : null,
-                "codigoDocumentoSector" => $data_cliente->codigo_documento_sector,
-                "codigoExcepcion" => $data_cliente->codigo_excepcion,
-                "codigoMoneda" => 1,
-                "codigoPuntoVenta" => $data_siat_cufd->codigo_punto_venta,
-                "codigoSucursal" => $data_siat_cufd->sucursal,
-                "codigoTipoDocumentoIdentidad" => max(1, (int) $data_cliente->tipo_documento),
-                "complemento" => $complemento,
-                "cuf" => "",
-                "cufd" => "",
-                "descuentoAdicional" => number_format($data_venta->order_discount, 2, '.', ''),
-
-                "mes" => $data_cliente->mes,
-                "gestion" => $data_cliente->gestion,
-                "ciudad" => $data_cliente->ciudad,
-                "zona" => $data_cliente->zona,
-                "categoria" => $data_cliente->categoria,
-                "numeroMedidor" => $data_cliente->numero_medidor,
-                "lecturaMedidorAnterior" => $data_cliente->lectura_medidor_anterior,
-                "lecturaMedidorActual" => $data_cliente->lectura_medidor_actual,
-                "domicilioCliente" => $data_cliente->domicilio_cliente,
-                "consumoPeriodo" => $data_cliente->consumo_periodo,
-                "beneficiarioLey1886" => $data_cliente->beneficiario_ley_1886,
-                "montoDescuentoLey1886" => 0 + $data_cliente->monto_descuento_ley_1886,
-                "montoDescuentoTarifaDignidad" => 0 + $data_cliente->monto_descuento_tarifa_dignidad,
-                "tasaAseo" => $data_cliente->tasa_aseo,
-                "tasaAlumbrado" => $data_cliente->tasa_alumbrado,
-                "otrasTasas" => $data_cliente->otras_tasas,
-                "ajusteNoSujetoIva" => $data_cliente->ajuste_no_sujeto_iva,
-                "detalleAjusteNoSujetoIva" => $data_cliente->detalle_ajuste_no_sujeto_iva,
-                "ajusteSujetoIva" => $data_cliente->ajuste_sujeto_iva,
-                "detalleAjusteSujetoIva" => $data_cliente->detalle_ajuste_sujeto_iva,
-                "otrosPagosNoSujetoIva" => 0 + $data_cliente->otros_pagos_no_sujeto_iva,
-                "detalleOtrosPagosNoSujetoIva" => $data_cliente->detalle_otros_pagos_no_sujeto_iva,
-
-                "detalle" => $data_product_sales,
-            ]
+                'nombreRazonSocial' => (string) $data_cliente->razon_social,
+                'codigoTipoDocumentoIdentidad' => max(1, (int) $data_cliente->tipo_documento),
+                'numeroDocumento' => (string) $data_cliente->valor_documento,
+                'complemento' => (string) $complemento,
+                'codigoCliente' => (string) $data_cliente->codigofijo,
+                'codigoMetodoPago' => max(1, (int) $data_cliente->tipo_metodo_pago),
+                'numeroTarjeta' => $nro_tarjeta,
+                'montoTotal' => (float) number_format(($data_venta->grand_total + $data_cliente->tasa_aseo + $data_cliente->tasa_alumbrado + $data_cliente->otras_tasas + $data_cliente->ajuste_sujeto_iva + $data_cliente->otros_pagos_no_sujeto_iva), 2, '.', ''),
+                'codigoMoneda' => 1,
+                'email' => (string) ($data_cliente->email ?? ''),
+                'codigoSucursal' => (int) $data_p_venta->sucursal,
+                'codigoPuntoVenta' => (int) $data_p_venta->codigo_punto_venta,
+                'montoGiftCard' => (float) number_format($data_gift_card->amount, 2, '.', ''),
+                'montoTotalMoneda' => (float) number_format(($data_venta->grand_total + $data_cliente->tasa_aseo + $data_cliente->tasa_alumbrado + $data_cliente->otras_tasas + $data_cliente->ajuste_sujeto_iva + $data_cliente->otros_pagos_no_sujeto_iva), 2, '.', ''),
+                'montoTotalSujetoIva' => (float) number_format(($data_venta->grand_total - $data_gift_card->amount + $data_cliente->ajuste_sujeto_iva), 2, '.', ''),
+                'descuentoAdicional' => (float) number_format($data_venta->order_discount, 2, '.', ''),
+                'tipoCambio' => 1,
+                'usuario' => (string) ($data_cliente->usuario ?? (Auth::user() ? Auth::user()->name : 'admin')),
+                'cafc' => (string) $codigo_cafc,
+                'codigoDocumentoSector' => (int) $data_cliente->codigo_documento_sector,
+                'codigoExcepcion' => (int) ($data_cliente->codigo_excepcion ?? 0),
+                'periodoFacturado' => $periodoFacturado !== '' ? $periodoFacturado : null,
+                'mes' => $data_cliente->mes,
+                'gestion' => $data_cliente->gestion,
+                'ciudad' => $data_cliente->ciudad,
+                'zona' => $data_cliente->zona,
+                'categoria' => $data_cliente->categoria,
+                'numeroMedidor' => $data_cliente->numero_medidor,
+                'lecturaMedidorAnterior' => $data_cliente->lectura_medidor_anterior,
+                'lecturaMedidorActual' => $data_cliente->lectura_medidor_actual,
+                'domicilioCliente' => $data_cliente->domicilio_cliente,
+                'consumoPeriodo' => $data_cliente->consumo_periodo,
+                'beneficiarioLey1886' => $data_cliente->beneficiario_ley_1886,
+                'montoDescuentoLey1886' => 0 + $data_cliente->monto_descuento_ley_1886,
+                'montoDescuentoTarifaDignidad' => 0 + $data_cliente->monto_descuento_tarifa_dignidad,
+                'tasaAseo' => $data_cliente->tasa_aseo,
+                'tasaAlumbrado' => $data_cliente->tasa_alumbrado,
+                'otrasTasas' => $data_cliente->otras_tasas,
+                'ajusteNoSujetoIva' => $data_cliente->ajuste_no_sujeto_iva,
+                'detalleAjusteNoSujetoIva' => $data_cliente->detalle_ajuste_no_sujeto_iva,
+                'ajusteSujetoIva' => $data_cliente->ajuste_sujeto_iva,
+                'detalleAjusteSujetoIva' => $data_cliente->detalle_ajuste_sujeto_iva,
+                'otrosPagosNoSujetoIva' => 0 + $data_cliente->otros_pagos_no_sujeto_iva,
+                'detalleOtrosPagosNoSujetoIva' => $data_cliente->detalle_otros_pagos_no_sujeto_iva,
+                'detalle' => $data_product_sales,
+            ],
+            'adicionales' => $listAdicionales ?? [],
         ];
-        
-        // Solo enviar CUFD cuando NO esté en modo centralizado - Servicio Básico Offline
-        if (($pos_setting->cufd_centralizado ?? 0) == 0) {
-            $data_body['cufd'] = $data_siat_cufd->codigo_cufd;
-            log::info('CUFD incluido en request (modo estándar) - Servicio Básico Offline');
-        } else {
-            log::info('CUFD NO incluido en request (modo centralizado - flag activa) - Servicio Básico Offline');
-        }
         
         $response = Http::withHeaders([
             'Authorization' => $bearer,
@@ -1739,30 +1699,37 @@ trait SiatTrait
 
         $respuesta = array();
         if ($response->successful()) {
-
-            $update_customer_sale = CustomerSale::where('sale_id', $data_cliente->sale_id)->first();
             $data_json = $response->json();
-            // $update_customer_sale->codigo_recepcion = $data_json['codigo_recepcion'];
-            $update_customer_sale->cuf = $data_json['cuf'];
-            $update_customer_sale->codigo_cufd = $data_siat_cufd->codigo_cufd;
-            $update_customer_sale->xml = $data_json['xmlfactura'];
-            if ($pos_setting->codigo_emision == 1) {
-                // emisión en línea
-                $update_customer_sale->estado_factura = "CONTINGENCIA";
-                $msj = "Venta Facturada correctamente en modo Contingencia";
+            $update_customer_sale = CustomerSale::where('sale_id', $data_cliente->sale_id)->first();
+            if ($update_customer_sale) {
+                $update_customer_sale->cuf = $data_json['cuf'] ?? '';
+                $update_customer_sale->codigo_cufd = $data_json['CUFD'] ?? $data_json['cufd'] ?? '';
+                $update_customer_sale->xml = $data_json['xmlfactura'] ?? '';
+                if (!empty($data_json['nro_factura'])) {
+                    $update_customer_sale->nro_factura = $data_json['nro_factura'];
+                }
+                if ($pos_setting->codigo_emision == 1) {
+                    $update_customer_sale->estado_factura = "CONTINGENCIA";
+                    $msj = "Venta Facturada correctamente en modo Contingencia";
+                } else {
+                    $update_customer_sale->estado_factura = "MASIVO";
+                    $msj = "Venta Facturada correctamente en modo Masivo";
+                }
+                $update_customer_sale->save();
             } else {
-                // emisión masiva
-                $update_customer_sale->estado_factura = "MASIVO";
-                $msj = "Venta Facturada correctamente en modo Masivo";
+                $msj = "Venta Facturada correctamente en modo Contingencia";
             }
-            $update_customer_sale->save();
             $totalGrand = ($data_venta->grand_total + $data_cliente->tasa_aseo + $data_cliente->tasa_alumbrado + $data_cliente->otras_tasas + $data_cliente->ajuste_sujeto_iva + $data_cliente->otros_pagos_no_sujeto_iva);
             $data_venta->total_price = $totalGrand;
             $data_venta->grand_total = $totalGrand;
             $data_venta->paid_amount = $totalGrand;
             $data_venta->save();
 
-            $respuesta = array('mensaje' => $msj, 'status' => true);
+            $respuesta = array(
+                'mensaje' => $msj,
+                'status' => true,
+                'nro_factura_central' => $data_json['nro_factura'] ?? null
+            );
         } else {
             $error = $response->json();
             $titulo_error = $error['status'];
@@ -1920,62 +1887,39 @@ trait SiatTrait
         if ($data_venta->sale_note != null || $data_venta->sale_note != '') {
             $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
         }
-        // Construir data_body base - Alquiler Offline
+        // Construir data_body según la especificación del nuevo endpoint gestionado
         $data_body = [
-            'codigoControl' => $data_siat_cufd->codigo_control ?? '',
-            'codigoDocumento' => $data_cliente->codigo_documento_sector,
-            'codigoPuntoVenta' => $data_p_venta->codigo_punto_venta,
-            'cuis' => $data_p_venta->codigo_cuis,
-            'nit' => $pos_setting->nit_emisor,
-            'sucursal' => $data_p_venta->sucursal,
-            'formatoFactura' => $tipo_impresion,
-            'adicionales' => $listAdicionales,
+            'nit' => (int) $pos_setting->nit_emisor,
+            'codigoDocumento' => (string) $data_cliente->codigo_documento_sector,
+            'sucursal' => (int) $data_p_venta->sucursal,
+            'codigoPuntoVenta' => (int) $data_p_venta->codigo_punto_venta,
             'factura' => [
-                'nitEmisor' => $pos_setting->nit_emisor,
-                'razonSocialEmisor' => $pos_setting->razon_social_emisor,
-                'direccion' => $data_siat_cufd->direccion ?? ($data_sucursal->direccion ?? ''),
-                'fechaEmision' => $fecha_emision,
-                'leyenda' => $data_leyenda->descripcion_leyenda,
-                'montoGiftCard' => number_format($data_gift_card->amount, 2, '.', ''),
-                'montoTotal' => number_format($data_venta->grand_total, 2, '.', ''),
-                'montoTotalMoneda' => number_format($data_venta->grand_total, 2, '.', ''),
-                'montoTotalSujetoIva' => number_format(($data_venta->grand_total - $data_gift_card->amount), 2, '.', ''),
-                "codigoMetodoPago" => $data_cliente->tipo_metodo_pago,
-                "municipio" => $data_sucursal->ciudad_municipio,
-
-                "nombreRazonSocial" => $data_cliente->razon_social,
-                "numeroDocumento" => $data_cliente->valor_documento,
-                "numeroFactura" => $nro_literal_factura,
-                "numeroTarjeta" => $nro_tarjeta,
-                "telefono" => $data_sucursal->telefono,
-                "tipoCambio" => 1,
-                "usuario" => $data_cliente->usuario,
-                "cafc" => $codigo_cafc,
-                "codigoCliente" => $data_cliente->customer_id,
-                "email" => $data_cliente->email,
-
-                "periodoFacturado" => $data_cliente->glosa_periodo_facturado,
-                "codigoDocumentoSector" => $data_cliente->codigo_documento_sector,
-                "codigoExcepcion" => $data_cliente->codigo_excepcion,
-                "codigoMoneda" => 1,
-                "codigoPuntoVenta" => $data_siat_cufd->codigo_punto_venta,
-                "codigoSucursal" => $data_siat_cufd->sucursal,
-                "codigoTipoDocumentoIdentidad" => max(1, (int) $data_cliente->tipo_documento),
-                "complemento" => $complemento,
-                "cuf" => "",
-                "cufd" => "",
-                "descuentoAdicional" => number_format($data_venta->order_discount, 2, '.', ''),
-                "detalle" => $data_product_sales,
-            ]
+                'nombreRazonSocial' => (string) $data_cliente->razon_social,
+                'codigoTipoDocumentoIdentidad' => max(1, (int) $data_cliente->tipo_documento),
+                'numeroDocumento' => (string) $data_cliente->valor_documento,
+                'complemento' => (string) $complemento,
+                'codigoCliente' => (string) ($data_cliente->codigofijo ?? $data_cliente->customer_id),
+                'codigoMetodoPago' => max(1, (int) $data_cliente->tipo_metodo_pago),
+                'numeroTarjeta' => $nro_tarjeta,
+                'montoTotal' => (float) number_format($data_venta->grand_total, 2, '.', ''),
+                'codigoMoneda' => 1,
+                'email' => (string) ($data_cliente->email ?? ''),
+                'codigoSucursal' => (int) $data_p_venta->sucursal,
+                'codigoPuntoVenta' => (int) $data_p_venta->codigo_punto_venta,
+                'montoGiftCard' => (float) number_format($data_gift_card->amount, 2, '.', ''),
+                'montoTotalMoneda' => (float) number_format($data_venta->grand_total, 2, '.', ''),
+                'montoTotalSujetoIva' => (float) number_format(($data_venta->grand_total - $data_gift_card->amount), 2, '.', ''),
+                'descuentoAdicional' => (float) number_format($data_venta->order_discount, 2, '.', ''),
+                'tipoCambio' => 1,
+                'usuario' => (string) ($data_cliente->usuario ?? (Auth::user() ? Auth::user()->name : 'admin')),
+                'cafc' => (string) $codigo_cafc,
+                'periodoFacturado' => $data_cliente->glosa_periodo_facturado,
+                'codigoDocumentoSector' => (int) $data_cliente->codigo_documento_sector,
+                'codigoExcepcion' => (int) ($data_cliente->codigo_excepcion ?? 0),
+                'detalle' => $data_product_sales,
+            ],
+            'adicionales' => $listAdicionales ?? [],
         ];
-        
-        // Solo enviar CUFD cuando NO esté en modo centralizado - Alquiler Offline
-        if (($pos_setting->cufd_centralizado ?? 0) == 0) {
-            $data_body['cufd'] = $data_siat_cufd->codigo_cufd;
-            log::info('CUFD incluido en request (modo estándar) - Alquiler Offline');
-        } else {
-            log::info('CUFD NO incluido en request (modo centralizado - flag activa) - Alquiler Offline');
-        }
 
         $response = Http::withHeaders([
             'Authorization' => $bearer,
@@ -1986,25 +1930,32 @@ trait SiatTrait
         $respuesta = array();
 
         if ($response->successful()) {
-
-            $update_customer_sale = CustomerSale::where('sale_id', $data_cliente->sale_id)->first();
             $data_json = $response->json();
-            // $update_customer_sale->codigo_recepcion = $data_json['codigo_recepcion'];
-            $update_customer_sale->cuf = $data_json['cuf'];
-            $update_customer_sale->codigo_cufd = $data_siat_cufd->codigo_cufd;
-            $update_customer_sale->xml = $data_json['xmlfactura'];
-            if ($pos_setting->codigo_emision == 1) {
-                // emisión en línea
-                $update_customer_sale->estado_factura = "CONTINGENCIA";
-                $msj = "Venta Facturada correctamente en modo Contingencia";
+            $update_customer_sale = CustomerSale::where('sale_id', $data_cliente->sale_id)->first();
+            if ($update_customer_sale) {
+                $update_customer_sale->cuf = $data_json['cuf'] ?? '';
+                $update_customer_sale->codigo_cufd = $data_json['CUFD'] ?? $data_json['cufd'] ?? '';
+                $update_customer_sale->xml = $data_json['xmlfactura'] ?? '';
+                if (!empty($data_json['nro_factura'])) {
+                    $update_customer_sale->nro_factura = $data_json['nro_factura'];
+                }
+                if ($pos_setting->codigo_emision == 1) {
+                    $update_customer_sale->estado_factura = "CONTINGENCIA";
+                    $msj = "Venta Facturada correctamente en modo Contingencia";
+                } else {
+                    $update_customer_sale->estado_factura = "MASIVO";
+                    $msj = "Venta Facturada correctamente en modo Masivo";
+                }
+                $update_customer_sale->save();
             } else {
-                // emisión masiva
-                $update_customer_sale->estado_factura = "MASIVO";
-                $msj = "Venta Facturada correctamente en modo Masivo";
+                $msj = "Venta Facturada correctamente en modo Contingencia";
             }
-            $update_customer_sale->save();
 
-            $respuesta = array('mensaje' => $msj, 'status' => true);
+            $respuesta = array(
+                'mensaje' => $msj,
+                'status' => true,
+                'nro_factura_central' => $data_json['nro_factura'] ?? null
+            );
         } else {
             $error = $response->json();
             $titulo_error = $error['status'];
