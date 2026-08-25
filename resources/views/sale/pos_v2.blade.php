@@ -3239,12 +3239,7 @@
         // Bandera para contingencia mayor a 5
         var bandera_evento_contingencia = false;
         var bandera_fecha_manual_cafc = new Date();
-        var bandera_siat = 0;
-        var bandera_siat = <?php if (session()->has('token_siat')) {
-            echo json_encode(1);
-        } else {
-            echo json_encode(0);
-        } ?>;
+        var bandera_siat = <?php echo json_encode($hasSiat ? 1 : 0); ?>;
 
         // Bandera para modo proforma
         var modo_proforma = false;
@@ -6306,7 +6301,7 @@
                     } else {
                         console.log('Falso, los servicios no están funcionando, SIN caído => ' + data);
                         bandera_servicio_sin = false;
-                        <?php if(session()->has('token_siat')){ ?>
+                        <?php if($hasSiat){ ?>
                         alertaPuntoVentaContingencia();
                         <?php } ?>
                     }

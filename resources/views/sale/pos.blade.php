@@ -1508,20 +1508,20 @@
                         <div class="modal-content" style="max-height: 90vh; height: auto; display: flex;">
                             <div class="modal-header bg-light " style="padding: 0.75rem 1rem;">
                                 <h6 id="exampleModalLabel" class="modal-title font-weight-bold" style="font-size: 0.95rem;">
-                                    @if (session()->has('token_siat'))
+                                    @if ($hasSiat)
                                         <i class="fa fa-file-invoice"></i> Facturar Venta
                                     @else
                                         <i class="fa fa-check-circle"></i> Finalizar Venta
                                     @endif
                                 </h6>
                                 <div style="display:none;">
-                                    @if (session()->has('token_siat'))
+                                    @if ($hasSiat)
                                         <input id="toggle-event" type="checkbox" data-toggle="toggle"
                                             data-on="Si" data-off="No" data-onstyle="primary"
                                             data-offstyle="secondary">
                                     @endif
                                 </div>
-                                @if (session()->has('token_siat'))
+                                @if ($hasSiat)
                                 <div id="btn_modeOnline" class="d-flex align-items-center mr-3" style="display:none;">
                                     <div class="mode-toggle-container">
                                         <small id="text_modo_pos" class="mode-label">Modo: Online</small>
@@ -1556,7 +1556,7 @@
                                                 <i class="fa fa-money-bill"></i> Monto
                                             </a>
                                         </li>
-                                        @if (session()->has('token_siat'))
+                                        @if ($hasSiat)
                                         <li class="nav-item">
                                             <a id="tab_preview" class="nav-link disabled" data-toggle="tab" href="#segundoTab" role="tab">
                                                 <i class="fa fa-eye"></i> Imprimible
@@ -1630,7 +1630,7 @@
                                                         <input type="hidden" name="monto_pago_online">
                                                         <input type="hidden" name="monto_debito_automatico">
                                                         <label>{{ trans('file.Paid By') }}</label>
-                                                        @if (session()->has('token_siat'))
+                                                        @if ($hasSiat)
                                                             <select name="paid_by_id_select"
                                                                 class="form-control selectpicker payment-select" data-live-search="true"
                                                                 data-live-search-style="contains"
@@ -1688,7 +1688,7 @@
                                                     <div class="form-group col-md-12" id="MP_cheque">
                                                         <label>{{ trans('file.Cheque Number') }} *</label>
                                                         <input type="text" name="cheque_no" class="form-control"
-                                                            onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">
+                                                             onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">
                                                     </div>
                                                     <div class="form-group col-md-12 qrsimple" style="display: none;">
                                                         <p class="text-center"><i
@@ -1737,7 +1737,7 @@
                                                 <div class="mt-3">
                                                     <button class="btn btn-secondary btn-sm"
                                                         id="segundoTabContinue" 
-                                                        @if (!session()->has('token_siat')) style="display:none;" @endif>
+                                                        @if (!$hasSiat) style="display:none;" @endif>
                                                         Facturar
                                                     </button>
                                                 </div>
@@ -1779,7 +1779,7 @@
                                         </div>
                                     </div>
                                     {{-- formulario de la segunda parte: IMPRIMIBLE (preview) --}}
-                                    @if (session()->has('token_siat'))
+                                    @if ($hasSiat)
                                         <div class="tab-pane fade" id="segundoTab" role="tabpanel">
                                             <div class="row">
                                                 <div class="col-md-12">
@@ -3314,12 +3314,7 @@
         // Bandera para contingencia mayor a 5
         var bandera_evento_contingencia = false;
         var bandera_fecha_manual_cafc = new Date();
-        var bandera_siat = 0;
-        var bandera_siat = <?php if (session()->has('token_siat')) {
-            echo json_encode(1);
-        } else {
-            echo json_encode(0);
-        } ?>;
+        var bandera_siat = <?php echo json_encode($hasSiat ? 1 : 0); ?>;
 
         // Bandera para modo proforma
         var modo_proforma = false;
@@ -6381,7 +6376,7 @@
                     } else {
                         console.log('Falso, los servicios no están funcionando, SIN caído => ' + data);
                         bandera_servicio_sin = false;
-                        <?php if(session()->has('token_siat')){ ?>
+                        <?php if($hasSiat){ ?>
                         alertaPuntoVentaContingencia();
                         <?php } ?>
                     }

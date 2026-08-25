@@ -1854,6 +1854,16 @@ class SaleController extends Controller
             \DB::beginTransaction();
 
             $sale_id = $request->input('sale_id');
+
+            // Asegurar que exista token SIAT antes de emitir la factura
+            if (empty(session('token_siat')) || !session('auth_siat', false)) {
+                try {
+                    $this->getToken();
+                } catch (\Throwable $e) {
+                    // El proceso de factura manejará el estado offline / contingencia si aplica
+                }
+            }
+
             Log::info('POS finalizeAjax: inicio de paso 3', [
                 'sale_id' => $sale_id,
                 'biller_id' => $request->input('biller_id'),
@@ -3022,8 +3032,16 @@ class SaleController extends Controller
                 $siatConfigured = !empty(trim((string) ($lims_pos_setting_data->user_siat ?? '')))
                     && !empty(trim((string) ($lims_pos_setting_data->pass_siat ?? '')))
                     && !empty(trim((string) ($lims_pos_setting_data->url_siat ?? '')));
+                
+                if ($siatConfigured && (empty(session('token_siat')) || !session('auth_siat', false))) {
+                    try {
+                        $this->getToken();
+                    } catch (\Throwable $e) {
+                        // Silenciar error si el servicio SIAT está temporalmente inaccesible
+                    }
+                }
                 $siatAuthenticated = (bool) session('auth_siat', false) && !empty(session('token_siat'));
-                $hasSiat = $siatConfigured && $siatAuthenticated;
+                $hasSiat = $siatConfigured;
                 return view('sale.pos', compact('all_permission', 'lims_customer_group_all', 'lims_warehouse_list', 'lims_product_list', 'product_number', 'lims_tax_list', 'lims_biller_list', 'lims_customer_list', 'lims_pos_setting_data', 'lims_brand_list', 'lims_category_list', 'recent_sale', 'recent_draft', 'lims_coupon_list', 'flag', 'lims_methodpay_list', 'biller_data', 'account_data', 'lista_documentos', 'lista_metodo_pago', 'customer_data', 'lims_sucursal_all', 'lims_warehouse_selects', 'hasSiat'));
             } else {
                 if (Auth::user()->role_id > 2 && Auth::user()->biller) {
@@ -3166,8 +3184,16 @@ class SaleController extends Controller
                 $siatConfigured = !empty(trim((string) ($lims_pos_setting_data->user_siat ?? '')))
                     && !empty(trim((string) ($lims_pos_setting_data->pass_siat ?? '')))
                     && !empty(trim((string) ($lims_pos_setting_data->url_siat ?? '')));
+                
+                if ($siatConfigured && (empty(session('token_siat')) || !session('auth_siat', false))) {
+                    try {
+                        $this->getToken();
+                    } catch (\Throwable $e) {
+                        // Silenciar error si el servicio SIAT está temporalmente inaccesible
+                    }
+                }
                 $siatAuthenticated = (bool) session('auth_siat', false) && !empty(session('token_siat'));
-                $hasSiat = $siatConfigured && $siatAuthenticated;
+                $hasSiat = $siatConfigured;
                 return view('sale.pos_v2', compact('all_permission', 'lims_customer_group_all', 'lims_warehouse_list', 'lims_product_list', 'product_number', 'lims_tax_list', 'lims_biller_list', 'lims_customer_list', 'lims_pos_setting_data', 'lims_brand_list', 'lims_category_list', 'recent_sale', 'recent_draft', 'lims_coupon_list', 'flag', 'lims_methodpay_list', 'biller_data', 'account_data', 'lista_documentos', 'lista_metodo_pago', 'customer_data', 'lims_sucursal_all', 'lims_warehouse_selects', 'hasSiat'));
             } else {
                 if (Auth::user()->role_id > 2 && Auth::user()->biller) {
