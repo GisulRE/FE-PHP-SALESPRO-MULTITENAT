@@ -1550,12 +1550,14 @@
                                 <div class="d-flex align-items-center">
                                     @if ($hasSiat)
                                     <div id="btn_modeOnline" class="d-flex align-items-center mr-3">
-                                        <div class="mode-toggle-container">
-                                            <small id="text_modo_pos" class="mode-label">Modo: Online</small>
-                                            <input id="toggle-event-mode" type="checkbox" checked data-toggle="toggle"
-                                                data-on="Online" data-off="Offline" data-onstyle="success"
-                                                data-offstyle="danger" data-size="sm" data-width="72">
-                                        </div>
+                                        <label class="modern-pos-switch" for="toggle-event-mode" title="Click para alternar entre Modo Online y Offline">
+                                            <input type="checkbox" id="toggle-event-mode" checked>
+                                            <span class="switch-slider">
+                                                <span class="switch-state state-online"><i class="fa fa-wifi mr-1"></i> ONLINE</span>
+                                                <span class="switch-state state-offline"><i class="fa fa-plane mr-1"></i> OFFLINE</span>
+                                                <span class="switch-handle"></span>
+                                            </span>
+                                        </label>
                                     </div>
                                     @endif
                                     <button type="button" data-dismiss="modal" aria-label="Close" class="close text-white">
@@ -2881,62 +2883,93 @@
             font-size: 0.75rem;
         }
 
-        /* ==== ESTILOS PARA SWITCHES MEJORADOS (COMPACTOS) ==== */
-
-        /* Switch Online/Offline - Modo de Contingencia (compacto) */
-        /* Contenedor externo del switch: usa flex y centra todo */
-        #btn_modeOnline {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 8px;
+        /* ==== ESTILOS PARA SWITCH ONLINE/OFFLINE (MODERNO PILL SLIDER) ==== */
+        .modern-pos-switch {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            margin: 0;
+            font-family: inherit;
         }
 
-        .mode-toggle-container {
+        .modern-pos-switch input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .modern-pos-switch .switch-slider {
+            position: relative;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 2px 6px;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            border-radius: 6px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+            justify-content: space-between;
+            width: 122px;
+            height: 30px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            border-radius: 30px;
+            padding: 0 10px;
+            transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.18), 0 2px 5px rgba(0,0,0,0.08);
         }
 
-        .mode-label {
-            display: block;
-            margin: 0;
-            font-weight: 600;
-            color: #495057;
-            white-space: nowrap;
-            font-size: 0.78rem;
-            letter-spacing: 0.2px;
-            text-align: center;
+        .modern-pos-switch input:checked + .switch-slider {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
 
-        /* Compactar los botones del toggle mode */
-        #btn_modeOnline .toggle.btn {
-            margin: 0 !important;
-            padding: 2px 8px !important;
-            min-height: 28px !important;
-            height: auto !important;
+        .modern-pos-switch .switch-state {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #ffffff;
+            z-index: 1;
+            transition: opacity 0.2s ease;
+            display: inline-flex;
+            align-items: center;
         }
 
-        #btn_modeOnline .toggle-group label {
-            padding: 0 6px !important;
-            font-size: 0.72rem !important;
-            font-weight: 600;
-            letter-spacing: 0.08px;
-            line-height: 1 !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            text-align: center !important;
+        .modern-pos-switch .state-online {
+            opacity: 1;
+            margin-left: 2px;
         }
 
-        /* Transición suave */
-        #btn_modeOnline .toggle {
-            transition: all 0.18s ease;
+        .modern-pos-switch .state-offline {
+            opacity: 0;
+            display: none;
+        }
+
+        .modern-pos-switch input:not(:checked) + .switch-slider .state-online {
+            opacity: 0;
+            display: none;
+        }
+
+        .modern-pos-switch input:not(:checked) + .switch-slider .state-offline {
+            opacity: 1;
+            display: inline-flex;
+            margin-right: 2px;
+        }
+
+        .modern-pos-switch .switch-handle {
+            position: absolute;
+            top: 3px;
+            right: 4px;
+            width: 24px;
+            height: 24px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+        }
+
+        .modern-pos-switch input:not(:checked) + .switch-slider .switch-handle {
+            transform: translateX(-90px);
+        }
+
+        .modern-pos-switch:hover .switch-slider {
+            filter: brightness(1.06);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.18), 0 3px 8px rgba(0,0,0,0.18);
         }
 
         /* Switch Proforma Si/No (compacto) */
@@ -6454,13 +6487,7 @@
             }
 
             var modoOnline = !bandera_puntoventa_contingencia;
-            if (modoOnline) {
-                $('#toggle-event-mode').bootstrapToggle('on', true);
-                $('#text_modo_pos').text('Modo: Online');
-            } else {
-                $('#toggle-event-mode').bootstrapToggle('off', true);
-                $('#text_modo_pos').text('Modo: Offline');
-            }
+            $('#toggle-event-mode').prop('checked', modoOnline);
         }
 
         var _toggleInicializando = false;
