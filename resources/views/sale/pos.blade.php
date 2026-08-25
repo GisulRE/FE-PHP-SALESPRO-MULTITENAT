@@ -6420,6 +6420,7 @@
                 url: url,
                 type: "GET",
                 success: function(data) {
+                    _toggleInicializando = true;
                     if (data == true) {
                         // el punto de venta se encuentra en modo contingencia
                         console.log('mostrarLabelContingencia ')
@@ -6434,6 +6435,7 @@
                         bandera_puntoventa_contingencia = false;
                         sincronizarSwitchModoPOS();
                     }
+                    _toggleInicializando = false;
                 }
             });
 
@@ -6511,24 +6513,28 @@
                 $('#text_modo_pos').text('Modo: Offline');
             }
         }
+        
+        var _toggleInicializando = false;
 
         function toggleModoPOS(modoOffline) {
             var id = $('select[name=biller_id]').val();
             var url_data = '{{ route('toggle_modo_contingencia', ':id') }}';
             url_data = url_data.replace(':id', id);
 
-            $(\"#spinner-contigencia-div\").show();
-            $(\"#submit-btn\").addClass(\"disabled noselect\");
+            $("#spinner-contigencia-div").show();
+            $("#submit-btn").addClass("disabled noselect");
 
             $.ajax({
                 url: url_data,
                 type: 'POST',
-                headers: { 'X-CSRF-TOKEN': $('meta[name=\"csrf-token\"]').attr('content') },
+                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                 data: { modo: modoOffline },
                 success: function(data) {
                     if (data.estado == true) {
                         bandera_puntoventa_contingencia = data.modo_contingencia;
+                        _toggleInicializando = true;
                         sincronizarSwitchModoPOS();
+                        _toggleInicializando = false;
                         if (data.modo_contingencia) {
                             $('#label_contingencia').show();
                             Swal.fire('Modo Offline', data.mensaje, 'warning');
@@ -6538,21 +6544,26 @@
                         }
                     } else {
                         Swal.fire('Error', data.mensaje, 'error');
+                        _toggleInicializando = true;
                         sincronizarSwitchModoPOS();
+                        _toggleInicializando = false;
                     }
                 },
                 error: function() {
                     Swal.fire('Error', 'No se pudo cambiar el modo.', 'error');
+                    _toggleInicializando = true;
                     sincronizarSwitchModoPOS();
+                    _toggleInicializando = false;
                 },
                 complete: function() {
-                    $(\"#spinner-contigencia-div\").hide();
-                    $(\"#submit-btn\").removeClass(\"disabled noselect\");
+                    $("#spinner-contigencia-div").hide();
+                    $("#submit-btn").removeClass("disabled noselect");
                 }
             });
         }
 
         $(document).on('change', '#toggle-event-mode', function() {
+            if (_toggleInicializando) return; // ignorar cambios programáticos de inicialización
             var modoOffline = !$(this).prop('checked'); // checked = Online, unchecked = Offline
             toggleModoPOS(modoOffline);
         });

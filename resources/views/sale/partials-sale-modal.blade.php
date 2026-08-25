@@ -421,19 +421,7 @@
         }
     })
 
-    // Caso Entrar a modo online, mostrar si desea entrar a modo online y enviar contigencia o no.
-    $('#toggle-event-mode').change(function() {
-        console.log('Toggle Mode: ' + $(this).prop('checked'))
-        if ($(this).prop('checked') == true) {
-            $("#spinner-contigencia-div").show();
-            $('#toggle-event-mode').prop('disabled', (i, v) => !v);
-            $("#submit-btn").addClass("disabled noselect");
-            registraEventoContingencia();
-        } else {
-            $("#spinner-contigencia-div").hide();
-            $("#submit-btn").removeClass("disabled noselect");
-        }
-    })
+    // Nota: el cambio de modo Online/Offline es manejado por toggleModoPOS() en pos.blade.php
 
     // Forzar Facturar siempre en POS
     $('#toggle-event').prop('checked', true).change();
