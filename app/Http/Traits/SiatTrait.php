@@ -4926,7 +4926,7 @@ Descripción: " . $data_response['descripcion'];
                 ->first();
         }
 
-        if (!$data_siat_cufd) {
+        if (!$data_siat_cufd && !$modo_centralizado) {
             Log::error("generaNotaFiscal - No se encontró CUFD vigente para sucursal={$data_p_venta->sucursal} codigoPuntoVenta={$data_p_venta->codigo_punto_venta}");
             return ['status' => false, 'mensaje' => 'No se encontró un CUFD vigente para la sucursal ' . $data_p_venta->sucursal . ' y punto de venta ' . $data_p_venta->codigo_punto_venta . '. Debe renovar el CUFD.'];
         }
@@ -4935,7 +4935,8 @@ Descripción: " . $data_response['descripcion'];
         if (!$data_sucursal) {
             $data_sucursal = (object)[
                 'ciudad_municipio' => 'LA PAZ',
-                'telefono' => $data_biller->phone_number ?? '0'
+                'telefono' => $data_biller->phone_number ?? '0',
+                'direccion' => ''
             ];
         }
 
@@ -4985,39 +4986,42 @@ Descripción: " . $data_response['descripcion'];
         }
         $montoIVA = ($montoDevuelto * $tax->rate) / 100;
 
+        $codigo_cufd_val = $modo_centralizado ? "" : ($data_siat_cufd->codigo_cufd ?? '');
+        $direccion_val = $data_siat_cufd->direccion ?? ($data_sucursal->direccion ?? '');
+
         // Construir data_body base - Nota Fiscal
         $data_body = [
-            'codigoPuntoVenta' => $data_siat_cufd->codigo_punto_venta,
+            'codigoPuntoVenta' => (int) $data_p_venta->codigo_punto_venta,
             'nit' => $pos_setting->nit_emisor,
-            'sucursal' => $data_siat_cufd->sucursal,
+            'sucursal' => (int) $data_p_venta->sucursal,
             'notaFiscal' => [
-                "codigoCliente" => $data_cliente->codigofijo,
+                "codigoCliente" => $data_cliente->codigofijo ?? '1',
                 "codigoDocumentoSector" => 24,
-                "codigoExcepcion" => $data_cliente->codigo_excepcion,
-                "codigoPuntoVenta" => $data_siat_cufd->codigo_punto_venta,
-                "codigoSucursal" => $data_siat_cufd->sucursal,
-                "codigoTipoDocumentoIdentidad" => $lims_customer_data->tipo_documento,
+                "codigoExcepcion" => (int) ($data_cliente->codigo_excepcion ?? 0),
+                "codigoPuntoVenta" => (int) $data_p_venta->codigo_punto_venta,
+                "codigoSucursal" => (int) $data_p_venta->sucursal,
+                "codigoTipoDocumentoIdentidad" => (int) $lims_customer_data->tipo_documento,
                 "complemento" => $lims_customer_data->complemento_documento,
                 "cuf" => $factura['cuf'],
-                "cufd" => $data_siat_cufd->codigo_cufd,
-                "direccion" => $data_siat_cufd->direccion,
+                "cufd" => $codigo_cufd_val,
+                "direccion" => $direccion_val,
                 "fechaEmision" => date("Y-m-d H:i:s"),
                 "fechaEmisionFactura" => $fechaemision,
                 "leyenda" => $data_leyenda->descripcion_leyenda,
                 "montoDescuentoCreditoDebito" => 0,
                 "montoEfectivoCreditoDebito" => number_format((float) $montoIVA, 2, '.', ''),
                 "montoTotalDevuelto" => number_format($montoDevuelto, 2, '.', ''),
-                "montoTotalOriginal" => number_format($factura['montoTotalMoneda'] + $factura['descuentoAdicional'], 2, '.', ''),
-                "municipio" => $data_sucursal->ciudad_municipio,
+                "montoTotalOriginal" => number_format($factura['montoTotalMoneda'] + ($factura['descuentoAdicional'] ?? 0), 2, '.', ''),
+                "municipio" => $data_sucursal->ciudad_municipio ?? 'LA PAZ',
                 "nitEmisor" => $pos_setting->nit_emisor,
                 "nombreRazonSocial" => $lims_customer_data->razon_social,
                 "numeroAutorizacionCuf" => $factura['cuf'],
                 "numeroDocumento" => $lims_customer_data->valor_documento,
-                "numeroFactura" => $data_cliente->nro_factura,
+                "numeroFactura" => $data_cliente->nro_factura ?? 1,
                 "numeroNotaCreditoDebito" => $correlativo_notafiscal,
                 'razonSocialEmisor' => $pos_setting->razon_social_emisor,
-                "telefono" => $data_sucursal->telefono,
-                "usuario" => $data_cliente->usuario,
+                "telefono" => $data_sucursal->telefono ?? '0',
+                "usuario" => $data_cliente->usuario ?? (Auth::user()->name ?? 'ADMIN'),
                 "email" => $lims_customer_data->email,
                 "detalle" => $list_items,
             ],
@@ -5049,14 +5053,14 @@ Descripción: " . $data_response['descripcion'];
             $obj_cliente->tipo_documento = $lims_customer_data->tipo_documento;
             $obj_cliente->valor_documento = $lims_customer_data->valor_documento;
             $obj_cliente->complemento_documento = $lims_customer_data->complemento_documento;
-            $obj_cliente->codigo_excepcion = $data_cliente->codigo_excepcion;
+            $obj_cliente->codigo_excepcion = $data_cliente->codigo_excepcion ?? 0;
             $obj_cliente->codigo_documento_sector = 24;
             $obj_cliente->nro_factura = $correlativo_notafiscal;
             $obj_cliente->tipo_caso_especial = false;
             $obj_cliente->estado_factura = "VIGENTE";
             $obj_cliente->sucursal = $data_p_venta->sucursal;
             $obj_cliente->codigo_punto_venta = $data_p_venta->codigo_punto_venta;
-            $obj_cliente->codigo_cufd = $data_siat_cufd->codigo_cufd;
+            $obj_cliente->codigo_cufd = $data['cufd'] ?? ($data_siat_cufd->codigo_cufd ?? null);
             $obj_cliente->cuf = $data['cuf'];
             $obj_cliente->codigo_recepcion = $data['codigo_recepcion'];
             $obj_cliente->xml = $data['xmlfactura'];

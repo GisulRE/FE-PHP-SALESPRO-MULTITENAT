@@ -136,6 +136,12 @@ trait CufdTrait
     // Devuelve true si hay un CUFD utilizable (vigente o recién renovado), false si no.
     public function asegurarCufdVigente($p_venta)
     {
+        $pos_setting = PosSetting::latest()->first();
+        if (($pos_setting->cufd_centralizado ?? 0) == 1) {
+            Log::info('asegurarCufdVigente: CUFD Centralizado activo (cufd_centralizado = 1), el servicio SIAT gestiona CUFD/CUIS internamente.');
+            return true;
+        }
+
         if ($p_venta == null) {
             Log::warning('asegurarCufdVigente: punto de venta nulo, no se puede verificar CUFD.');
             return false;
