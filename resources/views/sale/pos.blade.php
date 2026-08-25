@@ -4482,6 +4482,23 @@
                 $('#add-payment').modal('hide');
                 return;
             }
+
+            // Validar que hayan productos agregados si estamos en el primer paso
+            if ($('.tab-pane#primerTab').hasClass('show') || !$('#myTab').length) {
+                var rownumber = $('table.order-list tbody tr:last').index();
+                if (rownumber < 0) {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'warning',
+                        title: 'Por favor agregue al menos un producto a la orden',
+                        showConfirmButton: false,
+                        timer: 2500
+                    });
+                    e.preventDefault();
+                    return;
+                }
+            }
             
             // 1) Sin SIAT: interceptar, crear venta via AJAX y abrir recibo en la misma página
             if (!hasSiat) {
@@ -4722,7 +4739,7 @@
             if (checkStatusIntervalId) clearInterval(checkStatusIntervalId);
             if (timerIntervalId) clearInterval(timerIntervalId);
             var activeStep = $('#myTab .nav-link.active').attr('href');
-            var shouldCleanPosRoute = hasSiat && (activeStep === '#segundoTab' || activeStep === '#tercerTab' || activeStep === '#cuartoTab');
+            var shouldCleanPosRoute = (activeStep === '#cuartoTab');
             mostrarPanelMontosModal();
             // reset stepper to primer tab
             try {

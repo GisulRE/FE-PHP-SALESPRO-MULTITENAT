@@ -821,10 +821,16 @@ class SaleController extends Controller
             } else {
                 $data['quotation_id'] = null;
             }
-            // Limpiar campo auxiliar que no existe en la tabla sales
-            unset($data['quotation_id_loaded']);
+            // Validar que vengan productos
+            if (empty($data['product_id']) || !is_array($data['product_id']) || count($data['product_id']) === 0) {
+                $errorMsg = 'No hay productos agregados en la venta.';
+                if ($is_ajax || $request->ajax() || $request->wantsJson()) {
+                    return response()->json(['status' => false, 'message' => $errorMsg], 422);
+                }
+                return redirect()->back()->with('not_permitted', $errorMsg);
+            }
 
-            $data['item'] = isset($data['product_id']) ? count($data['product_id']) : 0;
+            $data['item'] = count($data['product_id']);
 
             $lims_sale_data = Sale::create($data);
 
@@ -1679,8 +1685,8 @@ class SaleController extends Controller
                 $obj_cliente->codigo_punto_venta = $data_p_venta->codigo_punto_venta;
                 $obj_cliente->save();
 
-                // En modo AJAX pero SIN factura SIAT: retornamos gen_invoice de Nota de Venta
-                if ($is_ajax && empty($data['bandera_factura_hidden'])) {
+                // En modo AJAX (preview de paso 1 en POS o sin factura SIAT): retornamos gen_invoice para vista previa
+                if ($is_ajax && (!empty($data['ajax_preview']) || empty($data['bandera_factura_hidden']))) {
                     $update_p_venta->save();
                     \DB::commit();
                     $print_url = url('sales/gen_invoice/' . $lims_sale_data->id);
@@ -1698,13 +1704,16 @@ class SaleController extends Controller
                     // Caso Modo Contingencia
                     if ($data_p_venta->modo_contingencia == true) {
                         $codigoEvento = $this->getTipoEventoContingenciaPuntoVenta($data['biller_id']);
-                        if ($codigoEvento && $obj_cliente->codigo_documento_sector == 1) {
+                        if (!$codigoEvento) {
+                            $codigoEvento = 4;
+                        }
+                        if ($obj_cliente->codigo_documento_sector == 1) {
                             $respuesta = $this->generarFacturaIndividualOffline($lims_sale_data->id, $codigoEvento);
                         }
-                        if ($codigoEvento && $obj_cliente->codigo_documento_sector == 13) {
+                        if ($obj_cliente->codigo_documento_sector == 13) {
                             $respuesta = $this->generarFacturaServicioBasicoOffline($lims_sale_data->id, $codigoEvento);
                         }
-                        if ($codigoEvento && $obj_cliente->codigo_documento_sector == 2) {
+                        if ($obj_cliente->codigo_documento_sector == 2) {
                             $respuesta = $this->generarFacturaAlquilerOffline($lims_sale_data->id, $codigoEvento);
                         }
                         if ($respuesta['status']) {
@@ -2088,6 +2097,9 @@ class SaleController extends Controller
 
             if ($data_p_venta->modo_contingencia) {
                 $codigoEvento = $this->getTipoEventoContingenciaPuntoVenta($data['biller_id']);
+                if (!$codigoEvento) {
+                    $codigoEvento = 4;
+                }
                 Log::info('POS finalizeAjax: generación en contingencia', [
                     'sale_id' => $sale_id,
                     'codigo_documento_sector' => $obj_cliente->codigo_documento_sector,
