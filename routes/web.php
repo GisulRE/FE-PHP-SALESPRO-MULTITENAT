@@ -13,6 +13,21 @@
 */
 
 Auth::routes();
+
+Route::get('/clear-cache', function () {
+    \Artisan::call('cache:clear');
+    \Artisan::call('config:clear');
+    \Artisan::call('route:clear');
+    \Artisan::call('view:clear');
+    if (function_exists('opcache_reset')) {
+        @opcache_reset();
+    }
+    return response()->json([
+        'status' => true,
+        'message' => 'Cache, Config, Route, Views and OPcache cleared successfully!'
+    ]);
+});
+
 Route::get('/check-error-log', function () {
     header('Content-Type: text/plain; charset=utf-8');
     echo "=== ARCHIVOS DE LOG EN storage/logs ===\n";
@@ -619,19 +634,6 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	//Receivable Routes
 	Route::get('lote/findbyproduct/{id}', 'ProductController@lotesforProduct')->name('product.bylotes');
 
-	Route::get('clear-cache', function () {
-		\Artisan::call('cache:clear');
-		\Artisan::call('config:clear');
-		\Artisan::call('route:clear');
-		\Artisan::call('view:clear');
-		if (function_exists('opcache_reset')) {
-			@opcache_reset();
-		}
-		return response()->json([
-			'status' => true,
-			'message' => 'Cache, Config, Route, Views and OPcache cleared successfully!'
-		]);
-	});
 	Route::get('run/tarea_programada', 'SettingController@runTareaProgramada')->name('run_tarea_programada');
 	Route::get('run/forzar_renovar_cufd', 'SettingController@forzarRenovarCUFD')->name('forzar_renovar_cufd');
 	Route::get('run/vigencia_renovar_cufd/{biller_id}', 'SettingController@vigenciaRenovarCUFD')->name('vigencia_renovar_cufd');
