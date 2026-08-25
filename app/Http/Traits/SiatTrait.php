@@ -4954,10 +4954,12 @@ Descripción: " . $data_response['descripcion'];
         $nro_de_pagos = $array_payment_sales->count();
         $leyendas = SiatLeyendaFactura::all();
         $data_leyenda = $this->pickRandomLeyenda($leyendas);
-        if (!$data_leyenda) {
-            $data_leyenda = (object)['descripcion_leyenda' => 'Ley N° 453: El proveedor debe brindar atención sin discriminación.'];
+        $rawFechaFactura = $factura['fechaEmision'] ?? null;
+        if (!empty($rawFechaFactura)) {
+            $fechaemision = date("Y-m-d H:i:s", strtotime($rawFechaFactura));
+        } else {
+            $fechaemision = date("Y-m-d H:i:s");
         }
-        $fechaemision = str_replace('-', '/', $factura['fechaEmision']);
         $list_items = [];
         foreach ($factura["detalle"] as $item) {
             $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $item["unidadMedida"])->where('tipo_clasificador', 'unidadMedida')->first();
