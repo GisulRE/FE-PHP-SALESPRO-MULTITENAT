@@ -1548,7 +1548,16 @@
                                     <i class="fa fa-cash-register"></i> <span id="pos-v2-modal-title">Cobro de Venta & Facturación SIAT</span>
                                 </h5>
                                 <div class="d-flex align-items-center">
-                                    <span class="badge badge-success px-2 py-1 mr-3"><i class="fa fa-circle"></i> SIAT Online</span>
+                                    @if ($hasSiat)
+                                    <div id="btn_modeOnline" class="d-flex align-items-center mr-3">
+                                        <div class="mode-toggle-container">
+                                            <small id="text_modo_pos" class="mode-label">Modo: Online</small>
+                                            <input id="toggle-event-mode" type="checkbox" checked data-toggle="toggle"
+                                                data-on="Online" data-off="Offline" data-onstyle="success"
+                                                data-offstyle="danger" data-size="sm" data-width="72">
+                                        </div>
+                                    </div>
+                                    @endif
                                     <button type="button" data-dismiss="modal" aria-label="Close" class="close text-white">
                                         <span aria-hidden="true"><i class="dripicons-cross"></i></span>
                                     </button>
@@ -4407,6 +4416,23 @@
                 $('#add-payment').modal('hide');
                 return;
             }
+
+            // Validar que hayan productos agregados si estamos en el primer paso
+            if ($('.tab-pane#primerTab').hasClass('show') || !$('#myTab').length) {
+                var rownumber = $('table.order-list tbody tr:last').index();
+                if (rownumber < 0) {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'warning',
+                        title: 'Por favor agregue al menos un producto a la orden',
+                        showConfirmButton: false,
+                        timer: 2500
+                    });
+                    e.preventDefault();
+                    return;
+                }
+            }
             
             // 1) Sin SIAT: interceptar, crear venta via AJAX y abrir recibo en la misma página
             if (!hasSiat) {
@@ -4647,7 +4673,7 @@
             if (checkStatusIntervalId) clearInterval(checkStatusIntervalId);
             if (timerIntervalId) clearInterval(timerIntervalId);
             var activeStep = $('#myTab .nav-link.active').attr('href');
-            var shouldCleanPosRoute = hasSiat && (activeStep === '#segundoTab' || activeStep === '#tercerTab' || activeStep === '#cuartoTab');
+            var shouldCleanPosRoute = (activeStep === '#cuartoTab');
             mostrarPanelMontosModal();
             // reset stepper to primer tab
             try {
@@ -6437,59 +6463,63 @@
             }
         }
 
-        function activarModoContingenciaPOS() {
+        var _toggleInicializando = false;
+
+        function _toastModo(icono, titulo) {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: icono,
+                title: titulo,
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true,
+            });
+        }
+
+        function toggleModoPOS(modoOffline) {
             var id = $('select[name=biller_id]').val();
-            var codigo_documento_sector = $('input[name="bandera_codigo_documento_sector_hidden"]').val();
-            var url_data = '{{ route('activar_modo_contingencia_pos', ':id') }}';
+            var url_data = '{{ route('toggle_modo_contingencia', ':id') }}';
             url_data = url_data.replace(':id', id);
 
-            $("#spinner-contigencia-div").show();
-            $("#submit-btn").addClass("disabled noselect");
             $.ajax({
                 url: url_data,
                 type: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                },
-                data: {
-                    codigo_documento_sector: codigo_documento_sector,
-                    codigo_evento: 4,
-                },
+                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                data: { modo: modoOffline },
                 success: function(data) {
                     if (data.estado == true) {
-                        bandera_puntoventa_contingencia = true;
-                        Swal.fire('Modo Contingencia', data.mensaje, 'success');
-                        mostrarLabelContingencia();
-                    } else {
-                        Swal.fire('Modo Contingencia', data.mensaje, 'warning');
-                        bandera_puntoventa_contingencia = false;
+                        bandera_puntoventa_contingencia = data.modo_contingencia;
+                        _toggleInicializando = true;
                         sincronizarSwitchModoPOS();
+                        _toggleInicializando = false;
+                        if (data.modo_contingencia) {
+                            $('#label_contingencia').show();
+                            _toastModo('warning', 'Modo Offline activado');
+                        } else {
+                            $('#label_contingencia').hide();
+                            _toastModo('success', 'Modo Online activado');
+                        }
+                    } else {
+                        _toastModo('error', data.mensaje || 'Error al cambiar modo');
+                        _toggleInicializando = true;
+                        sincronizarSwitchModoPOS();
+                        _toggleInicializando = false;
                     }
                 },
                 error: function() {
-                    Swal.fire('Error', 'No se pudo activar modo contingencia.', 'error');
-                    bandera_puntoventa_contingencia = false;
+                    _toastModo('error', 'No se pudo cambiar el modo');
+                    _toggleInicializando = true;
                     sincronizarSwitchModoPOS();
-                },
-                complete: function() {
-                    $("#spinner-contigencia-div").hide();
-                    $("#submit-btn").removeClass("disabled noselect");
+                    _toggleInicializando = false;
                 }
             });
         }
 
         $(document).on('change', '#toggle-event-mode', function() {
-            var modoOnline = $(this).prop('checked');
-            if (modoOnline) {
-                return;
-            }
-
-            if (bandera_puntoventa_contingencia === true) {
-                sincronizarSwitchModoPOS();
-                return;
-            }
-
-            activarModoContingenciaPOS();
+            if (_toggleInicializando) return;
+            var modoOffline = !$(this).prop('checked');
+            toggleModoPOS(modoOffline);
         });
 
         function consultarMinimoFechaManualCafc() {
