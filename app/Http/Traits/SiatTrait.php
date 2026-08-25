@@ -5098,39 +5098,68 @@ Descripción: " . $data_response['descripcion'];
     public function anularNotaDebitoCredito($factura, $motivo, $customerSale)
     {
         $pos_setting = PosSetting::latest()->first();
-        $bearer = 'Bearer ' . Session::get('token_siat');
+        $token = Session::get('token_siat');
+        if (!$token) {
+            $token = $this->getToken();
+        }
+        $bearer = 'Bearer ' . $token;
         $host = $pos_setting->url_operaciones;
         $path = '/documento.ajuste/anula.nota.ajuste';
+        $modo_centralizado = ($pos_setting->cufd_centralizado ?? 0) == 1;
 
-        Log::info("anularNotaDebitoCredito - CustomerSale ID: " . $customerSale->id . " - CUF: " . $customerSale->cuf . " - Motivo: " . $motivo . " - Endpoint: " . $host . $path);
+        Log::info("anularNotaDebitoCredito - CustomerSale ID: " . $customerSale->id . " - CUF: " . $customerSale->cuf . " - Motivo: " . $motivo . " - Centralizado: " . ($modo_centralizado ? 'SI' : 'NO') . " - Endpoint: " . $host . $path);
 
-        $data_p_venta = SiatPuntoVenta::where([
-            'sucursal' => $customerSale->sucursal,
-            'codigo_punto_venta' => $customerSale->codigo_punto_venta
-        ])->first();
+        $codigo_cufd_val = "";
+        $codigo_cuis_val = "";
 
-        if (!$data_p_venta) {
-            Log::error("anularNotaDebitoCredito - No se encontró SiatPuntoVenta para sucursal={$customerSale->sucursal} codigoPuntoVenta={$customerSale->codigo_punto_venta}");
-            return array('mensaje' => 'No se encontró el punto de venta configurado en SIAT.', 'status' => false);
-        }
+        if (!$modo_centralizado) {
+            $data_p_venta = SiatPuntoVenta::where([
+                'sucursal' => $customerSale->sucursal,
+                'codigo_punto_venta' => $customerSale->codigo_punto_venta
+            ])->first();
 
-        $this->asegurarCufdVigente($data_p_venta);
-        $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
+            if (!$data_p_venta) {
+                $data_p_venta = SiatPuntoVenta::withoutGlobalScope('company')
+                    ->where('sucursal', $customerSale->sucursal)
+                    ->where('codigo_punto_venta', $customerSale->codigo_punto_venta)
+                    ->first();
+            }
 
-        if (!$data_siat_cufd) {
-            Log::error("anularNotaDebitoCredito - No se encontró CUFD vigente para sucursal={$data_p_venta->sucursal} codigoPuntoVenta={$data_p_venta->codigo_punto_venta}");
-            return array('mensaje' => 'No se encontró un CUFD vigente para anular la nota.', 'status' => false);
+            if (!$data_p_venta) {
+                Log::error("anularNotaDebitoCredito - No se encontró SiatPuntoVenta para sucursal={$customerSale->sucursal} codigoPuntoVenta={$customerSale->codigo_punto_venta}");
+                return array('mensaje' => 'No se encontró el punto de venta configurado en SIAT.', 'status' => false);
+            }
+
+            $this->asegurarCufdVigente($data_p_venta);
+            $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
+
+            if (!$data_siat_cufd) {
+                $data_siat_cufd = SiatCufd::withoutGlobalScope('company')
+                    ->where('sucursal', $data_p_venta->sucursal)
+                    ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                    ->where('estado', true)
+                    ->orderBy('fecha_registro', 'desc')
+                    ->first();
+            }
+
+            if (!$data_siat_cufd) {
+                Log::error("anularNotaDebitoCredito - No se encontró CUFD vigente para sucursal={$data_p_venta->sucursal} codigoPuntoVenta={$data_p_venta->codigo_punto_venta}");
+                return array('mensaje' => 'No se encontró un CUFD vigente para anular la nota.', 'status' => false);
+            }
+
+            $codigo_cufd_val = $data_siat_cufd->codigo_cufd;
+            $codigo_cuis_val = $data_p_venta->codigo_cuis;
         }
 
         $data_body = [
             "codigoDocumento" => 24,
-            "codigoPuntoVenta" => $customerSale->codigo_punto_venta,
-            "cuf" => $customerSale->cuf,
-            "cufd" => $data_siat_cufd->codigo_cufd,
-            "cuis" => $data_p_venta->codigo_cuis,
-            "motivo" => $motivo,
+            "codigoPuntoVenta" => (int) ($customerSale->codigo_punto_venta ?? 0),
+            "cuf" => (string) $customerSale->cuf,
+            "cufd" => $codigo_cufd_val,
+            "cuis" => $codigo_cuis_val,
+            "motivo" => (int) $motivo,
             "nit" => $pos_setting->nit_emisor,
-            "sucursal" => $customerSale->sucursal
+            "sucursal" => (int) ($customerSale->sucursal ?? 0)
         ];
 
         Log::info("anularNotaDebitoCredito - URL => " . $host . $path);

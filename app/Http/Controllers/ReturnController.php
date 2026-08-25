@@ -1054,10 +1054,11 @@ class ReturnController extends Controller
         $lims_return_data = Returns::find($id);
         $lims_product_return_data = ProductReturn::where('return_id', $id)->get();
         if ($lims_return_data->cuf && $lims_return_data->customer_sale_id) {
-            $factura = $this->getFacturaData($lims_return_data->cuf);
-            if ($factura) {
-                $data_cliente = CustomerSale::find($lims_return_data->customer_sale_id);
-                Log::info("anularNotaFiscal - Anulando nota - CUF: " . $lims_return_data->cuf . " - CustomerSale ID: " . $lims_return_data->customer_sale_id);
+            $data_cliente = CustomerSale::find($lims_return_data->customer_sale_id)
+                ?? CustomerSale::where('cuf', $lims_return_data->cuf)->first();
+            if ($data_cliente) {
+                $factura = $this->getFacturaData($lims_return_data->cuf) ?? [];
+                Log::info("anularNotaFiscal - Anulando nota - CUF: " . $lims_return_data->cuf . " - CustomerSale ID: " . $data_cliente->id);
                 $result = $this->anularNotaDebitoCredito($factura, $id_motivo, $data_cliente);
                 Log::info("anularNotaFiscal - Resultado => " . json_encode($result, JSON_UNESCAPED_UNICODE));
                 if ($result['status'] == true) {
