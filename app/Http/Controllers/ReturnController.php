@@ -17,6 +17,7 @@ use App\ProductVariant;
 use App\Returns;
 use App\Sale;
 use App\SiatParametricaVario;
+use App\SiatPuntoVenta;
 use App\SiatSucursal;
 use App\Tax;
 use App\Unit;
@@ -946,22 +947,14 @@ class ReturnController extends Controller
         }
 
         $sucursalCode = (int) $sucursal;
-        $companyId = Auth::user()->company_id ?? null;
 
-        $query = \DB::table('puntos_venta')
+        $puntos = SiatPuntoVenta::where('sucursal', $sucursalCode)
+            ->where('is_active', 1)
             ->select('codigo_punto_venta', 'nombre_punto_venta')
-            ->where('sucursal', $sucursalCode)
-            ->whereNull('deleted_at')
-            ->where('is_active', 1);
+            ->orderBy('codigo_punto_venta', 'asc')
+            ->get();
 
-        if ($companyId) {
-            $query->where(function ($q) use ($companyId) {
-                $q->where('company_id', $companyId)
-                  ->orWhereNull('company_id');
-            });
-        }
-
-        return response()->json($query->get());
+        return response()->json($puntos);
     }
 
     public function listarFacturas(Request $request)
