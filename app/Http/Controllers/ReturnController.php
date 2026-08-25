@@ -1051,60 +1051,89 @@ class ReturnController extends Controller
     {
         Log::info("anularNotaFiscal - Return ID: " . $id . " - Motivo ID: " . $id_motivo);
 
-        $lims_return_data = Returns::find($id);
+        $lims_return_data = Returns::find($id) ?? Returns::withoutGlobalScope('company')->find($id);
+        if (!$lims_return_data) {
+            return response()->json([
+                "mensaje" => "Registro de devolución no encontrado en el sistema.",
+                "status" => false
+            ]);
+        }
+
         $lims_product_return_data = ProductReturn::where('return_id', $id)->get();
-        if ($lims_return_data->cuf && $lims_return_data->customer_sale_id) {
-            $data_cliente = CustomerSale::find($lims_return_data->customer_sale_id)
-                ?? CustomerSale::where('cuf', $lims_return_data->cuf)->first();
+        if ($lims_return_data->cuf || $lims_return_data->customer_sale_id) {
+            $data_cliente = null;
+            if ($lims_return_data->customer_sale_id) {
+                $data_cliente = CustomerSale::find($lims_return_data->customer_sale_id)
+                    ?? CustomerSale::withoutGlobalScope('company')->find($lims_return_data->customer_sale_id);
+            }
+            if (!$data_cliente && $lims_return_data->cuf) {
+                $data_cliente = CustomerSale::where('cuf', $lims_return_data->cuf)->first()
+                    ?? CustomerSale::withoutGlobalScope('company')->where('cuf', $lims_return_data->cuf)->first();
+            }
+
             if ($data_cliente) {
                 $factura = $this->getFacturaData($lims_return_data->cuf) ?? [];
                 Log::info("anularNotaFiscal - Anulando nota - CUF: " . $lims_return_data->cuf . " - CustomerSale ID: " . $data_cliente->id);
                 $result = $this->anularNotaDebitoCredito($factura, $id_motivo, $data_cliente);
                 Log::info("anularNotaFiscal - Resultado => " . json_encode($result, JSON_UNESCAPED_UNICODE));
-                if ($result['status'] == true) {
+                if (!empty($result['status'])) {
                     $data_cliente->estado_factura = "ANULADO";
                     foreach ($lims_product_return_data as $key => $product_return_data) {
                         $lims_product_data = Product::find($product_return_data->product_id);
-                        if ($lims_product_data->type == 'combo') {
+                        if ($lims_product_data && $lims_product_data->type == 'combo') {
                             $product_list = explode(",", $lims_product_data->product_list);
                             $qty_list = explode(",", $lims_product_data->qty_list);
 
                             foreach ($product_list as $index => $child_id) {
                                 $child_data = Product::find($child_id);
-                                if ($child_data->unit_id != 0 && $child_data->type != 'digital') {
+                                if ($child_data && $child_data->unit_id != 0 && $child_data->type != 'digital') {
 
                                     $child_warehouse_data = Product_Warehouse::where([
                                         ['product_id', $child_id],
                                         ['warehouse_id', $lims_return_data->warehouse_id],
                                     ])->first();
 
-                                    $child_data->qty -= $product_return_data->qty * $qty_list[$index];
-                                    $child_warehouse_data->qty -= $product_return_data->qty * $qty_list[$index];
-
+                                    $child_data->qty -= $product_return_data->qty * ($qty_list[$index] ?? 1);
+                                    if ($child_warehouse_data) {
+                                        $child_warehouse_data->qty -= $product_return_data->qty * ($qty_list[$index] ?? 1);
+                                        $child_warehouse_data->save();
+                                    }
                                     $child_data->save();
-                                    $child_warehouse_data->save();
                                 }
                             }
                         } elseif ($product_return_data->sale_unit_id != 0) {
                             $lims_sale_unit_data = Unit::find($product_return_data->sale_unit_id);
 
-                            if ($lims_sale_unit_data->operator == '*')
-                                $quantity = $product_return_data->qty * $lims_sale_unit_data->operation_value;
-                            elseif ($lims_sale_unit_data->operator == '/')
-                                $quantity = $product_return_data->qty / $lims_sale_unit_data->operation_value;
+                            if ($lims_sale_unit_data) {
+                                if ($lims_sale_unit_data->operator == '*')
+                                    $quantity = $product_return_data->qty * $lims_sale_unit_data->operation_value;
+                                elseif ($lims_sale_unit_data->operator == '/')
+                                    $quantity = $product_return_data->qty / $lims_sale_unit_data->operation_value;
+                                else
+                                    $quantity = $product_return_data->qty;
+                            } else {
+                                $quantity = $product_return_data->qty;
+                            }
 
                             if ($product_return_data->variant_id) {
                                 $lims_product_variant_data = ProductVariant::select('id', 'qty')->FindExactProduct($product_return_data->product_id, $product_return_data->variant_id)->first();
                                 $lims_product_warehouse_data = Product_Warehouse::FindProductWithVariant($product_return_data->product_id, $product_return_data->variant_id, $lims_return_data->warehouse_id)->first();
-                                $lims_product_variant_data->qty -= $quantity;
-                                $lims_product_variant_data->save();
-                            } else
+                                if ($lims_product_variant_data) {
+                                    $lims_product_variant_data->qty -= $quantity;
+                                    $lims_product_variant_data->save();
+                                }
+                            } else {
                                 $lims_product_warehouse_data = Product_Warehouse::FindProductWithoutVariant($product_return_data->product_id, $lims_return_data->warehouse_id)->first();
+                            }
 
-                            $lims_product_data->qty -= $quantity;
-                            $lims_product_warehouse_data->qty -= $quantity;
-                            $lims_product_data->save();
-                            $lims_product_warehouse_data->save();
+                            if ($lims_product_data) {
+                                $lims_product_data->qty -= $quantity;
+                                $lims_product_data->save();
+                            }
+                            if ($lims_product_warehouse_data) {
+                                $lims_product_warehouse_data->qty -= $quantity;
+                                $lims_product_warehouse_data->save();
+                            }
                             $product_return_data->is_active = false;
                             $product_return_data->save();
                         }
@@ -1113,34 +1142,30 @@ class ReturnController extends Controller
                     $lims_return_data->is_active = false;
                     $lims_return_data->save();
                     Log::info("anularNotaFiscal - ANULADO OK - Return ID: " . $id . " - CUF: " . $lims_return_data->cuf);
-                    $json_data = array(
-                        "mensaje" => "Se anulo nota debito/credito con éxito. ",
+                    return response()->json([
+                        "mensaje" => "Se anuló la nota débito/crédito con éxito.",
                         "status" => true
-                    );
-                    echo json_encode($json_data);
+                    ]);
                 } else {
                     Log::warning("anularNotaFiscal - FALLÓ ANULACIÓN - Return ID: " . $id . " - " . ($result["mensaje"] ?? 'Error desconocido'));
-                    $json_data = array(
-                        "mensaje" => $result["mensaje"],
+                    return response()->json([
+                        "mensaje" => $result["mensaje"] ?? 'Error al procesar la anulación en SIAT.',
                         "status" => false
-                    );
-                    echo json_encode($json_data);
+                    ]);
                 }
             } else {
-                Log::warning("anularNotaFiscal - Nota debito/credito no encontrada en SIAT - Return ID: " . $id . " - CUF: " . $lims_return_data->cuf);
-                $json_data = array(
-                    "mensaje" => "No, se pudo anular la nota de retorno, nota debito/credito no encontrado.",
+                Log::warning("anularNotaFiscal - Registro CustomerSale no encontrado - Return ID: " . $id . " - CUF: " . $lims_return_data->cuf);
+                return response()->json([
+                    "mensaje" => "No se encontró el registro de facturación de la nota débito/crédito.",
                     "status" => false
-                );
-                echo json_encode($json_data);
+                ]);
             }
         } else {
             Log::warning("anularNotaFiscal - Falta CUF o customer_sale_id - Return ID: " . $id);
-            $json_data = array(
-                "mensaje" => "Cuf ó Registro de Nota de Anulacion no encontrado.",
+            return response()->json([
+                "mensaje" => "CUF o registro de Nota de Anulación no encontrado.",
                 "status" => false
-            );
-            echo json_encode($json_data);
+            ]);
         }
     }
 }
