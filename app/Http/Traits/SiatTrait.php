@@ -1279,7 +1279,7 @@ trait SiatTrait
         $pos_setting = PosSetting::latest()->first();
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
-        $path = '/factura.venta/factura.individual.offline';
+        $path = '/factura.venta/factura.individual.offline/gestionada';
 
         $data_venta = Sale::where('id', $venta_id)->first();
         $data_biller = Biller::where('id', $data_venta->biller_id)->first();
@@ -1535,7 +1535,7 @@ trait SiatTrait
         $pos_setting = PosSetting::latest()->first();
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
-        $path = '/factura.venta/factura.individual.offline';
+        $path = '/factura.venta/factura.individual.offline/gestionada';
 
         $data_venta = Sale::where('id', $venta_id)->first();
         $data_biller = Biller::where('id', $data_venta->biller_id)->first();
@@ -1791,7 +1791,7 @@ trait SiatTrait
         $pos_setting = PosSetting::latest()->first();
         $bearer = 'Bearer ' . Session::get('token_siat');
         $host = $pos_setting->url_operaciones;
-        $path = '/factura.venta/factura.individual.offline';
+        $path = '/factura.venta/factura.individual.offline/gestionada';
 
         $data_venta = Sale::where('id', $venta_id)->first();
         $data_biller = Biller::where('id', $data_venta->biller_id)->first();

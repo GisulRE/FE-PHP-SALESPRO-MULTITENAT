@@ -2106,16 +2106,16 @@ class SaleController extends Controller
                     'codigo_evento' => $codigoEvento,
                 ]);
                 if ($obj_cliente->codigo_documento_sector == 1) {
-                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
-                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
+                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
+                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
                     $respuesta = $this->generarFacturaIndividualOffline($sale_id, $codigoEvento);
                 } elseif ($obj_cliente->codigo_documento_sector == 13) {
-                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasicoOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
-                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasicoOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
+                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasicoOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
+                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasicoOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
                     $respuesta = $this->generarFacturaServicioBasicoOffline($sale_id, $codigoEvento);
                 } elseif ($obj_cliente->codigo_documento_sector == 2) {
-                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaAlquilerOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
-                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaAlquilerOffline', 'endpoint' => '/factura.venta/factura.individual.offline']);
+                    Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaAlquilerOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
+                    $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaAlquilerOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
                     $respuesta = $this->generarFacturaAlquilerOffline($sale_id, $codigoEvento);
                 }
             } else {
