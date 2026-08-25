@@ -5097,7 +5097,7 @@ Descripción: " . $data_response['descripcion'];
 
     public function anularNotaDebitoCredito($factura, $motivo, $customerSale)
     {
-        $pos_setting = PosSetting::latest()->first();
+        $pos_setting = PosSetting::latest()->first() ?? PosSetting::withoutGlobalScope('company')->latest()->first();
         $token = Session::get('token_siat');
         if (!$token) {
             $token = $this->getToken();
@@ -5105,7 +5105,7 @@ Descripción: " . $data_response['descripcion'];
         $bearer = 'Bearer ' . $token;
         $host = $pos_setting->url_operaciones;
         $path = '/documento.ajuste/anula.nota.ajuste';
-        $modo_centralizado = ($pos_setting->cufd_centralizado ?? 0) == 1;
+        $modo_centralizado = !empty($pos_setting->cufd_centralizado);
 
         Log::info("anularNotaDebitoCredito - CustomerSale ID: " . $customerSale->id . " - CUF: " . $customerSale->cuf . " - Motivo: " . $motivo . " - Centralizado: " . ($modo_centralizado ? 'SI' : 'NO') . " - Endpoint: " . $host . $path);
 
@@ -5116,39 +5116,34 @@ Descripción: " . $data_response['descripcion'];
             $data_p_venta = SiatPuntoVenta::where([
                 'sucursal' => $customerSale->sucursal,
                 'codigo_punto_venta' => $customerSale->codigo_punto_venta
+            ])->first() ?? SiatPuntoVenta::withoutGlobalScope('company')->where([
+                'sucursal' => $customerSale->sucursal,
+                'codigo_punto_venta' => $customerSale->codigo_punto_venta
             ])->first();
 
-            if (!$data_p_venta) {
-                $data_p_venta = SiatPuntoVenta::withoutGlobalScope('company')
-                    ->where('sucursal', $customerSale->sucursal)
-                    ->where('codigo_punto_venta', $customerSale->codigo_punto_venta)
-                    ->first();
-            }
-
-            if (!$data_p_venta) {
-                Log::error("anularNotaDebitoCredito - No se encontró SiatPuntoVenta para sucursal={$customerSale->sucursal} codigoPuntoVenta={$customerSale->codigo_punto_venta}");
-                return array('mensaje' => 'No se encontró el punto de venta configurado en SIAT.', 'status' => false);
-            }
-
-            $this->asegurarCufdVigente($data_p_venta);
-            $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
-
-            if (!$data_siat_cufd) {
-                $data_siat_cufd = SiatCufd::withoutGlobalScope('company')
+            if ($data_p_venta) {
+                $codigo_cuis_val = $data_p_venta->codigo_cuis ?? "";
+                $this->asegurarCufdVigente($data_p_venta);
+                $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+                    ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+                    ->where('estado', true)
+                    ->orderBy('fecha_registro', 'desc')
+                    ->first() ?? SiatCufd::withoutGlobalScope('company')
                     ->where('sucursal', $data_p_venta->sucursal)
                     ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
                     ->where('estado', true)
                     ->orderBy('fecha_registro', 'desc')
                     ->first();
+
+                if ($data_siat_cufd) {
+                    $codigo_cufd_val = $data_siat_cufd->codigo_cufd;
+                }
             }
 
-            if (!$data_siat_cufd) {
-                Log::error("anularNotaDebitoCredito - No se encontró CUFD vigente para sucursal={$data_p_venta->sucursal} codigoPuntoVenta={$data_p_venta->codigo_punto_venta}");
-                return array('mensaje' => 'No se encontró un CUFD vigente para anular la nota.', 'status' => false);
+            // Fallback al cufd guardado en la venta si no hay CUFD local activo
+            if (empty($codigo_cufd_val) && !empty($customerSale->codigo_cufd)) {
+                $codigo_cufd_val = $customerSale->codigo_cufd;
             }
-
-            $codigo_cufd_val = $data_siat_cufd->codigo_cufd;
-            $codigo_cuis_val = $data_p_venta->codigo_cuis;
         }
 
         $data_body = [
