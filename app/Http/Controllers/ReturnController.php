@@ -41,13 +41,28 @@ class ReturnController extends Controller
         $role = Role::find(Auth::user()->role_id);
         $fecha_actual = date('Y-m-d');
         
-        $sucursales = Cache::remember('siat_sucursales_activas', 300, function () {
+        $companyId = Auth::user()->company_id ?? 0;
+        
+        $sucursales = Cache::remember('siat_sucursales_activas_comp_' . $companyId, 300, function () {
             return SiatSucursal::where('estado', true)->select('sucursal', 'nombre')->get();
         });
         
-        $lims_motivos = Cache::remember('siat_motivos_anulacion', 3600, function () {
-            return SiatParametricaVario::select('id', 'codigo_clasificador', 'descripcion')
-                ->where('tipo_clasificador', 'motivoAnulacion')
+        $lims_motivos = Cache::remember('siat_motivos_anulacion_comp_' . $companyId, 3600, function () {
+            $query = SiatParametricaVario::where('tipo_clasificador', 'motivoAnulacion');
+            if (\Schema::hasColumn('siat_parametricas_varios', 'company_id') && auth()->check()) {
+                $hasCompanyData = (clone $query)->where('company_id', auth()->user()->company_id)->exists();
+                if ($hasCompanyData) {
+                    $query->where('company_id', auth()->user()->company_id);
+                }
+            } elseif (\Schema::hasColumn('siat_parametricas_varios', 'id_empresa') && auth()->check()) {
+                $hasCompanyData = (clone $query)->where('id_empresa', auth()->user()->company_id)->exists();
+                if ($hasCompanyData) {
+                    $query->where('id_empresa', auth()->user()->company_id);
+                }
+            }
+            return $query->select('codigo_clasificador', 'descripcion')
+                ->groupBy('codigo_clasificador', 'descripcion')
+                ->orderBy('codigo_clasificador', 'asc')
                 ->get();
         });
 

@@ -5522,10 +5522,23 @@ class SaleController extends Controller
 
     public function getMotivoAnulacion()
     {
-        // Cachear los motivos de anulación por 24 horas ya que son datos que casi nunca cambian
-        $lista_motivo_anulacion = \Cache::remember('motivos_anulacion', 86400, function () {
-            return SiatParametricaVario::where('tipo_clasificador', 'motivoAnulacion')
-                ->select('codigo_clasificador', 'descripcion')
+        $companyId = Auth::user()->company_id ?? 0;
+        $lista_motivo_anulacion = \Cache::remember('motivos_anulacion_comp_' . $companyId, 86400, function () {
+            $query = SiatParametricaVario::where('tipo_clasificador', 'motivoAnulacion');
+            if (\Schema::hasColumn('siat_parametricas_varios', 'company_id') && auth()->check()) {
+                $hasCompanyData = (clone $query)->where('company_id', auth()->user()->company_id)->exists();
+                if ($hasCompanyData) {
+                    $query->where('company_id', auth()->user()->company_id);
+                }
+            } elseif (\Schema::hasColumn('siat_parametricas_varios', 'id_empresa') && auth()->check()) {
+                $hasCompanyData = (clone $query)->where('id_empresa', auth()->user()->company_id)->exists();
+                if ($hasCompanyData) {
+                    $query->where('id_empresa', auth()->user()->company_id);
+                }
+            }
+            return $query->select('codigo_clasificador', 'descripcion')
+                ->groupBy('codigo_clasificador', 'descripcion')
+                ->orderBy('codigo_clasificador', 'asc')
                 ->get();
         });
         return $lista_motivo_anulacion;
