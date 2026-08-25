@@ -7102,8 +7102,8 @@
 
         /**** Modo Proforma  */
         // Bootstrap Toggle NO dispara el evento 'change' correctamente
-        // Usamos un approach diferente: monitorear clicks en el contenedor del toggle
-        $(document).on('click', '.toggle-group', function() {
+        // Usamos un approach diferente: monitorear clicks específicamente en el contenedor del toggle de proforma
+        $(document).on('click', '.proforma-toggle-container .toggle-group', function() {
             // Forzar actualización después del click
             setTimeout(function() {
                 var isChecked = $('#toggle-event-pro').prop('checked');
