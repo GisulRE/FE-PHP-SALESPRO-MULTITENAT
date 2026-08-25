@@ -4887,19 +4887,53 @@ Descripción: " . $data_response['descripcion'];
         log::info('generaNotaFiscal - Modo centralizado: ' . ($modo_centralizado ? 'SI' : 'NO') . ' - Endpoint: ' . $host . $path);
 
         $data_venta = Sale::where('id', $venta_id)->first();
-        $data_biller = Biller::where([['id', $data_venta->biller_id], ['is_active', true]])->first();
-        $data_p_venta = SiatPuntoVenta::where([
-            'sucursal' => $data_biller->sucursal,
-            'codigo_punto_venta' => $data_biller->punto_venta_siat
-        ])->first();
-        $this->asegurarCufdVigente($data_p_venta);
-        $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
-        $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
-        $tax = Tax::where('name', 'like', 'IVA%')->where('is_active', true)->first();
-        if (!$data_siat_cufd) {
-            $respuesta = array('mensaje' => "Datos Cufd del Dia nulo, debe renovar CUFD", 'status' => false);
+        $data_biller = $data_venta ? Biller::where([['id', $data_venta->biller_id], ['is_active', true]])->first() : null;
+
+        $target_sucursal = $data_cliente->sucursal ?? ($data_biller->sucursal ?? 0);
+        $target_pv = $data_cliente->codigo_punto_venta ?? ($data_biller->punto_venta_siat ?? 0);
+
+        $data_p_venta = SiatPuntoVenta::where([
+            'sucursal' => $target_sucursal,
+            'codigo_punto_venta' => $target_pv
+        ])->first();
+
+        if (!$data_p_venta) {
+            $data_p_venta = SiatPuntoVenta::where('sucursal', $target_sucursal)->first()
+                ?? SiatPuntoVenta::where('codigo_punto_venta', $target_pv)->first()
+                ?? SiatPuntoVenta::first();
         }
+
+        if (!$data_p_venta) {
+            Log::error("generaNotaFiscal - No se encontró SiatPuntoVenta para sucursal={$target_sucursal} codigoPuntoVenta={$target_pv}");
+            return ['status' => false, 'mensaje' => 'No se encontró el Punto de Venta SIAT para la sucursal ' . $target_sucursal . ' y punto ' . $target_pv . '.'];
+        }
+
+        $this->asegurarCufdVigente($data_p_venta);
+
+        $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
+            ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+            ->where('estado', true)
+            ->orderBy('fecha_registro', 'desc')
+            ->first();
+
+        if (!$data_siat_cufd) {
+            Log::error("generaNotaFiscal - No se encontró CUFD vigente para sucursal={$data_p_venta->sucursal} codigoPuntoVenta={$data_p_venta->codigo_punto_venta}");
+            return ['status' => false, 'mensaje' => 'No se encontró un CUFD vigente para la sucursal ' . $data_p_venta->sucursal . ' y punto de venta ' . $data_p_venta->codigo_punto_venta . '. Debe renovar el CUFD.'];
+        }
+
+        $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
+        if (!$data_sucursal) {
+            $data_sucursal = (object)[
+                'ciudad_municipio' => 'LA PAZ',
+                'telefono' => $data_biller->phone_number ?? '0'
+            ];
+        }
+
+        $tax = Tax::where('name', 'like', 'IVA%')->where('is_active', true)->first()
+            ?? Tax::where('is_active', true)->first()
+            ?? (object)['rate' => 13];
+
         $correlativo_notafiscal = 0;
         if ($data_p_venta->correlativo_nota_debcred != null && $data_p_venta->correlativo_nota_debcred > 0) {
             $correlativo_notafiscal = $data_p_venta->correlativo_nota_debcred;
@@ -4908,14 +4942,11 @@ Descripción: " . $data_response['descripcion'];
         }
         $array_payment_sales = DB::table('payments')->where('sale_id', '=', $venta_id)->get();
         $nro_de_pagos = $array_payment_sales->count();
-        /*foreach ($array_payment_sales as $item_pago) {
-        if ($item_pago->paying_method == "Tarjeta_Regalo") {
-        $data_gift_card = $item_pago;
-        $return_data->total_price = $return_data->total_price - $item_pago->amount;
-        }
-        }*/
         $leyendas = SiatLeyendaFactura::all();
         $data_leyenda = $this->pickRandomLeyenda($leyendas);
+        if (!$data_leyenda) {
+            $data_leyenda = (object)['descripcion_leyenda' => 'Ley N° 453: El proveedor debe brindar atención sin discriminación.'];
+        }
         $fechaemision = str_replace('-', '/', $factura['fechaEmision']);
         $list_items = [];
         foreach ($factura["detalle"] as $item) {
