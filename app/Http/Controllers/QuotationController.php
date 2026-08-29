@@ -1012,6 +1012,9 @@ class QuotationController extends Controller
             return response()->json(['data' => [], 'recordsTotal' => 0, 'recordsFiltered' => 0]);
         }
 
+        $fecha_desde = $request->filled('fecha_desde') ? $request->fecha_desde : date('Y-m-01');
+        $fecha_hasta = $request->filled('fecha_hasta') ? $request->fecha_hasta : date('Y-m-t');
+
         $today = Carbon::now()->toDateString();
         $query = Quotation::with('customer', 'warehouse')
             ->where('quotation_status', 1) // Solo pendientes
@@ -1019,15 +1022,14 @@ class QuotationController extends Controller
                 // Válidas: sin fecha de vencimiento O con fecha >= hoy
                 $q->whereNull('valid_date')
                   ->orWhere('valid_date', '>=', $today);
-            });
+            })
+            ->whereDate('created_at', '>=', $fecha_desde)
+            ->whereDate('created_at', '<=', $fecha_hasta);
 
-        // Filtro por rango de fecha de creación
-        if ($request->filled('fecha_desde')) {
-            $query->whereDate('created_at', '>=', $request->fecha_desde);
+        if (Schema::hasColumn('quotations', 'sale_id')) {
+            $query->whereNull('sale_id');
         }
-        if ($request->filled('fecha_hasta')) {
-            $query->whereDate('created_at', '<=', $request->fecha_hasta);
-        }
+
         // Filtro de búsqueda (referencia o nombre de cliente)
         if ($request->filled('search')) {
             $search = $request->search;

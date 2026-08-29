@@ -31,24 +31,28 @@
                                 data-live-search="true" data-live-search-style="begins" required>
                                 <option value="">Seleccionar Almacen</option>
                                 @foreach ($lims_warehouse_list as $warehouse)
-                                    <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                                    <option value="{{ $warehouse->id }}" {{ (isset($warehouse_id) && $warehouse_id == $warehouse->id) ? 'selected' : '' }}>{{ $warehouse->name }}</option>
                                 @endforeach
                             </select>
                         </div>
                         <div class="col-md-8">
                             <label>{{ trans('file.Select Product') }}</label>
-                            <div class="search-box input-group">
-                                <button class="btn btn-secondary"><i class="fa fa-barcode"></i></button>
+                            <div class="search-box input-group position-relative">
+                                <div class="input-group-prepend">
+                                    <button class="btn btn-secondary" type="button"><i class="fa fa-barcode"></i></button>
+                                </div>
                                 <input type="hidden" name="lims_productcode" id="lims_productcode"
                                     value="{{ $lims_productcode ?? '' }}" required />
                                 <input type="text" name="product_code_name" id="lims_productcodeSearch"
                                     placeholder="Please type product code and select..." class="form-control"
                                     value="{{ $product_code_name ?? '' }}" required />
+                                <span id="clear_product_btn" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 9; cursor: pointer; color: #999; display: {{ !empty($product_code_name) ? 'block' : 'none' }}; font-size: 16px;" title="Limpiar producto">
+                                    <i class="fa fa-times-circle"></i>
+                                </span>
                             </div>
                         </div>
                         <div class="col-md-2 d-flex align-items-end justify-content-center">
-
-                            <button class="btn btn-primary fa fa-search" type="submit" style="margin-left: 5px">
+                            <button class="btn btn-primary fa fa-search" type="submit" id="submit_search_btn" style="margin-left: 5px">
                                 {{ trans('file.Search') }}</button>
                         </div>
                         @if (isset($report_data_list) && isset($lims_productcode))
@@ -106,7 +110,7 @@
                             </tr>
                         @endif
 
-                        @if (isset($prev_balance) && count($report_data_list) > 0)
+                        @if (isset($report_data_list) && count($report_data_list) > 0)
                             @foreach ($report_data_list as $key => $transaction)
                                 <?php
                                 $totalBalance = $calcTotalBalance($prev_balance, $transaction, $totalBalance, $key);
@@ -415,7 +419,7 @@
         $("ul#product").siblings('a').attr('aria-expanded', 'true');
         $("ul#product").addClass("show");
         $("ul#product #kardex-menu").addClass("active");
-        $('#warehouse_id').val({{ $warehouse_id ?? '' }});
+        $('#warehouse_id').val('{{ $warehouse_id ?? "" }}');
         let start_date = dateFormat($('#start_date').val());
         let end_date = dateFormat($('#end_date').val());
 
@@ -671,6 +675,29 @@
 
         var lims_productcodeSearch = $('#lims_productcodeSearch');
 
+        lims_productcodeSearch.on('focus click', function() {
+            $(this).select();
+        });
+
+        $('#clear_product_btn').on('click', function() {
+            $('#lims_productcodeSearch').val('').focus();
+            $('#lims_productcode').val('');
+            $(this).hide();
+        });
+
+        $('#lims_productcodeSearch').on('input', function() {
+            if ($(this).val().length > 0) {
+                $('#clear_product_btn').show();
+            } else {
+                $('#clear_product_btn').hide();
+                $('#lims_productcode').val('');
+            }
+        });
+
+        $('#submit_search_btn').on('click', function() {
+            $("#search_form").attr('action', "{{ route('kardex.search') }}");
+        });
+
         lims_productcodeSearch.autocomplete({
             minLength: 0,
             source: "{{ route('purchases.getproducts') }}",
@@ -684,6 +711,7 @@
                     var data = ui.content[0].value;
                     $("#lims_productcodeSearch").val(data);
                     $("#lims_productcode").val(data.split(' (')[0]);
+                    $('#clear_product_btn').show();
                     $(this).autocomplete("close");
 
                 };
@@ -692,8 +720,7 @@
                 var data = ui.item.value;
                 $("#lims_productcodeSearch").val(data);
                 $("#lims_productcode").val(data.split(' (')[0]);
-
-
+                $('#clear_product_btn').show();
             }
         }).autocomplete("instance")._renderItem = function(ul, item) {
             return $("<li>")

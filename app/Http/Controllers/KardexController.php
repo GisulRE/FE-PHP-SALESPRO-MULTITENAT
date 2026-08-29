@@ -32,15 +32,30 @@ class KardexController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
+        if ($request->isMethod('post')) {
+            return $this->search($request);
+        }
 
         $lims_warehouse_list = Warehouse::select('id', 'name')->get();
 
         return view('report.kardex', compact(
-            'lims_warehouse_list',
-
+            'lims_warehouse_list'
         ));
+    }
+
+    private function sanitizeDate($dateStr, $default = null)
+    {
+        if (empty($dateStr)) return $default;
+        $dateStr = trim($dateStr);
+        if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $dateStr, $m)) {
+            return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+        }
+        if (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/', $dateStr, $m)) {
+            return sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3]);
+        }
+        return $default;
     }
 
     public function search(Request $request)
@@ -142,23 +157,14 @@ class KardexController extends Controller
 
     private function searchService($request, $message)
     {
-
-        // Validar la solicitud y obtener los datos
-        $request->validate([
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date',
-            'warehouse_id' => 'nullable|integer',
-            'lims_productcode' => 'nullable|string',
-        ]);
-
-        // Obtener los datos de la solicitud
+        // Obtener y sanitizar los datos de la solicitud sin validación que lance 302
         $lims_warehouse_list = Warehouse::select('id', 'name')->get();
-        $start_date = $request->start_date;
-        $end_date = $request->end_date;
+        $start_date = $this->sanitizeDate($request->start_date, date('Y-m-01'));
+        $end_date = $this->sanitizeDate($request->end_date, date('Y-m-d'));
         $warehouse_id = $request->warehouse_id;
         $lims_productcode = $request->lims_productcode;
-        $product_id = null;
         $product_code_name = $request->product_code_name;
+        $product_id = null;
 
         // Crear la consulta base
         $query = Kardex::query();
@@ -169,53 +175,57 @@ class KardexController extends Controller
         }
 
         // Aplicar filtro de código de producto si está presente
-        if ($lims_productcode) {
-            $product_id = $this->getproductIdByCode($lims_productcode);
-            $query->where('product_id', $product_id);
+        if ($lims_productcode || $product_code_name) {
+            $product_id = $this->getproductIdByCode($lims_productcode ?: $product_code_name);
+            if ($product_id) {
+                $query->where('product_id', $product_id);
+            } else {
+                $query->where('product_id', 0);
+                if (!$message) {
+                    $message = ["alert" => "No se encontró el producto especificado."];
+                }
+            }
         }
 
-        $query_prev_balance = $query;
+        $query_prev_balance = clone $query;
 
         // Aplicar filtros de fecha si están presentes
         if ($start_date && $end_date) {
-            // $query->whereBetween('date', [$start_date, $end_date]);
-
             $query->whereDate('date', '>=', $start_date);
             $query->whereDate('date', '<=', $end_date);
         }
 
         // Obtener los datos filtrados
-        //$query->where('transaction_id', '!=', 0);
         $report_data_list = $query->orderBy('date', 'asc')->get();
 
         if ($start_date) {
-            // $query->whereBetween('date', [$start_date]);
             $query_prev_balance->whereDate('date', '<', $start_date);
         }
 
         // Obtener saldo anterior
-        #$query_prev_balance->select(\DB::raw('SUM(entrada) as total_entrada'), \DB::raw('SUM(salida) as total_salida'));
         $query_prev_balance->select(\DB::raw('SUM(entrada) as total_entrada'), \DB::raw('SUM(salida) as total_salida'), 'product', 'warehouse', 'cost', \DB::raw('SUM(entrada) - SUM(salida) as saldo'));
 
         $prev_balance = $query_prev_balance->first();
 
-        // Validad saldo anterior 
-        if ($prev_balance->product == null && $lims_productcode) {
+        // Validar saldo anterior de forma segura contra nulos
+        if (($prev_balance == null || empty($prev_balance->product)) && !empty($product_id) && !empty($warehouse_id)) {
+            $prev_balance = Kardex::select('entrada', 'salida', 'warehouse_qty_after as saldo', 'product', 'warehouse', 'cost')
+                ->where('product_id', $product_id)
+                ->where('warehouse_id', $warehouse_id)
+                ->where('transaction_id', 0)
+                ->first();
 
-            // Si   antes de la fecha inicial no hay una transaccion, el kardex tomara el valor el valor de inicializacion del producto en el kardex. 
-
-            $prev_balance = Kardex::select('entrada', 'salida', 'warehouse_qty_after as saldo', 'product', 'warehouse', 'cost')->where('product_id', $product_id)->where('warehouse_id', $warehouse_id)->where('transaction_id', 0)->first();
-            // se cambio logica de $prev_balance siempre entre en la condicion, esperar informe si afecta reporte saldo anterior
             if ($prev_balance) {
                 $product = Product::find($product_id);
-                $product_name = $product->name;
-                $product_cost = $product->cost;
-                $warehouse_name = Warehouse::find($warehouse_id)->name;
+                $product_name = $product ? $product->name : '';
+                $product_cost = $product ? $product->cost : 0;
+                $wh = Warehouse::find($warehouse_id);
+                $warehouse_name = $wh ? $wh->name : '';
                 $last_stock = \DB::select('Select warehouse_qty_after from record where product_id = ? and warehouse_id = ? and action_taken_at < ? order by action_taken_at desc limit 1', [$product_id, $warehouse_id, $start_date]);
                 $prev_balance = (object) [
                     'entrada' => 0,
                     'salida' => 0,
-                    'saldo' => $last_stock != null ? $last_stock[0]->warehouse_qty_after : 0,
+                    'saldo' => (!empty($last_stock)) ? $last_stock[0]->warehouse_qty_after : 0,
                     'product' => $product_name,
                     'warehouse' => $warehouse_name,
                     'cost' => $product_cost
@@ -226,21 +236,24 @@ class KardexController extends Controller
         $totalBalance = 0;
 
         $calcTotalBalance = function ($prev_balance, $transaction, $lastRs, $key) {
+            $cost = ($prev_balance && isset($prev_balance->cost)) ? (float)$prev_balance->cost : (float)($transaction->cost ?? 0);
+            $saldo = ($prev_balance && isset($prev_balance->saldo)) ? (float)$prev_balance->saldo : 0;
+
             if ($key == 0) {
-                $lastBalance = ($prev_balance->cost * $prev_balance->saldo);
+                $lastBalance = ($cost * $saldo);
                 if ($transaction->entrada > 0) {
-                    $operation = $transaction->entrada * $transaction->cost;
+                    $operation = (float)$transaction->entrada * (float)($transaction->cost ?? 0);
                     $totalBalance = $lastBalance + $operation;
                 } else {
-                    $operation = $transaction->salida * $transaction->cost;
+                    $operation = (float)$transaction->salida * (float)($transaction->cost ?? 0);
                     $totalBalance = $lastBalance - $operation;
                 }
             } else {
                 if ($transaction->entrada > 0) {
-                    $operation = $transaction->entrada * $transaction->cost;
+                    $operation = (float)$transaction->entrada * (float)($transaction->cost ?? 0);
                     $totalBalance = $lastRs + $operation;
                 } else {
-                    $operation = $transaction->salida * $transaction->cost;
+                    $operation = (float)$transaction->salida * (float)($transaction->cost ?? 0);
                     $totalBalance = $lastRs - $operation;
                 }
             }
@@ -278,25 +291,22 @@ class KardexController extends Controller
                         $tx->transfer_status_class = 'badge-info';
                     } elseif ($t->status == 4) {
                         // Rejected (Cancelado): add salida
-                        $tx->display_warehouse_qty_after = $tx->warehouse_qty_after + $tx->salida;
-                        $tx->transfer_status_label = 'Cancelado';
+                        $tx->display_warehouse_qty_after = $tx->warehouse_qty_after - $tx->salida;
+                        $tx->transfer_status_label = trans('file.Rejected');
                         $tx->transfer_status_class = 'badge-danger';
-                    } else {
-                        $tx->transfer_status_label = trans('file.Unknown');
-                        $tx->transfer_status_class = 'badge-secondary';
                     }
                 }
             }
         }
 
         return compact(
-            'prev_balance',
             'report_data_list',
             'lims_warehouse_list',
             'start_date',
             'end_date',
             'warehouse_id',
             'lims_productcode',
+            'prev_balance',
             'product_code_name',
             'message',
             'totalBalance',
@@ -306,8 +316,20 @@ class KardexController extends Controller
 
     public function getproductIdByCode($code)
     {
-        $product = Product::where('code', '=', $code)->where('is_active', true)->get();
-        return $product[0]->id;
+        if (empty($code)) return null;
+        $code_only = (strpos($code, ' (') !== false) ? trim(explode(' (', $code)[0]) : trim($code);
+        $clean = trim($code);
+        $product = Product::where('code', $code_only)->where('is_active', true)->first();
+        if ($product) return $product->id;
+        $product = Product::where('code', $clean)->where('is_active', true)->first();
+        if ($product) return $product->id;
+        $product = Product::where('name', $clean)->where('is_active', true)->first();
+        if ($product) return $product->id;
+        $product = Product::where('name', 'LIKE', '%' . $clean . '%')->where('is_active', true)->first();
+        if ($product) return $product->id;
+        $product = Product::where('code', 'LIKE', '%' . $code_only . '%')->where('is_active', true)->first();
+        if ($product) return $product->id;
+        return null;
     }
 
     public function transactionDetails(Request $request)

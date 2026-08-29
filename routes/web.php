@@ -735,7 +735,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 
 	Route::resource('credencial-cafc', 'CredencialCafcController');
 
-	Route::match(['get', 'post'], 'kardex', 'KardexController@index')->name('kardex.index');
+	Route::get('kardex', 'KardexController@index')->name('kardex.index');
 	Route::post('kardex', 'KardexController@search')->name('kardex.search');
 	Route::post('kardex/control', 'KardexController@controlPoint')->name('kardex.control');
 	Route::post('kardex/warehousecontrol', 'KardexController@warehouseControlPoint')->name('kardex.warehouseControl');

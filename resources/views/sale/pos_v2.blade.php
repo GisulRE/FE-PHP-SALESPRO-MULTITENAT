@@ -2641,6 +2641,7 @@
                                     <table class="table table-hover table-striped table-sm" style="font-size:0.85rem;">
                                         <thead class="thead-light">
                                             <tr>
+                                                <th class="text-center" style="width: 95px;">Acción</th>
                                                 <th>#</th>
                                                 <th>Referencia</th>
                                                 <th>Fecha</th>
@@ -2649,7 +2650,6 @@
                                                 <th class="text-right">Total</th>
                                                 <th>Válido hasta</th>
                                                 <th>Nota</th>
-                                                <th class="text-center">Acción</th>
                                             </tr>
                                         </thead>
                                         <tbody id="pf-list-body">
@@ -6079,8 +6079,21 @@
         // PROFORMA EN POS: Listar proformas pendientes y cargar en carrito
         // =====================================================================
 
-        // Abrir modal → cargar lista automáticamente
+        // Abrir modal → inicializar fechas al mes en curso por defecto y cargar lista
         $('#proformaListModal').on('show.bs.modal', function () {
+            var now = new Date();
+            var y = now.getFullYear();
+            var m = String(now.getMonth() + 1).padStart(2, '0');
+            var firstDay = y + '-' + m + '-01';
+            var lastDayDate = new Date(y, now.getMonth() + 1, 0);
+            var lastDay = y + '-' + m + '-' + String(lastDayDate.getDate()).padStart(2, '0');
+
+            if (!$('#pf-fecha-desde').val()) {
+                $('#pf-fecha-desde').val(firstDay);
+            }
+            if (!$('#pf-fecha-hasta').val()) {
+                $('#pf-fecha-hasta').val(lastDay);
+            }
             loadProformaList();
         });
 
@@ -6111,6 +6124,11 @@
                             : '<span class="text-muted">—</span>';
                         rows +=
                             '<tr>' +
+                            '<td class="text-center">' +
+                                '<button class="btn btn-success btn-sm font-weight-bold text-nowrap px-3 shadow-sm" onclick="loadQuotationInPos(' + q.id + ', \'' + q.reference_no + '\')">' +
+                                    '<i class="fa fa-download"></i> Cargar' +
+                                '</button>' +
+                            '</td>' +
                             '<td>' + q.key + '</td>' +
                             '<td><strong class="text-primary">' + q.reference_no + '</strong></td>' +
                             '<td>' + q.date + '</td>' +
@@ -6119,11 +6137,6 @@
                             '<td class="text-right font-weight-bold">' + q.grand_total + '</td>' +
                             '<td>' + q.valid_date + '</td>' +
                             '<td>' + noteCell + '</td>' +
-                            '<td class="text-center">' +
-                                '<button class="btn btn-sm btn-success" onclick="loadQuotationInPos(' + q.id + ', \'' + q.reference_no + '\')">' +
-                                    '<i class="fa fa-download"></i> Cargar' +
-                                '</button>' +
-                            '</td>' +
                             '</tr>';
                     });
                 } else {
