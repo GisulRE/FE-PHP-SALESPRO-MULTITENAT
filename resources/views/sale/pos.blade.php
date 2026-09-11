@@ -2053,6 +2053,7 @@
                                                     <i class="dripicons-brightness-low" id="theme-toggle-icon"></i>
                                                 </a>
                                             </li>
+                                            @include('layout.partials.latency-widget')
                                             <?php
                                             $general_setting_permission = DB::table('permissions')->where('name', 'general_setting')->first();
                                             $general_setting_permission_active = DB::table('role_has_permissions')

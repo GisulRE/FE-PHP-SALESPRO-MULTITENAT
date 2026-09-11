@@ -14,6 +14,14 @@
 
 Auth::routes();
 
+Route::get('/check-latency', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => microtime(true),
+        'server_time' => date('Y-m-d H:i:s'),
+    ]);
+})->name('check.latency');
+
 Route::get('/clear-cache', function () {
     \Artisan::call('cache:clear');
     \Artisan::call('config:clear');

@@ -54,6 +54,7 @@
                             <i class="dripicons-brightness-low" id="theme-toggle-icon"></i>
                         </a>
                     </li>
+                    @include('layout.partials.latency-widget')
                     <li class="nav-item">
                         <a rel="nofollow" data-target="#" href="#" data-toggle="dropdown" aria-haspopup="true"
                             aria-expanded="false" class="nav-link dropdown-item">

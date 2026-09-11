@@ -19,6 +19,7 @@ class Kernel extends HttpKernel
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         \App\Http\Middleware\TrustProxies::class,
+        \App\Http\Middleware\PerformanceMiddleware::class,
         //\Illuminate\Session\Middleware\StartSession::class,
     ];
 
@@ -65,5 +66,6 @@ class Kernel extends HttpKernel
         'active' => \App\Http\Middleware\Active::class,
         'proxy' => \App\Proxy\ProxyMiddleware::class,
         'blocked.module' => \App\Http\Middleware\BlockedModule::class,
+        'performance' => \App\Http\Middleware\PerformanceMiddleware::class,
     ];
 }

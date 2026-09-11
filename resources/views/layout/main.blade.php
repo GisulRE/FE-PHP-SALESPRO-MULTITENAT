@@ -979,6 +979,7 @@
             });
         });
     </script>
+    <script type="text/javascript" src="{{ asset('js/latency-monitor.js') }}"></script>
 </body>
 
 </html>

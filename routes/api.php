@@ -24,6 +24,13 @@ use App\Http\Controllers\WhatsAppMessageController;
     return $request->user();
 });*/
 
+Route::get('/ping', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => microtime(true),
+    ]);
+});
+
 // WhatsApp UI flow (POS Ajustes → Información de WhatsApp)
 Route::post('/whatsapp/auth/register', [WhatsAppSessionController::class, 'register'])
     ->name('whatsapp.auth.register');
