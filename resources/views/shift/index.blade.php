@@ -160,183 +160,14 @@
         <div role="document" class="modal-dialog" style="max-width: 420px; width: 95%; margin: 10px auto;">
             <div class="modal-content" style="max-height: 95vh; overflow-y: auto;">
                 <div class="modal-header bg-danger text-white">
-                    <h5 id="pinConfirmLabel" class="modal-title"><i class="dripicons-lock"></i> Confirmar Eliminación</h5>
+                    <h5 id="pinConfirmLabel" class="modal-title"><i class="dripicons-trash"></i> Confirmar Eliminación</h5>
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close text-white"><span
                             aria-hidden="true"><i class="dripicons-cross"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="pinConfirmTurnoId">
                     <input type="hidden" id="pinConfirmEmployeeId">
-                    <p>¿Eliminar el turno de <strong id="pinConfirmEmployeeName">este empleado</strong>?</p>
-                    <style>
-                        /* Estilos del Teclado Virtual Numérico */
-                        .keypad-grid {
-                            display: grid;
-                            grid-template-columns: repeat(3, 1fr);
-                            gap: 12px;
-                            max-width: 260px;
-                            margin: 15px auto 0 auto;
-                        }
-
-                        .btn-key {
-                            height: 55px;
-                            font-size: 1.4rem;
-                            font-weight: 600;
-                            border-radius: 50% !important;
-                            background-color: #f8f9fa;
-                            border: 2px solid #e9ecef;
-                            color: #495057;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-                            transition: all 0.1s ease-in-out;
-                            user-select: none;
-                            touch-action: manipulation;
-                        }
-
-                        .btn-key:hover {
-                            background-color: #e9ecef;
-                            border-color: #dee2e6;
-                            color: #212529;
-                        }
-
-                        .btn-key:active, .btn-key.active-state {
-                            background-color: #ced4da !important;
-                            border-color: #adb5bd !important;
-                            transform: scale(0.92);
-                            box-shadow: none;
-                        }
-
-                        .btn-key-danger {
-                            color: #dc3545;
-                            background-color: #fff5f5;
-                            border-color: #ffe3e3;
-                        }
-
-                        .btn-key-danger:hover {
-                            background-color: #ffe3e3;
-                            border-color: #ffc9c9;
-                            color: #bd2130;
-                        }
-
-                        .btn-key-danger:active, .btn-key-danger.active-state {
-                            background-color: #f8d7da !important;
-                            border-color: #f5c6cb !important;
-                        }
-
-                        .btn-key-warning {
-                            color: #fd7e14;
-                            background-color: #fff9db;
-                            border-color: #ffe8cc;
-                        }
-
-                        .btn-key-warning:hover {
-                            background-color: #ffe8cc;
-                            border-color: #ffd8a8;
-                            color: #d9480f;
-                        }
-
-                        .btn-key-warning:active, .btn-key-warning.active-state {
-                            background-color: #ffe8cc !important;
-                            border-color: #ffd8a8 !important;
-                        }
-
-                        /* Estilos del Contenedor OTP */
-                        .otp-container {
-                            display: flex;
-                            justify-content: center;
-                            gap: 12px;
-                            margin: 15px 0;
-                        }
-
-                        .otp-field {
-                            width: 50px;
-                            height: 50px;
-                            font-size: 1.6rem;
-                            font-weight: 700;
-                            text-align: center;
-                            border: 2px solid #ced4da;
-                            border-radius: 8px;
-                            caret-color: transparent;
-                            transition: all 0.15s ease-in-out;
-                        }
-
-                        .otp-field:focus {
-                            border-color: #dc3545;
-                            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
-                            outline: none;
-                        }
-
-                        /* Responsividad para pantallas pequeñas */
-                        @media (max-width: 440px) {
-                            .keypad-grid {
-                                gap: 10px;
-                                max-width: 230px;
-                            }
-                            .btn-key {
-                                height: 50px;
-                                font-size: 1.25rem;
-                            }
-                            .otp-field {
-                                width: 44px;
-                                height: 44px;
-                                font-size: 1.4rem;
-                            }
-                        }
-                        @media (max-width: 340px) {
-                            .keypad-grid {
-                                gap: 8px;
-                                max-width: 200px;
-                            }
-                            .btn-key {
-                                height: 44px;
-                                font-size: 1.15rem;
-                            }
-                            .otp-field {
-                                width: 38px;
-                                height: 38px;
-                                font-size: 1.25rem;
-                                gap: 8px;
-                            }
-                        }
-                    </style>
-
-                    <div id="pinInputGroup">
-                        <label><i class="dripicons-lock"></i> Código PIN del empleado:</label>
-                        <input type="hidden" id="pinConfirmInput">
-                        
-                        <!-- Contenedor OTP -->
-                        <div class="otp-container">
-                            <input type="password" class="otp-field" maxlength="1" pattern="[0-9]" inputmode="none" autocomplete="off" data-index="0">
-                            <input type="password" class="otp-field" maxlength="1" pattern="[0-9]" inputmode="none" autocomplete="off" data-index="1">
-                            <input type="password" class="otp-field" maxlength="1" pattern="[0-9]" inputmode="none" autocomplete="off" data-index="2">
-                            <input type="password" class="otp-field" maxlength="1" pattern="[0-9]" inputmode="none" autocomplete="off" data-index="3">
-                        </div>
-                        
-                        <!-- Teclado Virtual Numérico -->
-                        <div id="virtualKeypad">
-                            <div class="keypad-grid">
-                                <button type="button" class="btn btn-key" data-val="1">1</button>
-                                <button type="button" class="btn btn-key" data-val="2">2</button>
-                                <button type="button" class="btn btn-key" data-val="3">3</button>
-                                
-                                <button type="button" class="btn btn-key" data-val="4">4</button>
-                                <button type="button" class="btn btn-key" data-val="5">5</button>
-                                <button type="button" class="btn btn-key" data-val="6">6</button>
-                                
-                                <button type="button" class="btn btn-key" data-val="7">7</button>
-                                <button type="button" class="btn btn-key" data-val="8">8</button>
-                                <button type="button" class="btn btn-key" data-val="9">9</button>
-                                
-                                <button type="button" class="btn btn-key btn-key-danger" data-val="clear">C</button>
-                                <button type="button" class="btn btn-key" data-val="0">0</button>
-                                <button type="button" class="btn btn-key btn-key-warning" data-val="backspace">
-                                    <i class="dripicons-backspace"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="mb-0">¿Está seguro de que desea eliminar el turno de <strong id="pinConfirmEmployeeName">este empleado</strong>?</p>
                     <div id="pinConfirmMsg" class="mt-2" style="display:none;"></div>
                 </div>
                 <div class="modal-footer">
@@ -791,7 +622,7 @@
                 //document.getElementById('latest_trade_user').innerText = e.trade;
             })*/
 
-        // ---- PIN: Eliminar turno con confirmación ----
+        // ---- Eliminar turno con confirmación directa (sin PIN) ----
         var _pinDeleteTurnoId   = null;
         var _pinDeleteEmpId     = null;
         var _pinDeleteEmpName   = null;
@@ -804,114 +635,13 @@
             $('#pinConfirmTurnoId').val(turnoId);
             $('#pinConfirmEmployeeId').val(employeeId);
             $('#pinConfirmEmployeeName').text(_pinDeleteEmpName);
-            $('#pinConfirmInput').val('');
-            $('.otp-field').val(''); // Limpiar campos OTP
             $('#pinConfirmMsg').hide().html('');
-            // Ocultar campo PIN si no hay empleado
-            if (!employeeId) {
-                $('#pinInputGroup').hide();
-            } else {
-                $('#pinInputGroup').show();
-            }
             $('#pin-confirm-modal').modal('show');
         };
 
-        // Foco automático al abrir modal
-        $('#pin-confirm-modal').on('shown.bs.modal', function () {
-            $('.otp-field').eq(0).focus();
-        });
-
-        // Manejar entrada física de teclado en campos OTP
-        $(document).on('input', '.otp-field', function() {
-            var $fields = $('.otp-field');
-            var val = $(this).val();
-            // Mantener solo números
-            $(this).val(val.replace(/[^0-9]/g, ''));
-            
-            // Avanzar foco automático
-            if (this.value.length === 1) {
-                var index = $(this).data('index');
-                if (index < 3) {
-                    $fields.eq(index + 1).focus();
-                }
-            }
-            updatePinValue();
-        });
-
-        $(document).on('keydown', '.otp-field', function(e) {
-            var $fields = $('.otp-field');
-            var index = $(this).data('index');
-            
-            if (e.key === 'Backspace' && this.value.length === 0) {
-                if (index > 0) {
-                    $fields.eq(index - 1).val('').focus();
-                    updatePinValue();
-                }
-            }
-        });
-
-        function updatePinValue() {
-            var pin = '';
-            $('.otp-field').each(function() {
-                pin += $(this).val();
-            });
-            $('#pinConfirmInput').val(pin);
-        }
-
-        // Lógica del Teclado Virtual Numérico con OTP
-        $(document).on('click', '.btn-key', function(e) {
-            e.preventDefault();
-            var val = $(this).data('val');
-            var $fields = $('.otp-field');
-
-            // Retroalimentación visual
-            var $btn = $(this);
-            $btn.addClass('active-state');
-            setTimeout(function() {
-                $btn.removeClass('active-state');
-            }, 80);
-
-            if (val === 'clear') {
-                $fields.val('');
-                $fields.eq(0).focus();
-                $('#pinConfirmInput').val('');
-            } else if (val === 'backspace') {
-                // Encontrar el último campo con valor y borrarlo
-                for (var i = 3; i >= 0; i--) {
-                    if ($fields.eq(i).val() !== '') {
-                        $fields.eq(i).val('').focus();
-                        break;
-                    }
-                }
-                updatePinValue();
-            } else {
-                // Encontrar el primer campo vacío y rellenarlo
-                for (var i = 0; i < 4; i++) {
-                    if ($fields.eq(i).val() === '') {
-                        $fields.eq(i).val(val);
-                        if (i < 3) {
-                            $fields.eq(i + 1).focus();
-                        }
-                        break;
-                    }
-                }
-                updatePinValue();
-            }
-        });
-
         $('#btnConfirmDeleteShift').on('click', function() {
-            var turnoId    = $('#pinConfirmTurnoId').val();
-            var employeeId = $('#pinConfirmEmployeeId').val();
-            var pin        = $('#pinConfirmInput').val();
-            var $btn       = $(this);
-
-            // Si no hay empleado asignado, eliminar directamente sin PIN
-            if (!employeeId) {
-                pin = '';
-            } else if (!pin) {
-                $('#pinConfirmMsg').html('<div class="alert alert-warning">Por favor ingresa el código PIN.</div>').show();
-                return;
-            }
+            var turnoId = $('#pinConfirmTurnoId').val();
+            var $btn    = $(this);
 
             $btn.prop('disabled', true).html('<i class="dripicons-clockwise"></i> Eliminando...');
             $('#pinConfirmMsg').hide();
@@ -919,7 +649,7 @@
             $.ajax({
                 type: 'DELETE',
                 url: baseUrl + '/attentionshift/' + turnoId + '/secure',
-                data: { pin: pin },
+                data: {},
                 success: function(resp) {
                     if (resp.success) {
                         $('#pin-confirm-modal').modal('hide');
@@ -943,7 +673,7 @@
                 }
             });
         });
-        // ---- FIN PIN: Eliminar turno ----
+        // ---- FIN: Eliminar turno ----
     </script>
 
     <script>

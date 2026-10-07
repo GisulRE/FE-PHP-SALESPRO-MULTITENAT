@@ -34,9 +34,7 @@ class Customer extends Model
             4 => 'OTRO DOCUMENTO DE IDENTIDAD',
             5 => 'NIT ',
         ];
-        $descripcion_documento = $tipo_documento_identidad_lookup[ $this->tipo_documento ];
-
-        return $descripcion_documento;
+        return $tipo_documento_identidad_lookup[$this->tipo_documento] ?? 'Sin Definir';
     }
 
     protected static function boot()

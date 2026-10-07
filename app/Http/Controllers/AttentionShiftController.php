@@ -7,6 +7,7 @@ use App\Customer;
 use App\CustomerGroup;
 use App\Employee;
 use App\PreSale;
+use App\Product_Presale;
 use App\ShiftEmployee;
 use Auth;
 use Illuminate\Http\Request;
@@ -274,59 +275,43 @@ class AttentionShiftController extends Controller
     }
 
     /**
-     * Eliminar un turno verificando el código PIN del empleado asociado.
-     * Si el empleado no tiene PIN configurado, se permite la eliminación directamente.
+     * Eliminar un turno directamente liberando al empleado y limpiando preventas asociadas.
      *
      * DELETE /attentionshift/{id}/secure
      */
-    public function destroyWithPin(Request $request, $id)
-    {
-        $this->date = date('Y-m-d');
-        $turno_data = AttentionShift::find($id);
+     public function destroyWithPin(Request $request, $id)
+     {
+         $this->date = date('Y-m-d');
+         $turno_data = AttentionShift::find($id);
 
-        if (!$turno_data) {
-            return response()->json(['success' => false, 'message' => 'Turno no encontrado'], 404);
-        }
+         if (!$turno_data) {
+             return response()->json(['success' => false, 'message' => 'Turno no encontrado'], 404);
+         }
 
-        // Verificar PIN si el empleado tiene uno configurado
-        if ($turno_data->employee_id) {
-            $employee = Employee::find($turno_data->employee_id);
+         // Liberar posición del empleado asociado si existe
+         if ($turno_data->employee_id) {
+             $employee_position = ShiftEmployee::where([['status', 0], ['employee_id', $turno_data->employee_id]])
+                 ->whereDate('created_at', $this->date)->first();
+             if ($employee_position) {
+                 $employee_position->status = 1;
+                 $employee_position->save();
+             }
+         }
 
-            if ($employee && $employee->attendance_pin) {
-                $pin = $request->input('pin');
+         // Eliminar preventa asociada si existe
+         $presale = PreSale::where('attentionshift_id', $id)->first();
+         if ($presale) {
+             Product_Presale::where('presale_id', $presale->id)->delete();
+             $presale->delete();
+         }
 
-                if (empty($pin)) {
-                    return response()->json([
-                        'success'      => false,
-                        'message'      => 'Se requiere el código PIN del empleado para esta acción.',
-                        'requires_pin' => true,
-                    ], 422);
-                }
+         $turno_data->delete();
 
-                if (!Hash::check($pin, $employee->attendance_pin)) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Código PIN incorrecto. Intente nuevamente.',
-                    ], 403);
-                }
-            }
-
-            // PIN válido (o sin PIN): liberar posición del empleado
-            $employee_position = ShiftEmployee::where([['status', 0], ['employee_id', $turno_data->employee_id]])
-                ->whereDate('created_at', $this->date)->first();
-            if ($employee_position) {
-                $employee_position->status = 1;
-                $employee_position->save();
-            }
-        }
-
-        $turno_data->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Turno eliminado con éxito, empleado liberado.',
-        ]);
-    }
+         return response()->json([
+             'success' => true,
+             'message' => 'Turno eliminado con éxito, empleado liberado.',
+         ]);
+     }
 
     /**
      * Show the specified resource from storage.

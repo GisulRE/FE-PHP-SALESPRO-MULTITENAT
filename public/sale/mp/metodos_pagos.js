@@ -58,6 +58,7 @@ function metodosPago(dom) {
 				$("#" + x.id).hide();
 			}
 		});
+		ValidacionMetodoPago();
 		resolve(true);
 	});
 }
@@ -113,7 +114,7 @@ function cargarOpcionesPagoMultiple() {
 			$target.append(option);
 		});
 	});
-	$(".selectpicker").selectpicker("refresh");
+	$("#multi_pay_method_1, #multi_pay_method_2, #multi_pay_method_3").selectpicker("refresh");
 }
 
 function obtenerMetodosMultiplesSeleccionados() {
@@ -171,7 +172,7 @@ function aplicarPagoMultiple() {
 		fn();
 	});
 
-	$(".selectpicker").selectpicker("refresh");
+	$('select[name="paid_by_id_select"]').selectpicker("refresh");
 	ValidacionMetodoPago();
 }
 
@@ -185,7 +186,7 @@ window.activarPagoMultiple = function () {
 	$("#multi_pay_method_1").val("");
 	$("#multi_pay_method_2").val("");
 	$("#multi_pay_method_3").val("");
-	$(".selectpicker").selectpicker("refresh");
+	$('select[name="paid_by_id_select"], #multi_pay_method_1, #multi_pay_method_2, #multi_pay_method_3').selectpicker("refresh");
 	aplicarPagoMultiple();
 };
 
@@ -199,7 +200,7 @@ window.desactivarPagoMultiple = function () {
 	$("#multi_pay_method_1").val("");
 	$("#multi_pay_method_2").val("");
 	$("#multi_pay_method_3").val("");
-	$(".selectpicker").selectpicker("refresh");
+	$('select[name="paid_by_id_select"], #multi_pay_method_1, #multi_pay_method_2, #multi_pay_method_3').selectpicker("refresh");
 };
 
 $(document).on("change", ".multi-pay-method", function () {
@@ -294,13 +295,23 @@ function guardarMetodosPagos() {
 	);
 }
 
+function getMontoInicialAutoFill() {
+	var autoFill = $('#pos_setting_auto_fill_amount').val();
+	if (autoFill == '1' || autoFill === undefined) {
+		var total = parseFloat($('#grand-total').text().replace(/,/g, ''));
+		return isNaN(total) ? '0' : total.toFixed(2);
+	}
+	return '0';
+}
+
 function appendMontoItemHtml(label, inputId) {
+	let initialVal = getMontoInicialAutoFill();
 	return `
 		<div class="payment-list-item">
 			<div class="row">
 				<div class="col-md-12 form-group mb-0">
 					<label>${label}</label>
-					<input id="${inputId}" class="form-control payment-list-input" onkeyup="ValidacionMetodoPago()" type="number" step="0.01" min="0" max="1000000" value="0"/>
+					<input id="${inputId}" class="form-control payment-list-input" onkeyup="ValidacionMetodoPago()" type="number" step="0.01" min="0" max="1000000" value="${initialVal}"/>
 				</div>
 			</div>
 		</div>`;
@@ -311,25 +322,29 @@ function MPtarjeta() {
 	let html = appendMontoItemHtml("Monto Tarjeta", "montoTarjeta");
 	$("#html_montos_metodos_de_pago").append(html);
 	$("#number_card").prop("required", true);
+	ValidacionMetodoPago();
 }
 
 function MPgiftCard() {
 	giftCard();
+	ValidacionMetodoPago();
 }
 
 function MPcheque() {
 	$("#MP_cheque").show();
 	let html = appendMontoItemHtml("Monto Cheque", "montoCheque");
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPefectivo() {
+	let initialVal = getMontoInicialAutoFill();
 	let html = `
 	<div class="payment-list-item">
 		<div class="row">
 			<div class="col-md-7 form-group mb-0">
 				<label>Monto Efectivo</label>
-				<input id="montoEfectivo" class="form-control payment-list-input" onkeyup="ValidacionMetodoPago();" type="number" step="0.01" min="0" max="1000000" value="0"/>
+				<input id="montoEfectivo" class="form-control payment-list-input" onkeyup="ValidacionMetodoPago();" type="number" step="0.01" min="0" max="1000000" value="${initialVal}"/>
 			</div>
 			<div class="col-md-5 form-group mb-0">
 				<label>Monto Cambio</label>
@@ -338,21 +353,25 @@ function MPefectivo() {
 		</div>
 	</div>`;
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPvale() {
 	let html = appendMontoItemHtml("Monto Vale", "montoVale");
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPotros() {
 	let html = appendMontoItemHtml("Monto Otros", "montoOtros");
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPpagoPosterior() {
 	let html = appendMontoItemHtml("Monto Pago Posterior", "montoPagoPosterior");
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPtransferenciaBancaria() {
@@ -361,21 +380,25 @@ function MPtransferenciaBancaria() {
 		"montoTransferenciaBancaria",
 	);
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPdepositoCuenta() {
 	let html = appendMontoItemHtml("Monto Dep. en Cuenta", "montoDepositoCuenta");
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPtransferenciaSwift() {
 	let html = appendMontoItemHtml("Monto Transferencia Swift", "montoSwift");
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPcanalPago() {
 	let html = appendMontoItemHtml("Monto Canal de Pago", "montoCanalPago");
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPbilleteraMovil() {
@@ -384,11 +407,13 @@ function MPbilleteraMovil() {
 		"montoBilleteraMovil",
 	);
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPpagoOnline() {
 	let html = appendMontoItemHtml("Monto Pago Online", "montoPagoOnline");
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }
 
 function MPdebitoAutomatico() {
@@ -397,4 +422,5 @@ function MPdebitoAutomatico() {
 		"montoDebitoAutomatico",
 	);
 	$("#html_montos_metodos_de_pago").append(html);
+	ValidacionMetodoPago();
 }

@@ -833,10 +833,10 @@ class ControlContingenciaController extends Controller
 
     private function create_sale(array $dataHead, array $dataDetails)
     {
-        $last_ref = Sale::get()->last();
-        if ($last_ref != null) {
-            $nros = explode("-", $last_ref['reference_no']);
-            $nro = ltrim($nros[1], "0");
+        $last_ref = Sale::select('reference_no')->orderBy('id', 'desc')->first();
+        if ($last_ref != null && !empty($last_ref->reference_no)) {
+            $nros = explode("-", $last_ref->reference_no);
+            $nro = isset($nros[1]) ? (int) ltrim($nros[1], "0") : 0;
             $nro++;
             $nro = str_pad($nro, 8, "0", STR_PAD_LEFT);
         } else {

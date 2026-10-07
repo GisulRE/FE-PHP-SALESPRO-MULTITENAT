@@ -10,30 +10,22 @@
                     <li><a href="{{ url('/') }}"> <i
                                 class="dripicons-meter"></i><span>{{ __('file.dashboard') }}</span></a></li>
                     <?php
-                    $role = DB::table('roles')->find(Auth::user()->role_id);
-                    $index_permission = DB::table('permissions')->where('name', 'products-index')->first();
-                    $index_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    
-                    $print_barcode = DB::table('permissions')->where('name', 'print_barcode')->first();
-                    $print_barcode_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $print_barcode->id], ['role_id', $role->id]])
-                        ->first();
-                    
-                    $stock_count = DB::table('permissions')->where('name', 'stock_count')->first();
-                    $stock_count_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $stock_count->id], ['role_id', $role->id]])
-                        ->first();
-                    
-                    $adjustment = DB::table('permissions')->where('name', 'adjustment')->first();
-                    $adjustment_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $adjustment->id], ['role_id', $role->id]])
-                        ->first();
-                    $adjustment_qty_add = DB::table('permissions')->where('name', 'qty_adjustment-add')->first();
-                    $adjustment_add_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $adjustment_qty_add->id], ['role_id', $role->id]])
-                        ->first();
+                    if (!isset($all_permission) || !is_array($all_permission) || count($all_permission) <= 2) {
+                        $all_permission = DB::table('permissions')
+                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                            ->where('role_id', Auth::user()->role_id)
+                            ->pluck('name')
+                            ->toArray();
+                    }
+                    $all_perm = array_flip($all_permission);
+                    $hasPerm = function($permName) use ($all_perm) {
+                        return isset($all_perm[$permName]);
+                    };
+                    $index_permission_active = $hasPerm('products-index');
+                    $print_barcode_active = $hasPerm('print_barcode');
+                    $stock_count_active = $hasPerm('stock_count');
+                    $adjustment_active = $hasPerm('adjustment');
+                    $adjustment_add_active = $hasPerm('qty_adjustment-add');
                     ?>
 
                     <li><a href="#product" aria-expanded="false" data-toggle="collapse"> <i
@@ -45,10 +37,7 @@
                                 <li id="product-list-menu"><a
                                         href="{{ route('products.index') }}">{{ __('file.product_list') }}</a></li>
                                 <?php
-                                $add_permission = DB::table('permissions')->where('name', 'products-add')->first();
-                                $add_permission_active = DB::table('role_has_permissions')
-                                    ->where([['permission_id', $add_permission->id], ['role_id', $role->id]])
-                                    ->first();
+                                $add_permission_active = $hasPerm('products-add');
                                 ?>
                                 @if ($add_permission_active)
                                     <li id="product-create-menu"><a
@@ -76,10 +65,7 @@
                         </ul>
                     </li>
                     <?php
-                    $index_permission = DB::table('permissions')->where('name', 'purchases-index')->first();
-                    $index_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                        ->first();
+                    $index_permission_active = $hasPerm('purchases-index');
                     ?>
                     @if ($index_permission_active)
                         <li><a href="#purchase" aria-expanded="false" data-toggle="collapse"> <i
@@ -88,10 +74,7 @@
                                 <li id="purchase-list-menu"><a
                                         href="{{ route('purchases.index') }}">{{ trans('file.Purchase List') }}</a></li>
                                 <?php
-                                $add_permission = DB::table('permissions')->where('name', 'purchases-add')->first();
-                                $add_permission_active = DB::table('role_has_permissions')
-                                    ->where([['permission_id', $add_permission->id], ['role_id', $role->id]])
-                                    ->first();
+                                $add_permission_active = $hasPerm('purchases-add');
                                 ?>
                                 @if ($add_permission_active)
                                     <li id="purchase-create-menu"><a
@@ -105,45 +88,15 @@
                         </li>
                     @endif
                     <?php
-                    $index_permission = DB::table('permissions')->where('name', 'sales-index')->first();
-                    $index_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    
-                    $gift_card_permission = DB::table('permissions')->where('name', 'gift_card')->first();
-                    $gift_card_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $gift_card_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    
-                    $coupon_permission = DB::table('permissions')->where('name', 'coupon')->first();
-                    $coupon_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $coupon_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    
-                    $presale_index_permission = DB::table('permissions')->where('name', 'presale-create')->first();
-                    $presale_index_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $presale_index_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    $attentionshift = DB::table('permissions')->where('name', 'attentionshift')->first();
-                    $attentionshift_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $attentionshift->id], ['role_id', $role->id]])
-                        ->first();
-                    $contigenciasiat = DB::table('permissions')->where('name', 'contingencia_siat')->first();
-                    $contigenciasiat_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $contigenciasiat->id], ['role_id', $role->id]])
-                        ->first();
-                    $facturamasivasiat = DB::table('permissions')->where('name', 'facturamasiva_siat')->first();
-                    $facturamasivasiat_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $facturamasivasiat->id], ['role_id', $role->id]])
-                        ->first();
-                    $sale_pendingdue = DB::table('permissions')->where('name', 'sale_pendingdue')->first();
-                    $sale_pendingdue_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $sale_pendingdue->id], ['role_id', $role->id]])
-                        ->first();
-                    $sale_booksale = DB::table('permissions')->where('name', 'sales-list-booksale')->first();
-                    $sale_booksale_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $sale_booksale->id], ['role_id', $role->id]])
-                        ->first();
+                    $index_permission_active = $hasPerm('sales-index');
+                    $gift_card_permission_active = $hasPerm('gift_card');
+                    $coupon_permission_active = $hasPerm('coupon');
+                    $presale_index_permission_active = $hasPerm('presale-create');
+                    $attentionshift_active = $hasPerm('attentionshift');
+                    $contigenciasiat_permission_active = $hasPerm('contingencia_siat');
+                    $facturamasivasiat_permission_active = $hasPerm('facturamasiva_siat');
+                    $sale_pendingdue_permission_active = $hasPerm('sale_pendingdue');
+                    $sale_booksale_active = $hasPerm('sales-list-booksale');
                     ?>
 
                     <li><a href="#sale" aria-expanded="false" data-toggle="collapse"> <i
@@ -163,10 +116,7 @@
                                     </li>
                                 @endif
                                 <?php
-                                $add_permission = DB::table('permissions')->where('name', 'sales-add')->first();
-                                $add_permission_active = DB::table('role_has_permissions')
-                                    ->where([['permission_id', $add_permission->id], ['role_id', $role->id]])
-                                    ->first();
+                                $add_permission_active = $hasPerm('sales-add');
                                 ?>
                                 @if ($add_permission_active)
                                     <li><a href="{{ route('sale.pos') }}">POS</a></li>
@@ -212,10 +162,7 @@
                         </ul>
                     </li>
                     <?php
-                    $index_permission = DB::table('permissions')->where('name', 'expenses-index')->first();
-                    $index_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                        ->first();
+                    $index_permission_active = $hasPerm('expenses-index');
                     ?>
                     @if ($index_permission_active)
                         <li><a href="#expense" aria-expanded="false" data-toggle="collapse"> <i
@@ -227,10 +174,7 @@
                                 <li id="exp-list-menu"><a
                                         href="{{ route('expenses.index') }}">{{ trans('file.Expense List') }}</a></li>
                                 <?php
-                                $add_permission = DB::table('permissions')->where('name', 'expenses-add')->first();
-                                $add_permission_active = DB::table('role_has_permissions')
-                                    ->where([['permission_id', $add_permission->id], ['role_id', $role->id]])
-                                    ->first();
+                                $add_permission_active = $hasPerm('expenses-add');
                                 ?>
                                 @if ($add_permission_active)
                                     <li><a id="add-expense" href=""> {{ trans('file.Add Expense') }}</a></li>
@@ -239,10 +183,7 @@
                         </li>
                     @endif
                     <?php
-                    $index_permission = DB::table('permissions')->where('name', 'quotes-index')->first();
-                    $index_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                        ->first();
+                    $index_permission_active = $hasPerm('quotes-index');
                     ?>
                     @if ($index_permission_active)
                         <li><a href="#quotation" aria-expanded="false" data-toggle="collapse"> <i
@@ -251,10 +192,7 @@
                                 <li id="quotation-list-menu"><a
                                         href="{{ route('quotations.index') }}">{{ trans('file.Quotation List') }}</a></li>
                                 <?php
-                                $add_permission = DB::table('permissions')->where('name', 'quotes-add')->first();
-                                $add_permission_active = DB::table('role_has_permissions')
-                                    ->where([['permission_id', $add_permission->id], ['role_id', $role->id]])
-                                    ->first();
+                                $add_permission_active = $hasPerm('quotes-add');
                                 ?>
                                 @if ($add_permission_active)
                                     <li id="quotation-create-menu"><a
@@ -265,10 +203,7 @@
                         </li>
                     @endif
                     <?php
-                    $index_permission = DB::table('permissions')->where('name', 'transfers-index')->first();
-                    $index_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                        ->first();
+                    $index_permission_active = $hasPerm('transfers-index');
                     ?>
                     @if ($index_permission_active)
                         <li><a href="#transfer" aria-expanded="false" data-toggle="collapse"> <i
@@ -277,10 +212,7 @@
                                 <li id="transfer-list-menu"><a
                                         href="{{ route('transfers.index') }}">{{ trans('file.Transfer List') }}</a></li>
                                 <?php
-                                $add_permission = DB::table('permissions')->where('name', 'transfers-add')->first();
-                                $add_permission_active = DB::table('role_has_permissions')
-                                    ->where([['permission_id', $add_permission->id], ['role_id', $role->id]])
-                                    ->first();
+                                $add_permission_active = $hasPerm('transfers-add');
                                 ?>
                                 @if ($add_permission_active)
                                     <li id="transfer-create-menu"><a
@@ -298,20 +230,14 @@
                                 class="dripicons-archive"></i><span>{{ trans('file.return') }}</span></a>
                         <ul id="return" class="collapse list-unstyled ">
                             <?php
-                            $index_permission = DB::table('permissions')->where('name', 'returns-index')->first();
-                            $index_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                                ->first();
+                            $index_permission_active = $hasPerm('returns-index');
                             ?>
                             @if ($index_permission_active)
                                 <li id="sale-return-menu"><a
                                         href="{{ route('return-sale.index') }}">{{ trans('file.Sale') }}</a></li>
                             @endif
                             <?php
-                            $index_permission = DB::table('permissions')->where('name', 'purchase-return-index')->first();
-                            $index_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                                ->first();
+                            $index_permission_active = $hasPerm('purchase-return-index');
                             ?>
                             @if ($index_permission_active)
                                 <li id="purchase-return-menu"><a
@@ -320,37 +246,15 @@
                         </ul>
                     </li>
                     <?php
-                    $index_permission = DB::table('permissions')->where('name', 'account-index')->first();
-                    $index_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    
-                    $money_transfer_permission = DB::table('permissions')->where('name', 'money-transfer')->first();
-                    $money_transfer_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $money_transfer_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    
-                    $balance_sheet_permission = DB::table('permissions')->where('name', 'balance-sheet')->first();
-                    $balance_sheet_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $balance_sheet_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    $balance_sheet_account_permission = DB::table('permissions')->where('name', 'balance-sheet-account')->first();
-                    $balance_sheet_account_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $balance_sheet_account_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    $close_balance_account_permission = DB::table('permissions')->where('name', 'close-balance-account')->first();
-                    $close_balance_account_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $close_balance_account_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    $account_statement_permission = DB::table('permissions')->where('name', 'account-statement')->first();
-                    $account_statement_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $account_statement_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    $adjaccount_statement_permission = DB::table('permissions')->where('name', 'adjustment-account-index')->first();
-                    $adjaccount_statement_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $account_statement_permission->id], ['role_id', $role->id]])
-                        ->first();
-                    
+                    $index_permission_active = $hasPerm('account-index');
+                    $money_transfer_permission_active = $hasPerm('money-transfer');
+                    $balance_sheet_permission_active = $hasPerm('balance-sheet');
+                    $balance_sheet_account_permission_active = $hasPerm('balance-sheet-account');
+                    $close_balance_account_permission_active = $hasPerm('close-balance-account');
+                    $account_statement_permission_active = $hasPerm('account-statement');
+                    $adjaccount_statement_permission = $hasPerm('adjustment-account-index');
+                    $adjaccount_statement_permission_active = $adjaccount_statement_permission;
+                    $close_balance_account_permission = $close_balance_account_permission_active;
                     ?>
                     @if (
                         $index_permission_active ||
@@ -397,7 +301,7 @@
                                         ]) !!}
                                         <input type="hidden" name="start_date" value="{{ date('Y-m-d') }}" />
                                         <input type="hidden" name="end_date"
-                                            value="{{ date('Y-m-d', strtotime(' 1 day')) }}" />
+                                             value="{{ date('Y-m-d', strtotime(' 1 day')) }}" />
                                         <input type="hidden" name="account_id" value="0" />
                                         <a id="account-mov-report-link" href="">Arqueo Caja</a>
                                         {!! Form::close() !!}
@@ -420,26 +324,11 @@
                         </li>
                     @endif
                     <?php
-                    $hrm_menu = DB::table('permissions')->where('name', 'hrm-menu')->first();
-                    $hrm_menu_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $hrm_menu->id], ['role_id', $role->id]])
-                        ->first();
-                    $department = DB::table('permissions')->where('name', 'department')->first();
-                    $department_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $department->id], ['role_id', $role->id]])
-                        ->first();
-                    $index_employee = DB::table('permissions')->where('name', 'employees-index')->first();
-                    $index_employee_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $index_employee->id], ['role_id', $role->id]])
-                        ->first();
-                    $attendance = DB::table('permissions')->where('name', 'attendance')->first();
-                    $attendance_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $attendance->id], ['role_id', $role->id]])
-                        ->first();
-                    $payroll = DB::table('permissions')->where('name', 'payroll')->first();
-                    $payroll_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $payroll->id], ['role_id', $role->id]])
-                        ->first();
+                    $hrm_menu_active = $hasPerm('hrm-menu');
+                    $department_active = $hasPerm('department');
+                    $index_employee_active = $hasPerm('employees-index');
+                    $attendance_active = $hasPerm('attendance');
+                    $payroll_active = $hasPerm('payroll');
                     ?>
                     @if ($hrm_menu_active)
                         <li class=""><a href="#hrm" aria-expanded="false" data-toggle="collapse"> <i
@@ -471,38 +360,24 @@
                     <li><a href="#people" aria-expanded="false" data-toggle="collapse"> <i
                                 class="dripicons-user"></i><span>{{ trans('file.People') }}</span></a>
                         <ul id="people" class="collapse list-unstyled ">
-                            <?php $index_permission_active = DB::table('permissions')
-                                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                                ->where([['permissions.name', 'users-index'], ['role_id', $role->id]])
-                                ->first();
-                            ?>
+                            <?php $index_permission_active = $hasPerm('users-index'); ?>
                             @if ($index_permission_active)
                                 <li id="user-list-menu"><a
                                         href="{{ route('user.index') }}">{{ trans('file.User List') }}</a></li>
-                                <?php $add_permission_active = DB::table('permissions')
-                                    ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                                    ->where([['permissions.name', 'users-add'], ['role_id', $role->id]])
-                                    ->first();
-                                ?>
+                                <?php $add_permission_active = $hasPerm('users-add'); ?>
                                 @if ($add_permission_active)
                                     <li id="user-create-menu"><a
                                             href="{{ route('user.create') }}">{{ trans('file.Add User') }}</a></li>
                                 @endif
                             @endif
                             <?php
-                            $index_permission = DB::table('permissions')->where('name', 'customers-index')->first();
-                            $index_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                                ->first();
+                            $index_permission_active = $hasPerm('customers-index');
                             ?>
                             @if ($index_permission_active)
                                 <li id="customer-list-menu"><a
                                         href="{{ route('customer.index') }}">{{ trans('file.Customer List') }}</a></li>
                                 <?php
-                                $add_permission = DB::table('permissions')->where('name', 'customers-add')->first();
-                                $add_permission_active = DB::table('role_has_permissions')
-                                    ->where([['permission_id', $add_permission->id], ['role_id', $role->id]])
-                                    ->first();
+                                $add_permission_active = $hasPerm('customers-add');
                                 ?>
                                 @if ($add_permission_active)
                                     <li id="customer-create-menu"><a
@@ -511,19 +386,13 @@
                                 @endif
                             @endif
                             <?php
-                            $index_permission = DB::table('permissions')->where('name', 'billers-index')->first();
-                            $index_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                                ->first();
+                            $index_permission_active = $hasPerm('billers-index');
                             ?>
                             @if ($index_permission_active)
                                 <li id="biller-list-menu"><a
                                         href="{{ route('biller.index') }}">{{ trans('file.Biller List') }}</a></li>
                                 <?php
-                                $add_permission = DB::table('permissions')->where('name', 'billers-add')->first();
-                                $add_permission_active = DB::table('role_has_permissions')
-                                    ->where([['permission_id', $add_permission->id], ['role_id', $role->id]])
-                                    ->first();
+                                $add_permission_active = $hasPerm('billers-add');
                                 ?>
                                 @if ($add_permission_active)
                                     <li id="biller-create-menu"><a
@@ -531,19 +400,13 @@
                                 @endif
                             @endif
                             <?php
-                            $index_permission = DB::table('permissions')->where('name', 'suppliers-index')->first();
-                            $index_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $index_permission->id], ['role_id', $role->id]])
-                                ->first();
+                            $index_permission_active = $hasPerm('suppliers-index');
                             ?>
                             @if ($index_permission_active)
                                 <li id="supplier-list-menu"><a
                                         href="{{ route('supplier.index') }}">{{ trans('file.Supplier List') }}</a></li>
                                 <?php
-                                $add_permission = DB::table('permissions')->where('name', 'suppliers-add')->first();
-                                $add_permission_active = DB::table('role_has_permissions')
-                                    ->where([['permission_id', $add_permission->id], ['role_id', $role->id]])
-                                    ->first();
+                                $add_permission_active = $hasPerm('suppliers-add');
                                 ?>
                                 @if ($add_permission_active)
                                     <li id="supplier-create-menu"><a
@@ -556,111 +419,32 @@
                     <li><a href="#report" aria-expanded="false" data-toggle="collapse"> <i
                                 class="dripicons-document-remove"></i><span>{{ trans('file.Reports') }}</span></a>
                         <?php
-                        $profit_loss_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'profit-loss'], ['role_id', $role->id]])
-                            ->first();
-                        $best_seller_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'best-seller'], ['role_id', $role->id]])
-                            ->first();
-                        $warehouse_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'warehouse-report'], ['role_id', $role->id]])
-                            ->first();
-                        $warehouse_stock_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'warehouse-stock-report'], ['role_id', $role->id]])
-                            ->first();
-                        $product_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'product-report'], ['role_id', $role->id]])
-                            ->first();
-                        $productdetail_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'product-detail-report'], ['role_id', $role->id]])
-                            ->first();
-                        $daily_sale_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'daily-sale'], ['role_id', $role->id]])
-                            ->first();
-                        $monthly_sale_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'monthly-sale'], ['role_id', $role->id]])
-                            ->first();
-                        $daily_purchase_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'daily-purchase'], ['role_id', $role->id]])
-                            ->first();
-                        $monthly_purchase_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'monthly-purchase'], ['role_id', $role->id]])
-                            ->first();
-                        $purchase_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'purchase-report'], ['role_id', $role->id]])
-                            ->first();
-                        $sale_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'sale-report'], ['role_id', $role->id]])
-                            ->first();
-                        $salebiller_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'salebiller-report'], ['role_id', $role->id]])
-                            ->first();
-                        $sale_detail_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'saledetail-report'], ['role_id', $role->id]])
-                            ->first();
-                        $salecustomer_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'salecustomer-report'], ['role_id', $role->id]])
-                            ->first();
-                        $payment_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'payment-report'], ['role_id', $role->id]])
-                            ->first();
-                        $product_qty_alert_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'product-qty-alert'], ['role_id', $role->id]])
-                            ->first();
-                        $user_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'user-report'], ['role_id', $role->id]])
-                            ->first();
-                        
-                        $customer_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'customer-report'], ['role_id', $role->id]])
-                            ->first();
-                        $supplier_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'supplier-report'], ['role_id', $role->id]])
-                            ->first();
-                        $due_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'due-report'], ['role_id', $role->id]])
-                            ->first();
-                        $onlycommision_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'only-commision-report'], ['role_id', $role->id]])
-                            ->first();
-                        $servicecommision_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'service-commission-report'], ['role_id', $role->id]])
-                            ->first();
-                        $salerenueve_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'sale-renueve-report'], ['role_id', $role->id]])
-                            ->first();
-                        $holidayemp_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'holiday-employee-report'], ['role_id', $role->id]])
-                            ->first();
-                        $attendancemp_report_active = DB::table('permissions')
-                            ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                            ->where([['permissions.name', 'attendance-employee-report'], ['role_id', $role->id]])
-                            ->first();
+                        $profit_loss_active = $hasPerm('profit-loss');
+                        $best_seller_active = $hasPerm('best-seller');
+                        $warehouse_report_active = $hasPerm('warehouse-report');
+                        $warehouse_stock_report_active = $hasPerm('warehouse-stock-report');
+                        $product_report_active = $hasPerm('product-report');
+                        $productdetail_report_active = $hasPerm('product-detail-report');
+                        $daily_sale_active = $hasPerm('daily-sale');
+                        $monthly_sale_active = $hasPerm('monthly-sale');
+                        $daily_purchase_active = $hasPerm('daily-purchase');
+                        $monthly_purchase_active = $hasPerm('monthly-purchase');
+                        $purchase_report_active = $hasPerm('purchase-report');
+                        $sale_report_active = $hasPerm('sale-report');
+                        $salebiller_report_active = $hasPerm('salebiller-report');
+                        $sale_detail_report_active = $hasPerm('saledetail-report');
+                        $salecustomer_report_active = $hasPerm('salecustomer-report');
+                        $payment_report_active = $hasPerm('payment-report');
+                        $product_qty_alert_active = $hasPerm('product-qty-alert');
+                        $user_report_active = $hasPerm('user-report');
+                        $customer_report_active = $hasPerm('customer-report');
+                        $supplier_report_active = $hasPerm('supplier-report');
+                        $due_report_active = $hasPerm('due-report');
+                        $onlycommision_report_active = $hasPerm('only-commision-report');
+                        $servicecommision_report_active = $hasPerm('service-commission-report');
+                        $salerenueve_report_active = $hasPerm('sale-renueve-report');
+                        $holidayemp_report_active = $hasPerm('holiday-employee-report');
+                        $attendancemp_report_active = $hasPerm('attendance-employee-report');
                         ?>
                         <ul id="report" class="collapse list-unstyled ">
                             @if ($best_seller_active)
@@ -944,10 +728,7 @@
                     </li>
                     {{-- Indice SIAT --}}
                     <?php
-                    $siat_permission = DB::table('permissions')->where('name', 'module_siat')->first();
-                    $siat_permission_active = DB::table('role_has_permissions')
-                        ->where([['permission_id', $siat_permission->id], ['role_id', $role->id]])
-                        ->first();
+                    $siat_permission_active = $hasPerm('module_siat');
                     ?>
                     @if ($siat_permission_active)
                         @include('layout.partials.aside-siat')
@@ -958,63 +739,19 @@
                                 class="dripicons-gear"></i><span>{{ trans('file.settings') }}</span></a>
                         <ul id="setting" class="collapse list-unstyled ">
                             <?php
-                            
-                            $warehouse_permission = DB::table('permissions')->where('name', 'warehouse')->first();
-                            $warehouse_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $warehouse_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $customer_group_permission = DB::table('permissions')->where('name', 'customer_group')->first();
-                            $customer_group_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $customer_group_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $brand_permission = DB::table('permissions')->where('name', 'brand')->first();
-                            $brand_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $brand_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $unit_permission = DB::table('permissions')->where('name', 'unit')->first();
-                            $unit_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $unit_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $tax_permission = DB::table('permissions')->where('name', 'tax')->first();
-                            $tax_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $tax_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $general_setting_permission = DB::table('permissions')->where('name', 'general_setting')->first();
-                            $general_setting_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $general_setting_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $mail_setting_permission = DB::table('permissions')->where('name', 'mail_setting')->first();
-                            $mail_setting_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $mail_setting_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $sms_setting_permission = DB::table('permissions')->where('name', 'sms_setting')->first();
-                            $sms_setting_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $sms_setting_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $create_sms_permission = DB::table('permissions')->where('name', 'create_sms')->first();
-                            $create_sms_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $create_sms_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $pos_setting_permission = DB::table('permissions')->where('name', 'pos_setting')->first();
-                            $pos_setting_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $pos_setting_permission->id], ['role_id', $role->id]])
-                                ->first();
-                            
-                            $hrm_setting_permission = DB::table('permissions')->where('name', 'hrm_setting')->first();
-                            $hrm_setting_permission_active = DB::table('role_has_permissions')
-                                ->where([['permission_id', $hrm_setting_permission->id], ['role_id', $role->id]])
-                                ->first();
+                            $warehouse_permission_active = $hasPerm('warehouse');
+                            $customer_group_permission_active = $hasPerm('customer_group');
+                            $brand_permission_active = $hasPerm('brand');
+                            $unit_permission_active = $hasPerm('unit');
+                            $tax_permission_active = $hasPerm('tax');
+                            $general_setting_permission_active = $hasPerm('general_setting');
+                            $mail_setting_permission_active = $hasPerm('mail_setting');
+                            $sms_setting_permission_active = $hasPerm('sms_setting');
+                            $create_sms_permission_active = $hasPerm('create_sms');
+                            $pos_setting_permission_active = $hasPerm('pos_setting');
+                            $hrm_setting_permission_active = $hasPerm('hrm_setting');
                             ?>
-                            @if ($role->id <= 2)
+                            @if (Auth::user() && Auth::user()->role_id <= 2)
                                 <li id="role-menu"><a
                                         href="{{ route('role.index') }}">{{ trans('file.Role Permission') }}</a></li>
                             @endif
@@ -1092,6 +829,7 @@
                                 'files' => true,
                                 'class' => 'payment-form',
                                 'id' => 'formPayment',
+                                'autocomplete' => 'off',
                             ]) !!}
                             @php
                                 if ($lims_pos_setting_data) {
@@ -1100,18 +838,7 @@
                                     $keybord_active = 0;
                                 }
 
-                                $customer_active = DB::table('permissions')
-                                    ->join(
-                                        'role_has_permissions',
-                                        'permissions.id',
-                                        '=',
-                                        'role_has_permissions.permission_id',
-                                    )
-                                    ->where([
-                                        ['permissions.name', 'customers-add'],
-                                        ['role_id', \Auth::user()->role_id],
-                                    ])
-                                    ->first();
+                                $customer_active = in_array('customers-add', $all_permission);
                             @endphp
                             <div class="row">
                                 <div class="col-md-12">
@@ -1172,6 +899,7 @@
                                                     <input type="hidden" name="customer_id_hidden"
                                                         value="{{ $biller_data->customer_id }}">
                                                 @endif
+                                                <input type="hidden" id="pos_setting_auto_fill_amount" value="{{ (!isset($lims_pos_setting_data->auto_fill_amount) || $lims_pos_setting_data->auto_fill_amount == 1) ? 1 : 0 }}">
                                                 <div class="input-group pos">
                                                     @if ($customer_active)
                                                         <?php $deposit = []; ?>
@@ -1216,6 +944,7 @@
                                                 <input type="text" name="product_code_name"
                                                     id="lims_productcodeSearch"
                                                     placeholder="Buscar/Escanear por Nombre/Código" class="form-control"
+                                                    autocomplete="off"
                                                     onclick="validatemp()" onkeyup="validatemp()"
                                                     onkeypress="validatemp()" />
                                             </div>
@@ -1559,17 +1288,17 @@
                                             </a>
                                         </li>
                                         @if ($hasSiat)
-                                        <li class="nav-item">
+                                        <li class="nav-item" id="nav_tab_preview_li" @if(empty($lims_pos_setting_data->print)) style="display:none;" @endif>
                                             <a id="tab_preview" class="nav-link disabled" data-toggle="tab" href="#segundoTab" role="tab">
                                                 <i class="fa fa-eye"></i> Imprimible
                                             </a>
                                         </li>
-                                        <li class="nav-item">
+                                        <li class="nav-item" id="nav_tab_billing_li" @if(empty($lims_pos_setting_data->print)) style="display:none;" @endif>
                                             <a id="tab_billing" class="nav-link disabled" data-toggle="tab" href="#tercerTab" role="tab">
                                                 <i class="fa fa-file-alt"></i> Datos Facturación
                                             </a>
                                         </li>
-                                        <li class="nav-item">
+                                        <li class="nav-item" id="nav_tab_final_li" @if(empty($lims_pos_setting_data->print)) style="display:none;" @endif>
                                             <a id="tab_final" class="nav-link disabled" data-toggle="tab" href="#cuartoTab" role="tab">
                                                 <i class="fa fa-print"></i> Impresión
                                             </a>
@@ -1739,7 +1468,7 @@
                                                 <div class="mt-3">
                                                     <button class="btn btn-secondary btn-sm"
                                                         id="segundoTabContinue" 
-                                                        @if (!$hasSiat) style="display:none;" @endif>
+                                                        @if (!$hasSiat || empty($lims_pos_setting_data->print)) style="display:none;" @endif>
                                                         Facturar
                                                     </button>
                                                 </div>
@@ -2055,16 +1784,8 @@
                                             </li>
                                             @include('layout.partials.latency-widget')
                                             <?php
-                                            $general_setting_permission = DB::table('permissions')->where('name', 'general_setting')->first();
-                                            $general_setting_permission_active = DB::table('role_has_permissions')
-                                                ->where([['permission_id', $general_setting_permission->id], ['role_id', Auth::user()->role_id]])
-                                                ->first();
-                                            
-                                            $pos_setting_permission = DB::table('permissions')->where('name', 'pos_setting')->first();
-                                            
-                                            $pos_setting_permission_active = DB::table('role_has_permissions')
-                                                ->where([['permission_id', $pos_setting_permission->id], ['role_id', Auth::user()->role_id]])
-                                                ->first();
+                                            $general_setting_permission_active = $hasPerm('general_setting');
+                                            $pos_setting_permission_active = $hasPerm('pos_setting');
                                             ?>
                                             @if ($pos_setting_permission_active)
                                                 <li class="nav-item"><a class="dropdown-item"
@@ -3212,6 +2933,35 @@
         var permission_proforma = <?php echo json_encode(in_array('quotes-add', $all_permission)); ?>;
         var permission_discount_item = <?php echo json_encode(in_array('pos_discount_item', $all_permission)); ?>;
         const hasSiat = <?php echo json_encode((bool)($hasSiat ?? false)); ?>;
+        var flag_print_nota_venta = <?php echo json_encode((bool) ($lims_pos_setting_data->print ?? false)); ?>;
+
+        if (typeof window.Swal === 'undefined') {
+            window.Swal = {
+                fire: function() {
+                    var args = Array.prototype.slice.call(arguments);
+                    if (args.length === 1 && typeof args[0] === 'object') {
+                        var opt = args[0];
+                        var title = opt.title || '';
+                        var text = opt.text || opt.html || '';
+                        var icon = opt.icon || opt.type || 'info';
+                        if (typeof window.swal === 'function') {
+                            try { return Promise.resolve(window.swal(title, text, icon)); } catch(e) {}
+                        }
+                        alert(title + (text ? '\n' + text : ''));
+                        return Promise.resolve();
+                    } else if (typeof window.swal === 'function') {
+                        try { return Promise.resolve(window.swal.apply(window, args)); } catch(e) {}
+                    }
+                    alert(args.join('\n'));
+                    return Promise.resolve();
+                }
+            };
+        }
+        if (typeof window.swal === 'undefined' && typeof window.Swal !== 'undefined' && typeof window.Swal.fire === 'function') {
+            window.swal = function() {
+                return window.Swal.fire.apply(window.Swal, arguments);
+            };
+        }
 
         var baseUrl = "<?php echo url('/'); ?>";
         $("ul#sale").siblings('a').attr('aria-expanded', 'true');
@@ -3370,6 +3120,9 @@
                 modo_proforma = $toggleProforma.prop('checked');
                 $toggleProforma.off('change.proforma').on('change.proforma', function() {
                     modo_proforma = $(this).prop('checked');
+                    if (typeof posProductCache !== 'undefined') {
+                        posProductCache = {};
+                    }
                 });
             }
             
@@ -3420,7 +3173,11 @@
             @if (session()->has('printsale') && session()->has('saleid'))
                 var id = '{{ session()->get('saleid') }}';
                 var win = window.open('sales/gen_invoice/' + id, '_blank');
-                win.focus();
+                if (win) {
+                    win.focus();
+                } else {
+                    Swal.fire("Aviso", "El navegador bloqueó la ventana emergente de impresión. Por favor habilite las ventanas emergentes.", "warning");
+                }
                 // No recargar automáticamente al cerrar la ventana de impresión
             @endif
         });
@@ -3536,7 +3293,7 @@
         }
 
         $('#customer_id').val($("input[name='customer_id_hidden']").val());
-        $('.selectpicker').selectpicker('refresh');
+        $('select[name="warehouse_id"], select[name="biller_id"], #customer_id').selectpicker('refresh');
 
         var id_c = $("#customer_id").val();
         $.get('sales/getcustomergroup/' + id_c, function(data) {
@@ -3597,6 +3354,10 @@
         $("#print-btn").on("click", function() {
             var divToPrint = document.getElementById('sale-details');
             var newWin = window.open('', 'Print-Window');
+            if (!newWin) {
+                Swal.fire("Aviso", "El navegador bloqueó la ventana emergente de impresión. Por favor habilite las ventanas emergentes.", "warning");
+                return;
+            }
             newWin.document.open();
             newWin.document.write(
                 '<link rel="stylesheet" href="/public/vendor/bootstrap/css/bootstrap.min.css" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">' +
@@ -3745,73 +3506,246 @@
         }
 
         /** search product **/
+        var activeSearchProductXhr = null;
+        var posProductCache = {};
+
+        function tryIncrementProduct(code) {
+            if (!code) return false;
+            var found = false;
+            var targetCode = code.toString().trim().toLowerCase();
+            $(".product-code").each(function(i) {
+                if ($(this).val().toString().trim().toLowerCase() === targetCode) {
+                    rowindex = i;
+                    var $row = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')');
+                    var pre_qty = $row.find('.qty').val();
+                    var qty = pre_qty ? parseFloat(pre_qty) + 1 : 1;
+                    $row.find('.qty').val(qty);
+                    checkQuantity(String(qty), true);
+                    if (typeof safePlayAudio === 'function') {
+                        safePlayAudio($("#mysoundclip1")[0]);
+                    }
+                    found = true;
+                    return false;
+                }
+            });
+            return found;
+        }
+
+        function handleSelectProduct(item) {
+            if (!item) return;
+            var code = item.code || (item.pos_data && item.pos_data[1]);
+            if (!code) return;
+
+            // 1. Incrementar en memoria con 0 llamadas si el producto ya existe en la tabla
+            if (tryIncrementProduct(code)) {
+                $('#lims_productcodeSearch').val('');
+                return;
+            }
+
+            // 2. Obtener pos_data del item o de la caché
+            var posData = item.pos_data;
+            if (!posData) {
+                var customerId = $('#customer_id').val();
+                var warehouseId = $('select[name="warehouse_id"]').val();
+                var cacheKey = code + '_' + customerId + '_' + warehouseId;
+                posData = posProductCache[cacheKey];
+            }
+
+            if (posData) {
+                // Sincronizar arreglos globales para compatibilidad de vistas
+                var pIdx = product_code.indexOf(posData[1]);
+                if (pIdx === -1) {
+                    product_code.push(item.code || posData[1]);
+                    product_name.push(item.name || posData[0]);
+                    product_qty.push(item.qty !== undefined ? item.qty : (posData[16] || 0));
+                    product_type.push(item.type || posData[17] || 'standard');
+                    product_id.push(item.id || posData[9]);
+                    product_list.push(item.product_list !== undefined ? item.product_list : (posData[14] || []));
+                    qty_list.push(item.qty_list !== undefined ? item.qty_list : (posData[15] || []));
+                } else if (posData[16] !== undefined) {
+                    product_qty[pIdx] = posData[16];
+                }
+
+                // Insertar en tabla de ventas con latencia 0 ms sin peticiones HTTP adicionales
+                addNewProduct(posData, false, false);
+                $('#lims_productcodeSearch').val('');
+            } else {
+                // Fallback en caso de no disponer de pos_data precomputado
+                var customerId = $('#customer_id').val();
+                productSearch([code, customerId]);
+            }
+        }
+
         var lims_productcodeSearch = $('#lims_productcodeSearch');
         lims_productcodeSearch.autocomplete({
+            delay: 350,
+            minLength: 2,
             source: function(request, response) {
-                // Obtener el estado REAL del toggle en el momento de la búsqueda
+                // Cancelar peticiones anteriores en curso (evita copar conexiones de Chrome)
+                if (activeSearchProductXhr && activeSearchProductXhr.readyState !== 4) {
+                    activeSearchProductXhr.abort();
+                }
+
                 var modoProformaActual = getModoProforma();
-                
-                console.log('[Autocomplete] Estado del toggle AL BUSCAR:', modoProformaActual);
-                
+                var customerId = $('#customer_id').val();
+                var warehouseId = $('select[name="warehouse_id"]').val();
+
                 var searchParams = { 
                     term: request.term,
-                    id_customer: $('#customer_id').val(),  
-                    id_warehouse: $('select[name="warehouse_id"]').val(),
+                    id_customer: customerId,  
+                    id_warehouse: warehouseId,
                     modo_proforma: modoProformaActual.toString()
                 };
-                console.log('[Autocomplete] Enviando búsqueda:', searchParams);
-                
-                $.get("sales/search_product", searchParams, function(data) {
-                    console.log('[Autocomplete] Productos recibidos:', data.length, 'productos');
-                    response(data);
+
+                activeSearchProductXhr = $.ajax({
+                    type: 'GET',
+                    url: 'sales/search_product',
+                    data: searchParams,
+                    success: function(data) {
+                        if (Array.isArray(data)) {
+                            data.forEach(function(it) {
+                                if (it && it.code && it.pos_data) {
+                                    posProductCache[it.code + '_' + customerId + '_' + warehouseId] = it.pos_data;
+                                }
+                            });
+                        }
+                        response(data);
+                    },
+                    error: function(xhr, status, error) {
+                        if (status !== 'abort') {
+                            response([]);
+                        }
+                    }
                 });
             },
             response: function(event, ui) {
-                var customer_id = $('#customer_id').val();
-                var filter = [];
-                if (ui.content.length == 1) {
-                    var data = ui.content[0].code;
-                    $(this).autocomplete("close");
-                    filter.push(data);
-                    filter.push(customer_id);
-                    product_code.push(ui.content[0].code);
-                    product_name.push(ui.content[0].name);
-                    product_qty.push(ui.content[0].qty);
-                    product_type.push(ui.content[0].type);
-                    product_id.push(ui.content[0].id);
-                    product_list.push(ui.content[0].product_list);
-                    qty_list.push(ui.content[0].qty_list);
-                    productSearch(filter);
+                if (!$(this).val() || !$(this).val().trim()) {
                     return false;
-                };
+                }
+                if (ui.content && ui.content.length == 1) {
+                    var item = ui.content[0];
+                    $(this).autocomplete("close");
+                    $(this).val('');
+                    handleSelectProduct(item);
+                    return false;
+                }
             },
             select: function(event, ui) {
-                var customer_id = $('#customer_id').val();
-                var filter = [];
-                var data = ui.item.code;
-                filter.push(data);
-                filter.push(customer_id);
-                product_code.push(ui.item.code);
-                product_name.push(ui.item.name);
-                product_qty.push(ui.item.qty);
-                product_type.push(ui.item.type);
-                product_id.push(ui.item.id);
-                product_list.push(ui.item.product_list);
-                qty_list.push(ui.item.qty_list);
-                productSearch(filter);
+                event.preventDefault();
+                $(this).val('');
+                handleSelectProduct(ui.item);
                 return false;
             },
         })
         .autocomplete("instance")._renderItem = function(ul, item) {
-                return $("<li>")
-                    .append("<div>" + item.code + " (" + item.name + ") - Precio:"
-                     + item.price_value + " - Stock:" + item.qty +"</div>")
-                    .appendTo(ul);
-            };
+            return $("<li>")
+                .append("<div>" + item.code + " (" + item.name + ") - Precio:"
+                 + item.price_value + " - Stock:" + item.qty +"</div>")
+                .appendTo(ul);
+        };
+
+        // Captura de tecla Enter para escáner de código de barras
+        lims_productcodeSearch.on('keydown', function(e) {
+            if (e.which === 13 || e.keyCode === 13) {
+                e.preventDefault();
+                var term = $(this).val().trim();
+                if (!term) {
+                    return false;
+                }
+
+                // Si el menú de autocomplete está abierto con un item activo/navegado con flechas, seleccionarlo
+                var autoInst = $(this).autocomplete("instance");
+                if (autoInst) {
+                    if (autoInst.searching) {
+                        clearTimeout(autoInst.searching);
+                    }
+                    if (autoInst.menu && autoInst.menu.element.is(":visible")) {
+                        var activeItem = autoInst.menu.element.find(".ui-state-focus");
+                        if (activeItem.length) {
+                            activeItem.trigger("click");
+                            return false;
+                        }
+                    }
+                    autoInst.close();
+                }
+
+                // Cancelar debounce y peticiones pendientes inmediatamente
+                if (activeSearchProductXhr && activeSearchProductXhr.readyState !== 4) {
+                    activeSearchProductXhr.abort();
+                }
+                $(this).val('');
+
+                var customer_id = $('#customer_id').val();
+                var warehouse_id = $('select[name="warehouse_id"]').val();
+                if (!customer_id) {
+                    Swal.fire("Información", "Por favor, seleccione cliente!", "info");
+                    return false;
+                }
+                if (!warehouse_id) {
+                    Swal.fire("Información", "Por favor, seleccione almacén!", "info");
+                    return false;
+                }
+
+                // 1. Si ya existe en la tabla de venta, incrementar en DOM sin peticiones HTTP
+                if (tryIncrementProduct(term)) {
+                    return false;
+                }
+
+                // 2. Si está en la caché en memoria, agregarlo inmediatamente
+                var cacheKey = term + '_' + customer_id + '_' + warehouse_id;
+                if (posProductCache[cacheKey]) {
+                    handleSelectProduct({
+                        code: term,
+                        pos_data: posProductCache[cacheKey]
+                    });
+                    return false;
+                }
+
+                // 3. Búsqueda rápida directa del código escaneado
+                var modoProformaActual = getModoProforma();
+                activeSearchProductXhr = $.ajax({
+                    type: 'GET',
+                    url: 'sales/search_product',
+                    data: {
+                        term: term,
+                        id_customer: customer_id,
+                        id_warehouse: warehouse_id,
+                        modo_proforma: modoProformaActual.toString()
+                    },
+                    success: function(data) {
+                        if (data && data.length > 0) {
+                            var exactItem = data.find(function(it) {
+                                return it.code && it.code.toString().trim().toLowerCase() === term.toLowerCase();
+                            });
+                            var item = exactItem || data[0];
+                            if (item.pos_data) {
+                                posProductCache[item.code + '_' + customer_id + '_' + warehouse_id] = item.pos_data;
+                                posProductCache[term + '_' + customer_id + '_' + warehouse_id] = item.pos_data;
+                            }
+                            handleSelectProduct(item);
+                        } else {
+                            Swal.fire("Información", "Producto no encontrado o sin stock disponible.", "warning");
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        if (status !== 'abort') {
+                            Swal.fire("Error", "Error al buscar el producto", "error");
+                        }
+                    }
+                });
+                return false;
+            }
+        });
         /** end search product **/
+
+        // Vaciar caché de productos cuando cambie el almacén
+        $('select[name="warehouse_id"], #warehouse_id').on('change', function() {
+            posProductCache = {};
+        });
 
         /** customer selector **/
         $('#customer_id').on('change', function() {
+            posProductCache = {};
             consultarClientePOS();
             var id = $(this).val();
             var id_w = $('select[name="warehouse_id"]').val();
@@ -3894,9 +3828,20 @@
             rowindex = $(this).closest('tr').index();
         });
 
+        function safePlayAudio(audio) {
+            if (audio) {
+                var p = audio.play();
+                if (p !== undefined) {
+                    p.catch(function(e) {
+                        // Silenciar advertencia de autoplay bloqueado en Chrome
+                    });
+                }
+            }
+        }
+
         $(document).on('click', '.sound-btn', function() {
             var audio = $("#mysoundclip1")[0];
-            audio.play();
+            safePlayAudio(audio);
         });
 
         $(document).on('click', '.product-img', function() {
@@ -3913,6 +3858,22 @@
                 if (!rawProduct) return;
                 var data = rawProduct.split(" ");
                 var term = data[0];
+
+                // 1. Si ya existe en la tabla de venta, incrementar en DOM sin peticiones HTTP
+                if (tryIncrementProduct(term)) {
+                    return;
+                }
+
+                // 2. Si está en caché, agregarlo inmediatamente
+                var cacheKey = term + '_' + customer_id + '_' + warehouse_id;
+                if (posProductCache[cacheKey]) {
+                    handleSelectProduct({
+                        code: term,
+                        pos_data: posProductCache[cacheKey]
+                    });
+                    return;
+                }
+
                 var modoProformaVal = (typeof getModoProforma === 'function') ? getModoProforma() : false;
                 $.get("sales/search_product", { 
                     term: term,
@@ -3925,16 +3886,21 @@
                         Swal.fire("Información", "Producto no encontrado o sin stock disponible.", "warning");
                         return;
                     }
-                    filter.push(term);
-                    filter.push(customer_id);
-                    product_code.push(res[0].code);
-                    product_name.push(res[0].name);
-                    product_qty.push(res[0].qty);
-                    product_type.push(res[0].type);
-                    product_id.push(res[0].id);
-                    product_list.push(res[0].product_list);
-                    qty_list.push(res[0].qty_list);
-                    productSearch(filter);
+                    if (res[0].pos_data) {
+                        posProductCache[res[0].code + '_' + customer_id + '_' + warehouse_id] = res[0].pos_data;
+                        handleSelectProduct(res[0]);
+                    } else {
+                        filter.push(term);
+                        filter.push(customer_id);
+                        product_code.push(res[0].code);
+                        product_name.push(res[0].name);
+                        product_qty.push(res[0].qty);
+                        product_type.push(res[0].type);
+                        product_id.push(res[0].id);
+                        product_list.push(res[0].product_list);
+                        qty_list.push(res[0].qty_list);
+                        productSearch(filter);
+                    }
                 });
             }
         });
@@ -3942,7 +3908,7 @@
         //Delete product
         $("table.order-list tbody").on("click", ".ibtnDel", function(event) {
             var audio = $("#mysoundclip2")[0];
-            audio.play();
+            safePlayAudio(audio);
             rowindex = $(this).closest('tr').index();
             product_price.splice(rowindex, 1);
             product_discount.splice(rowindex, 1);
@@ -4094,7 +4060,11 @@
                                 if (printer) {
                                     var win = window.open('receivable/report/' + result.report_id,
                                         '_blank');
-                                    win.focus();
+                                    if (win) {
+                                        win.focus();
+                                    } else {
+                                        Swal.fire("Aviso", "El navegador bloqueó la ventana emergente de impresión. Por favor habilite las ventanas emergentes.", "warning");
+                                    }
                                     $('#formpaydue').modal('hide')
                                     $('body').removeClass('modal-open');
                                     $('.modal-backdrop').remove();
@@ -4115,9 +4085,16 @@
         }
 
         // Cada botón de venta pasa por aquí
-        $(".payment-btn").on("click", function() {
+        $(document).on("click", ".payment-btn", function(e) {
+            var rownumber = $('table.order-list tbody tr:last').index();
+            if (rownumber < 0) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                Swal.fire("Carrito Vacío", "Por favor, agregue al menos un producto a la venta.", "warning");
+                return false;
+            }
             var audio = $("#mysoundclip2")[0];
-            audio.play();
+            safePlayAudio(audio);
             var totalbs = $("#grand-total").text();
             var totalus = totalbs / tc;
 
@@ -4134,7 +4111,7 @@
             $("#number_card").prop("required", false)
             blockAmounts()
             var audio = $("#mysoundclip2")[0];
-            audio.play();
+            safePlayAudio(audio);
             $('input[name="sale_status"]').val(3);
             $('input[name="paying_amount"]').prop('required', false);
             $('input[name="paid_amount"]').prop('required', false);
@@ -4156,7 +4133,7 @@
         $("#presale-btn").on("click", function() {
             blockAmounts()
             var audio = $("#mysoundclip2")[0];
-            audio.play();
+            safePlayAudio(audio);
             if (permission_turno && ($('input[name="attentionshift_id"]').val() == 0 && $(
                     'input[name="presale_id"]').val() == 0)) {
                 choose_turno();
@@ -4215,7 +4192,11 @@
                                         .then((printer) => {
                                             if (printer) {
                                                 var win = window.open('presales/gen_invoice/' + data.id, '_blank');
-                                                win.focus();
+                                                if (win) {
+                                                    win.focus();
+                                                } else {
+                                                    Swal.fire("Aviso", "El navegador bloqueó la ventana emergente de impresión. Por favor habilite las ventanas emergentes.", "warning");
+                                                }
                                                 // No recargar automáticamente al cerrar la ventana de impresión
                                             } else {
                                                 // No recargar automáticamente; simplemente mostrar mensaje
@@ -4246,7 +4227,7 @@
             $("#number_card").prop("required", false)
             blockAmounts();
             var audio = $("#mysoundclip2")[0];
-            audio.play();
+            safePlayAudio(audio);
             const customerId = $('#customer_id').val();
             var customer = null;
             $.get('{{ url("sales/getcliente") }}/' + customerId, function(data) {
@@ -4304,7 +4285,7 @@
             const customerId = $('#customer_id').val();
             var customer = null;
             var audio = $("#mysoundclip2")[0];
-            audio.play();
+            safePlayAudio(audio);
             $.get('{{ url("sales/getcliente") }}/' + customerId, function(data) {
                 customer = data;
                 console.log(customer);
@@ -4333,7 +4314,7 @@
             else
                 $('select[name="paid_by_id_select"]').val(3);
 
-            $('.selectpicker').selectpicker('refresh');
+            $('select[name="paid_by_id_select"]').selectpicker('refresh');
             giftCard();
             bloqueoSegundoTabs();
         });
@@ -4345,7 +4326,7 @@
             else
                 $('select[name="paid_by_id_select"]').val(4);
 
-            $('.selectpicker').selectpicker('refresh');
+            $('select[name="paid_by_id_select"]').selectpicker('refresh');
             creditCard();
             MPtarjeta();
             bloqueoSegundoTabs();
@@ -4358,7 +4339,7 @@
             else
                 $('select[name="paid_by_id_select"]').val(5);
 
-            $('.selectpicker').selectpicker('refresh');
+            $('select[name="paid_by_id_select"]').selectpicker('refresh');
             cheque();
             MPcheque();
             bloqueoSegundoTabs();
@@ -4370,7 +4351,7 @@
                 window.desactivarPagoMultiple();
             }
             $('select[name="paid_by_id_select"]').val(1);
-            $('.selectpicker').selectpicker('refresh');
+            $('select[name="paid_by_id_select"]').selectpicker('refresh');
             MPefectivo();
             $('div.qc').show();
             // unblockAmounts();
@@ -4412,7 +4393,7 @@
             else
                 $('select[name="paid_by_id_select"]').val(7);
 
-            $('.selectpicker').selectpicker('refresh');
+            $('select[name="paid_by_id_select"]').selectpicker('refresh');
             deposits();
             MPdepositoCuenta();
             bloqueoSegundoTabs();
@@ -4429,7 +4410,7 @@
             else
                 $('select[name="paid_by_id_select"]').val(6);
 
-            $('.selectpicker').selectpicker('refresh');
+            $('select[name="paid_by_id_select"]').selectpicker('refresh');
             MPdepositoCuenta();
         });
 
@@ -4445,11 +4426,49 @@
             else
                 $('select[name="paid_by_id_select"]').val(11);
 
-            $('.selectpicker').selectpicker('refresh');
+            $('select[name="paid_by_id_select"]').selectpicker('refresh');
             MPefectivo();
             $('div.qc').show();
             MPdepositoCuenta();
             bloqueoSegundoTabs();
+        });
+
+        function limpiarPedidoPOS() {
+            var rownumber = $('table.order-list tbody tr:last').index();
+            if (typeof cancel === 'function') {
+                cancel(rownumber);
+            }
+            $('input[name="presale_id"]').val(0);
+            $('input[name="quotation_id_loaded"]').val(0);
+            $("input[name=attentionshift_id]").val(0);
+
+            // Restaurar cliente predeterminado
+            var defaultCustomerId = $("input[name='customer_id_hidden']").val();
+            if (defaultCustomerId) {
+                $('#customer_id').val(defaultCustomerId);
+                if (typeof $.fn.selectpicker === 'function') {
+                    $('#customer_id').selectpicker('refresh');
+                }
+                $('#customer_id').trigger('change');
+            }
+            if (typeof setClientePredeterminado === 'function') {
+                setClientePredeterminado();
+            }
+        }
+
+        $('#add-payment').on('show.bs.modal', function(e) {
+            var rownumber = $('table.order-list tbody tr:last').index();
+            if (rownumber < 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                Swal.fire("Carrito Vacío", "Por favor, agregue al menos un producto a la venta.", "warning");
+                return false;
+            }
+            $('.qc').data('initial', 1);
+        });
+
+        $(document).on('input keyup change', '#montoEfectivo', function() {
+            $('.qc').data('initial', 0);
         });
 
         // stepper: cuando se abre el modal, forzar primer paso y gestionar textos
@@ -4458,22 +4477,22 @@
             $('#myTab a[href="#primerTab"]').tab('show');
             // re-deshabilitar tabs de pasos siguientes para un inicio limpio
             $('#tab_preview, #tab_billing, #tab_final').addClass('disabled');
-            if (!hasSiat) {
+            if (!hasSiat || !flag_print_nota_venta) {
+                $('#nav_tab_preview_li, #nav_tab_billing_li, #nav_tab_final_li').hide();
                 $('#tab_preview, #tab_billing, #tab_final').closest('.nav-item').hide();
+                $('#segundoTabContinue').hide();
+                $('#submit-btn').text('Confirmar Venta');
             } else {
+                $('#nav_tab_preview_li, #nav_tab_billing_li, #nav_tab_final_li').show();
                 $('#tab_preview, #tab_billing, #tab_final').closest('.nav-item').show();
+                $('#segundoTabContinue').show();
+                $('#submit-btn').text('Siguiente');
             }
             // siempre iniciar el switch de facturar en OFF
             if ($('#toggle-event').length) {
                 try { $('#toggle-event').bootstrapToggle('off'); } catch(e) {
                     $('#toggle-event').prop('checked', false);
                 }
-            }
-            // si existe la pestaña de facturación, mostrar 'Siguiente'
-            if (hasSiat && $('#segundoTab').length) {
-                $('#submit-btn').text('Siguiente');
-            } else {
-                $('#submit-btn').text('Confirmar Venta');
             }
 
             // Consultar cliente actual o predeterminado
@@ -4497,7 +4516,7 @@
         $('#myTab a').on('shown.bs.tab', function(e) {
             var target = $(e.target).attr('href');
             if (target == '#primerTab') {
-                if (hasSiat && $('#segundoTab').length) $('#submit-btn').text('Siguiente');
+                if (hasSiat && flag_print_nota_venta && $('#segundoTab').length) $('#submit-btn').text('Siguiente');
                 else $('#submit-btn').text('Confirmar Venta');
             } else if (hasSiat && target == '#segundoTab') {
                 $('#submit-btn').text('Siguiente');
@@ -4533,39 +4552,75 @@
                     return;
                 }
             }
-            
-            // 1) Sin SIAT: interceptar, crear venta via AJAX y abrir recibo en la misma página
-            if (!hasSiat) {
+
+            var hasSiatTabs = Boolean(hasSiat && $('#tercerTab').length > 0 && flag_print_nota_venta && $('#tab_billing').is(':visible'));
+            var btnText = $('#submit-btn').text().trim();
+            var isDirectSale = !hasSiatTabs || btnText === 'Confirmar Venta';
+
+            // CASO: Venta Directa / Nota de Venta (cuando isDirectSale sea verdadero y estemos en #primerTab)
+            if (isDirectSale && ($('.tab-pane#primerTab').hasClass('show') || !$('#myTab').length)) {
                 e.preventDefault();
+                var $btn = $('#submit-btn');
+                $btn.prop('disabled', true);
+
                 $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
                 var formData = $('#formPayment').serializeArray();
                 formData.push({ name: 'ajax_preview', value: 1 });
                 formData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
                 try { $('#spinner-div').show(); } catch (err) {}
+
                 $.post('{{ url("sales/store-ajax") }}', formData)
                     .done(function(res) {
                         try { $('#spinner-div').hide(); } catch (err) {}
                         if (res.status) {
-                            // Abrir recibo en la misma página (navega a gen_invoice)
-                            window.location.href = '{{ url("sales/gen_invoice") }}/' + res.sale_id;
+                            $('#add-payment').modal('hide');
+                            $('body').removeClass('modal-open');
+                            $('.modal-backdrop').remove();
+
+                            limpiarPedidoPOS();
+                            if (typeof setClientePredeterminado === 'function') {
+                                setClientePredeterminado();
+                            }
+
+                            window.open('{{ url("sales/gen_invoice") }}/' + res.sale_id, '_blank');
                         } else {
-                            Swal.fire('Error', res.message || 'Error al procesar la venta', 'error');
+                            if (typeof window.Swal !== 'undefined' && typeof window.Swal.fire === 'function') {
+                                window.Swal.fire("Error", res.message || 'Error al procesar la venta', "error");
+                            } else {
+                                alert(res.message || 'Error al procesar la venta');
+                            }
                         }
-                    }).fail(function() {
+                    })
+                    .fail(function(xhr) {
                         try { $('#spinner-div').hide(); } catch (err) {}
-                        Swal.fire('Error', 'Error de red', 'error');
+                        var errMsg = 'Error de red';
+                        if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                            errMsg = xhr.responseJSON.message;
+                        }
+                        if (typeof window.Swal !== 'undefined' && typeof window.Swal.fire === 'function') {
+                            window.Swal.fire("Error", errMsg, "error");
+                        } else {
+                            alert(errMsg);
+                        }
+                    })
+                    .always(function() {
+                        $btn.prop('disabled', false);
                     });
                 return;
             }
 
-            // 1b) Con SIAT: primer paso -> crear venta en modo preview via AJAX y mostrar imprimible
-            if (hasSiat && $('#segundoTab').length && $('.tab-pane#primerTab').hasClass('show')) {
+            // Rama wizard facturación SIAT (#segundoTab / #tercerTab)
+            if (hasSiatTabs && !isDirectSale && $('.tab-pane#primerTab').hasClass('show')) {
                 e.preventDefault();
+                var $btn = $('#submit-btn');
+                $btn.prop('disabled', true);
+
                 $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
                 var formData = $('#formPayment').serializeArray();
                 formData.push({ name: 'ajax_preview', value: 1 });
                 formData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
                 try { $('#spinner-div').show(); } catch (err) {}
+
                 $.post('{{ url("sales/store-ajax") }}', formData)
                     .done(function(res) {
                         try { $('#spinner-div').hide(); } catch (err) {}
@@ -4577,12 +4632,20 @@
                             $('#tab_billing').removeClass('disabled');
                             $('#tab_final').removeClass('disabled');
                             $('#myTab a[href="#segundoTab"]').tab('show');
+                            // Disparar ventana emergente de impresión inmediata
+                            window.open('{{ url("sales/gen_invoice") }}/' + res.sale_id, '_blank');
                         } else {
                             Swal.fire('Error', res.message || 'Error al generar vista previa', 'error');
                         }
-                    }).fail(function() {
+                    }).fail(function(xhr) {
                         try { $('#spinner-div').hide(); } catch (err) {}
-                        Swal.fire('Error', 'Error de red', 'error');
+                        var errMsg = 'Error de red';
+                        if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                            errMsg = xhr.responseJSON.message;
+                        }
+                        Swal.fire('Error', errMsg, 'error');
+                    }).always(function() {
+                        $btn.prop('disabled', false);
                     });
                 return;
             }
@@ -4769,7 +4832,6 @@
         });
 
         $('#add-payment').on('hidden.bs.modal', function(e) {
-            $(this).modal("hide");
             if (checkStatusIntervalId) clearInterval(checkStatusIntervalId);
             if (timerIntervalId) clearInterval(timerIntervalId);
             var activeStep = $('#myTab .nav-link.active').attr('href');
@@ -4778,7 +4840,7 @@
             // reset stepper to primer tab
             try {
                 $('#myTab a[href="#primerTab"]').tab('show');
-                if ($('#segundoTab').length) $('#submit-btn').text('Siguiente');
+                if (hasSiat && flag_print_nota_venta && $('#segundoTab').length) $('#submit-btn').text('Siguiente');
                 else $('#submit-btn').text('Confirmar Venta');
             } catch (err) {}
 
@@ -4901,6 +4963,19 @@
         }
 
         function productSearch(data, isCourtesy = false, employee = false, presale = false) {
+            if (activeSearchProductXhr && activeSearchProductXhr.readyState !== 4) {
+                activeSearchProductXhr.abort();
+            }
+
+            // Si no es cortesía ni preventa, verificar si ya existe en la tabla para incrementar en memoria con 0 llamadas
+            if (!isCourtesy && !presale && data && data[0]) {
+                var codeToCheck = data[0].toString().split(" ")[0];
+                if (tryIncrementProduct(codeToCheck)) {
+                    $("input[name='product_code_name']").val('');
+                    return;
+                }
+            }
+
             var alm = $('select[name="warehouse_id"]').val();
             qty_list2 = null;
             
@@ -4912,7 +4987,7 @@
                 modo_proforma_toggle: modoProformaActual,
                 isCourtesy: isCourtesy
             });
-            $.ajax({
+            activeSearchProductXhr = $.ajax({
                 type: 'GET',
                 url: 'sales/lims_product_search',
                 data: {
@@ -4936,7 +5011,7 @@
                                 qty);
                             flag = 0;
                             checkQuantity(String(qty), true);
-                            flag = 0;
+                            return false;
                         }
                     });
 
@@ -5019,7 +5094,9 @@
                     }
                 },
                 error: function(XMLHttpRequest, textStatus, errorThrown) {
-                    Swal.fire("Error", "Estado: " + textStatus + " Error: " + errorThrown, "error");
+                    if (textStatus !== 'abort') {
+                        Swal.fire("Error", "Estado: " + textStatus + " Error: " + errorThrown, "error");
+                    }
                 }
             });
         }
@@ -5041,19 +5118,31 @@
                 data[2] = parseFloat(presale.net_unit_price || 0);
                 pre = presale.presale_id;
             }
-            temp_unit_name = (data[6]).split(',');
+            temp_unit_name = (data[6] || '').split(',');
+
+            var hasCourtesy = (data[11] != null && (Array.isArray(data[11]) ? data[11].length > 0 : Object.keys(data[11]).length > 0) && !data[13]);
+            var hasEmployee = (data[12] != null && (Array.isArray(data[12]) ? data[12].length > 0 : Object.keys(data[12]).length > 0) && !data[13]);
+
             cols +=
                 '<td class="col-sm-4 product-title" style="text-align: start;"><button type="button" class="edit-product btn btn-link" style="font-size: smaller; white-space: normal;"><strong>' +
-                data[0] + '</strong></button> [' + data[1] + ']' +
-                '<div class="input-group div_emp_' + data[1] + pre + '"><select id="employee_id_' + data[1] + pre +
-                '" name="employee_id" class="selectpicker form-control courtesy-select" data-live-search="true" data-live-search-style="contains"><option value="0">Seleccione Personal...</option></select></div> <input type="hidden" id="service_' +
-                data[1] + pre + '" class="service-pro" name="service_kind" value="false"/></td>';
+                data[0] + '</strong></button> [' + data[1] + ']';
+            
+            if (hasEmployee) {
+                cols += '<div class="input-group div_emp_' + data[1] + pre + '"><select id="employee_id_' + data[1] + pre +
+                    '" name="employee_id" class="selectpicker form-control courtesy-select" data-live-search="true" data-live-search-style="contains"><option value="0">Seleccione Personal...</option></select></div>';
+            }
+            cols += ' <input type="hidden" id="service_' + data[1] + pre + '" class="service-pro" name="service_kind" value="' + (hasEmployee ? 'true' : 'false') + '"/></td>';
             cols += '<td class="col-sm-2 product-price" style="text-align: end;"></td>';
             cols +=
                 '<td class="col-sm-3"><div class="input-group"><span class="input-group-btn"><button type="button" class="btn btn-default minus"><span class="dripicons-minus"></span></button></span><input type="text" name="qty[]" class="form-control qty numkey input-number" value="1" step="0.01" required><span class="input-group-btn">' +
-                '<button type="button" class="btn btn-default plus"><span class="dripicons-plus"></span></button></span></div><div class="input-group"><select id="cortesia_id_' +
-                data[1] +
-                '" name="cortesia_id" class="selectpicker form-control courtesy-select" data-live-search="true" data-live-search-style="contains" onchange="validatemp()"><option value="0">Seleccione Cortesia...</option></select></div></td>';
+                '<button type="button" class="btn btn-default plus"><span class="dripicons-plus"></span></button></span></div>';
+            
+            if (hasCourtesy) {
+                cols += '<div class="input-group"><select id="cortesia_id_' +
+                    data[1] +
+                    '" name="cortesia_id" class="selectpicker form-control courtesy-select" data-live-search="true" data-live-search-style="contains" onchange="validatemp()"><option value="0">Seleccione Cortesia...</option></select></div>';
+            }
+            cols += '</td>';
             cols += '<td class="col-sm-2 sub-total" style="text-align: end;"></td>';
             cols +=
                 '<td class="col-sm-1"><button type="button" class="ibtnDel btn btn-danger btn-sm"><i class="dripicons-cross"></i></button></td>';
@@ -5111,68 +5200,53 @@
             unit_name.push(data[6]);
             unit_operator.push(data[7]);
             unit_operation_value.push(data[8]);
-            if (data[11] != null && data[13] == false) {
-                if (data[11].length > 0) {
-                    addOptions(`cortesia_id_${data[1]}`, data[11], 1);
-                    //add a tabla cuando selecciona
-                    $(`#cortesia_id_${data[1]}`).on("change", function() {
-                        var filter = [];
-                        var customer_id = $('#customer_id').val();
-                        if (emp_temp == false) {
-                            $.get("sales/search_product", { 
-                                term: $(this).val(),
-                                id_customer: customer_id,  
-                                id_warehouse: $('select[name="warehouse_id"]').val(),  
-                            }, 
-                            function(res) {
-                                filter.push($(this).val());
-                                filter.push(customer_id);
-                                product_code.push(res[0].code);
-                                product_name.push(res[0].name);
-                                product_qty.push(res[0].qty);
-                                product_type.push(res[0].type);
-                                product_id.push(res[0].id);
-                                product_list.push(res[0].product_list);
-                                qty_list.push(res[0].qty_list);
-                                productSearch(filter, true);
-                            });
-                        } else {
-                            $(`#cortesia_id_${data[1]}`).val(0);
-                        }
-                    });
-                    $('.selectpicker').selectpicker('refresh');
-                } else {
-                    $(`#cortesia_id_${data[1]}`).addClass('d-none');
-                }
-            } else {
-                $('#cortesia_id').addClass('d-none');
-                $(`#cortesia_id_${data[1]}`).addClass('d-none');
+
+            if (hasCourtesy) {
+                addOptions(`cortesia_id_${data[1]}`, data[11], 1);
+                $(`#cortesia_id_${data[1]}`).on("change", function() {
+                    var cortesiaCode = $(this).val();
+                    if (!cortesiaCode || cortesiaCode === '0') return;
+                    var customer_id = $('#customer_id').val();
+                    if (emp_temp == false) {
+                        $.get("sales/search_product", { 
+                            term: cortesiaCode,
+                            id_customer: customer_id,  
+                            id_warehouse: $('select[name="warehouse_id"]').val(),  
+                        }, 
+                        function(res) {
+                            if (res && res.length > 0) {
+                                var cItem = res[0];
+                                if (cItem.pos_data) {
+                                    cItem.pos_data[2] = 0;
+                                }
+                                cItem.price_value = 0;
+                                handleSelectProduct(cItem);
+                            }
+                        });
+                    } else {
+                        $(`#cortesia_id_${data[1]}`).val(0);
+                    }
+                });
+                $(`#cortesia_id_${data[1]}`).selectpicker('refresh');
             }
 
-            if (data[12] != null && data[13] == false) {
-                $(`#service_${data[1]+pre}`).val('true');
-                if (data[12].length > 0) {
-                    addOptions(`employee_id_${data[1]+pre}`, data[12], 2);
-                    //add a tabla cuando selecciona
-                    emp_temp = true;
-                    $(`#employee_id_${data[1]+pre}`).on("change", function() {
-                        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.employee-id').val($(
-                            this).val());
-                        emp_temp = false;
-                    });
-                    if (emp) {
-                        $(`#employee_id_${data[1]+pre}`).val(emp);
-                        emp_temp = false;
-                    }
-                    $('.selectpicker').selectpicker('refresh');
-                } else {
-                    $(`#employee_id_${data[1]+pre}`).addClass('d-none');
+            if (hasEmployee) {
+                addOptions(`employee_id_${data[1]+pre}`, data[12], 2);
+                emp_temp = true;
+                $(`#employee_id_${data[1]+pre}`).on("change", function() {
+                    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.employee-id').val($(
+                        this).val());
+                    emp_temp = false;
+                });
+                if (emp) {
+                    $(`#employee_id_${data[1]+pre}`).val(emp);
                     emp_temp = false;
                 }
+                $(`#employee_id_${data[1]+pre}`).selectpicker('refresh');
             } else {
-                $(`#employee_id_${data[1]+pre}`).addClass('d-none');
                 emp_temp = false;
             }
+
             rowindex = newRow.index();
             if (presale != false) {
                 checkQuantity(presale.qty, true);
@@ -5287,7 +5361,7 @@
             console.log("monto min: " + min_monto_price);
 
             mostrarPorcentaDesdeMontoManual();
-            $('.selectpicker').selectpicker('refresh');
+            $('select[name="edit_unit"]').selectpicker('refresh');
         }
 
         function mostrarPorcentaDesdeMontoManual() {
@@ -5376,8 +5450,6 @@
             var rownumber = $('table.order-list tbody tr:last').index();
             if (rownumber < 0) {
                 emp_temp = false;
-                Swal.fire("Información de Items", "Por favor, inserte el producto para ordenar la tabla!", "info");
-
             } else if ($("#coupon-code").val() != '') {
                 valid = 0;
                 $.each(coupon_list, function(key, value) {
@@ -5801,7 +5873,7 @@
 
         function confirmCancel() {
             var audio = $("#mysoundclip2")[0];
-            audio.play();
+            safePlayAudio(audio);
 
             Swal.fire({
                     title: "Está seguro de querer cancelar?",
@@ -6078,11 +6150,12 @@
 
                 var customer_id = data.head.customer_id;
                 $('#customer_id').val(customer_id);
-                $('.selectpicker').selectpicker('refresh');
+                $('#customer_id').selectpicker('refresh');
                 $('#customer_id').trigger('change');
                 $('input[name="presale_id"]').val(data.head.id);
                 var warehouse_id = data.head.warehouse_id;
                 $('select[name="warehouse_id"]').val(warehouse_id);
+                $('select[name="warehouse_id"]').selectpicker('refresh');
                 if (data.head.order_discount != null && data.head.order_discount != 0) {
                     $('input[name="order_discount"]').val(data.head.order_discount);
                 } else {
@@ -6098,7 +6171,6 @@
                     $('#tips').text(tips.toFixed(2));
                     $('input[name="total_tips"]').val(tips.toFixed(2));
                 }
-                $('.selectpicker').selectpicker('refresh');
                 var list_item = [];
                 list_item = data.body;
 
@@ -6251,7 +6323,7 @@
                 var customer_id = response.head.customer_id;
                 if (customer_id) {
                     $('#customer_id').val(customer_id);
-                    $('.selectpicker').selectpicker('refresh');
+                    $('#customer_id').selectpicker('refresh');
                     $('#customer_id').trigger('change');
                 }
 
@@ -6259,7 +6331,7 @@
                 var warehouse_id = response.head.warehouse_id;
                 if (warehouse_id) {
                     $('select[name="warehouse_id"]').val(warehouse_id);
-                    $('.selectpicker').selectpicker('refresh');
+                    $('select[name="warehouse_id"]').selectpicker('refresh');
                 }
 
                 // 7. Cargar productos usando el mismo mecanismo que loadPresale
@@ -6314,7 +6386,7 @@
                 }
                 //$('#selecturno-modal').modal('show');
                 $('#selecturno-modal').modal();
-                $('.selectpicker').selectpicker('refresh');
+                $('select[name="turno_id"]').selectpicker('refresh');
             });
         }
 
@@ -7217,6 +7289,9 @@
             setTimeout(function() {
                 var isChecked = $('#toggle-event-pro').prop('checked');
                 modo_proforma = isChecked;
+                if (typeof posProductCache !== 'undefined') {
+                    posProductCache = {};
+                }
                 
                 console.log('========================================');
                 console.log('[Toggle Click] Estado actualizado:', isChecked);
@@ -7260,6 +7335,9 @@
         $('#toggle-event-pro').change(function() {
             var isChecked = $(this).prop('checked');
             modo_proforma = isChecked;
+            if (typeof posProductCache !== 'undefined') {
+                posProductCache = {};
+            }
             console.log('[Toggle change] Respaldo activado. modo_proforma:', modo_proforma);
         });
 
@@ -7278,7 +7356,7 @@
         function generaProforma() {
             blockAmounts()
             var audio = $("#mysoundclip2")[0];
-            audio.play();
+            safePlayAudio(audio);
             $('input[name="status"]').val(1);
             $('input[name="paying_amount"]').prop('required', false);
             $('input[name="paid_amount"]').prop('required', false);
@@ -7317,7 +7395,11 @@
                                     .then((printer) => {
                                             if (printer) {
                                                 var win = window.open('quotations/gen_invoice/' + data.id, '_blank');
-                                                win.focus();
+                                                if (win) {
+                                                    win.focus();
+                                                } else {
+                                                    Swal.fire("Aviso", "El navegador bloqueó la ventana emergente de impresión. Por favor habilite las ventanas emergentes.", "warning");
+                                                }
                                                 // No recargar automáticamente al cerrar la ventana de impresión
                                             } else {
                                                 // No recargar automáticamente; simplemente mostrar mensaje
@@ -7387,7 +7469,7 @@
                             );
                         }
                         $("#customer_id").val(data.customer.id);
-                        $('.selectpicker').selectpicker('refresh');
+                        $('#customer_id').selectpicker('refresh');
                         $('#customer_id').trigger('change');
                         Swal.fire("Mensaje", data.message, 'success');
                         $('#addCustomer').modal('hide')

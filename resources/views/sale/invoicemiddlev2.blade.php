@@ -402,7 +402,12 @@
 
     <script type="text/javascript">
         function auto_print() {
-            window.print()
+            window.print();
+            if (window.opener && !window.opener.closed) {
+                window.close();
+            } else if (window.self === window.top) {
+                window.location.assign("{{ route('sale.pos') }}");
+            }
         }
         setTimeout(auto_print, 1000);
     </script>

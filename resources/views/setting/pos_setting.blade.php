@@ -144,11 +144,9 @@
                                                 Pre-Venta</label>
                                     </div>
                                     <div class="form-group">
-                                        @if ($lims_pos_setting_data)
-                                            <input class="mt-2" type="checkbox" name="print" value="1"
-                                                @if ($lims_pos_setting_data->print) checked @endif>
-                                        @endif
-                                        <label class="mt-2"><strong>{{ trans('file.Print Function') }}?</label>
+                                        <input class="mt-2" type="checkbox" name="print" value="1"
+                                            @if ($lims_pos_setting_data && $lims_pos_setting_data->print == 1) checked @endif>
+                                        <label class="mt-2"><strong>¿Imprimir Nota de Venta?</strong></label>
                                         &nbsp;&nbsp;
                                         @if ($lims_pos_setting_data)
                                             <input class="mt-2" type="checkbox" name="print_presale" value="1"
@@ -172,6 +170,12 @@
                                         @endif
                                         <label class="mt-2"><strong>Requerir Autorización de
                                                 transferencia?</strong></label>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <input class="mt-2" type="checkbox" name="auto_fill_amount" value="1"
+                                            @if (!isset($lims_pos_setting_data->auto_fill_amount) || $lims_pos_setting_data->auto_fill_amount == 1) checked @endif>
+                                        <label class="mt-2"><strong>¿Autocompletar monto total en formas de pago?</strong></label>
                                     </div>
                                 </div>
                             </div>

@@ -72,33 +72,55 @@ class CustomerController extends Controller
                 ->get();
 
         } else {
-            $search = $request->input('search.value');
-            $customers = Customer::where('is_active', true)
-                ->whereDate('created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
-                ->orwhere('valor_documento', 'LIKE', "%{$search}%")
-                ->orwhere('name', 'LIKE', "%{$search}%")
-                ->orwhere('codigofijo', 'LIKE', "%{$search}%")
-                ->offset($start)
+            $search = trim($request->input('search.value'));
+            $isDate = false;
+            $parsedDate = null;
+            if (preg_match('/^\d{1,4}[-\/]\d{1,2}[-\/]\d{1,4}$/', $search)) {
+                $timestamp = strtotime(str_replace('/', '-', $search));
+                if ($timestamp !== false && $timestamp > 0) {
+                    $isDate = true;
+                    $parsedDate = date('Y-m-d', $timestamp);
+                }
+            }
+
+            $query = Customer::where('is_active', true);
+            $query->where(function ($q) use ($search, $isDate, $parsedDate) {
+                if ($isDate) {
+                    $q->whereDate('created_at', '=', $parsedDate)
+                        ->orWhere('valor_documento', 'LIKE', "%{$search}%")
+                        ->orWhere('name', 'LIKE', "%{$search}%")
+                        ->orWhere('codigofijo', 'LIKE', "%{$search}%");
+                } else {
+                    $q->where('valor_documento', 'LIKE', "%{$search}%")
+                        ->orWhere('name', 'LIKE', "%{$search}%")
+                        ->orWhere('codigofijo', 'LIKE', "%{$search}%");
+                }
+            });
+
+            $totalFiltered = (clone $query)->count();
+
+            $customers = $query->offset($start)
                 ->limit($limit)
                 ->orderBy($order, $dir)
                 ->get();
-
-            $totalFiltered = Customer::where('is_active', true)
-                ->whereDate('created_at', '=', date('Y-m-d', strtotime(str_replace('/', '-', $search))))
-                ->orwhere('valor_documento', 'LIKE', "%{$search}%")
-                ->orwhere('name', 'LIKE', "%{$search}%")
-                ->orwhere('codigofijo', 'LIKE', "%{$search}%")
-                ->count();
         }
 
         $data = array();
         if (!empty($customers)) {
+            $customerGroupIds = $customers->pluck('customer_group_id')->filter()->unique();
+            $customerGroups = !empty($customerGroupIds) ? CustomerGroup::whereIn('id', $customerGroupIds)->get()->keyBy('id') : collect();
+
+            $customerIds = $customers->pluck('id')->filter()->unique();
+            $customerCompanies = !empty($customerIds)
+                ? CustomerCompany::where('is_active', true)->whereIn('customer_id', $customerIds)->get()->keyBy('customer_id')
+                : collect();
+
             foreach ($customers as $key => $customer) {
                 $nestedData['id'] = $customer->id;
                 $nestedData['key'] = $key;
                 $nestedData['name'] = $customer->name;
-                $customer_group = CustomerGroup::where('id', $customer->customer_group_id)->first();
-                $lims_customer_company = CustomerCompany::where([['is_active', true], ['customer_id', $customer->id]])->first();
+                $customer_group = $customerGroups[$customer->customer_group_id] ?? null;
+                $lims_customer_company = $customerCompanies[$customer->id] ?? null;
                 if ($customer_group) {
                     $nestedData['customer_group'] = $customer_group->name;
                 } else {
@@ -583,41 +605,38 @@ class CustomerController extends Controller
     {
         $data = $request->all();
         $pos_setting = PosSetting::latest()->first() ?? new PosSetting();
+        $term = isset($data['term']) ? trim($data['term']) : '';
+
         if (Auth::user()->role_id > 2 && $pos_setting->customer_sucursal) {
             $biller_data = Biller::select('sucursal')->find(Auth::user()->biller_id);
-            $list_customers = Customer::select("id", "name", "valor_documento", "codigofijo", "nro_medidor")
-                ->where([
-                    ['name', 'LIKE', "%{$data['term']}%"],
-                    ['sucursal_id', $biller_data->sucursal],
-                    ['is_active', true]
-                ])->orWhere([
-                        ['valor_documento', 'LIKE', "%{$data['term']}%"],
-                        ['sucursal_id', $biller_data->sucursal],
-                        ['is_active', true]
-                    ])->orWhere([
-                        ['codigofijo', 'LIKE', "%{$data['term']}%"],
-                        ['sucursal_id', $biller_data->sucursal],
-                        ['is_active', true]
-                    ])->orWhere([
-                        ['nro_medidor', 'LIKE', "%{$data['term']}%"],
-                        ['sucursal_id', $biller_data->sucursal],
-                        ['is_active', true]
-                    ])->limit(30)->get();
+            $query = Customer::select("id", "name", "valor_documento", "codigofijo", "nro_medidor")
+                ->where('sucursal_id', $biller_data ? $biller_data->sucursal : null)
+                ->where('is_active', true);
+
+            if ($term !== '') {
+                $query->where(function ($q) use ($term) {
+                    $q->where('name', 'LIKE', "%{$term}%")
+                        ->orWhere('valor_documento', 'LIKE', "%{$term}%")
+                        ->orWhere('codigofijo', 'LIKE', "%{$term}%")
+                        ->orWhere('nro_medidor', 'LIKE', "%{$term}%");
+                });
+            }
+
+            $list_customers = $query->limit(30)->get();
         } else {
-            $list_customers = Customer::select("id", "name", "valor_documento", "codigofijo", "nro_medidor")
-                ->where([
-                    ['name', 'LIKE', "%{$data['term']}%"],
-                    ['is_active', true]
-                ])->orWhere([
-                        ['valor_documento', 'LIKE', "%{$data['term']}%"],
-                        ['is_active', true]
-                    ])->orWhere([
-                        ['codigofijo', 'LIKE', "%{$data['term']}%"],
-                        ['is_active', true]
-                    ])->orWhere([
-                        ['nro_medidor', 'LIKE', "%{$data['term']}%"],
-                        ['is_active', true]
-                    ])->limit(30)->get();
+            $query = Customer::select("id", "name", "valor_documento", "codigofijo", "nro_medidor")
+                ->where('is_active', true);
+
+            if ($term !== '') {
+                $query->where(function ($q) use ($term) {
+                    $q->where('name', 'LIKE', "%{$term}%")
+                        ->orWhere('valor_documento', 'LIKE', "%{$term}%")
+                        ->orWhere('codigofijo', 'LIKE', "%{$term}%")
+                        ->orWhere('nro_medidor', 'LIKE', "%{$term}%");
+                });
+            }
+
+            $list_customers = $query->limit(30)->get();
         }
 
         return $list_customers;

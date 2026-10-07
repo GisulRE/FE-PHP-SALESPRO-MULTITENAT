@@ -11,7 +11,9 @@ class Warehouse extends Model
 {
     protected $fillable = [
         "name", "phone", "email", "address", "is_active",
-        "sucursal_id", "sucursal_siat", "company_id"
+        "sucursal_id", "sucursal_siat", "company_id",
+        "latitude", "longitude", "geofence_radius",
+        "wifi_ssid", "wifi_bssid", "attendance_validation_mode"
     ];
 
     public function product()

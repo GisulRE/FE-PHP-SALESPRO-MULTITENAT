@@ -775,6 +775,7 @@ class SettingController extends Controller
     }
     public function posSetting()
     {
+        $this->ensurePosSettingColumnsExist();
         $lims_customer_list = Customer::where('is_active', true)->get();
         $lims_warehouse_list = Warehouse::where('is_active', true)->get();
         $lims_formatprint_list = array();
@@ -857,8 +858,22 @@ class SettingController extends Controller
         return array('status' => true, 'message' => 'Actualizado con éxito');
     }
 
+    protected function ensurePosSettingColumnsExist()
+    {
+        $addCol = function ($column, $sql) {
+            try {
+                if (Schema::hasTable('pos_setting') && !Schema::hasColumn('pos_setting', $column)) {
+                    \DB::statement($sql);
+                }
+            } catch (\Throwable $e) {}
+        };
+
+        $addCol('auto_fill_amount', "ALTER TABLE pos_setting ADD COLUMN auto_fill_amount TINYINT(1) NOT NULL DEFAULT 1");
+    }
+
     public function posSettingStore(Request $request)
     {
+        $this->ensurePosSettingColumnsExist();
         if ($request->has('hora_inicio_atencion') && $request->hora_inicio_atencion) {
             $request->merge([
                 'hora_inicio_atencion' => date('H:i', strtotime($request->hora_inicio_atencion)),
@@ -958,6 +973,10 @@ class SettingController extends Controller
             $pos_setting->user_category = false;
         else
             $pos_setting->user_category = true;
+
+        if (Schema::hasColumn('pos_setting', 'auto_fill_amount')) {
+            $pos_setting->auto_fill_amount = isset($data['auto_fill_amount']) ? 1 : 0;
+        }
 
         $pos_setting->save();
         return redirect()->back()->with('message', 'Ajustes POS actualizado con éxito');

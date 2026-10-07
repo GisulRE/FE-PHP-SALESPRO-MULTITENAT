@@ -326,10 +326,12 @@
     <script type="text/javascript">
         @if (!isset($is_preview_mode) || !$is_preview_mode)
         function auto_print() {
-            window.print()
-            //window.history.go(-1);
-            //window.history.back();
-            window.location.assign("{{ route('sale.pos') }}");
+            window.print();
+            if (window.opener && !window.opener.closed) {
+                window.close();
+            } else if (window.self === window.top) {
+                window.location.assign("{{ route('sale.pos') }}");
+            }
         }
         setTimeout(auto_print, 1000);
         @endif

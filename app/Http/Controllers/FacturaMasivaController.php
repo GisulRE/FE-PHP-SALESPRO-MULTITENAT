@@ -202,10 +202,10 @@ class FacturaMasivaController extends Controller
                 if ($sheet->montoDescuentoTarifaDignidad > 0) {
                     $data_head['sale_note'] .= "- Descuento Tarifa Dignidad : " . number_format((float) $sheet->montoDescuentoTarifaDignidad, 2);
                 }
-                $last_ref = Sale::get()->last();
-                if ($last_ref != null) {
-                    $nros = explode("-", $last_ref['reference_no']);
-                    $nro = ltrim($nros[1], "0");
+                $last_ref = Sale::select('reference_no')->orderBy('id', 'desc')->first();
+                if ($last_ref != null && !empty($last_ref->reference_no)) {
+                    $nros = explode("-", $last_ref->reference_no);
+                    $nro = isset($nros[1]) ? (int) ltrim($nros[1], "0") : 0;
                     $nro++;
                     $nro = str_pad($nro, 8, "0", STR_PAD_LEFT);
                 } else {

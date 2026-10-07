@@ -176,7 +176,7 @@ class ProductController extends Controller
                     }
                     
                     // data for product details by one click
-                    $tax = $product->tax ? $product->tax->name : 'N/A';
+                    $tax = $product->tax->name ?? 'N/A';
 
                     if ($product->tax_method == 1)
                         $tax_method = trans('file.Exclusive');

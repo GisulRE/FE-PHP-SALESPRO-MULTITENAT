@@ -53,7 +53,8 @@ class PosSetting extends Model
         "hora_inicio_atencion",
         "hora_fin_atencion",
         "intervalo_reserva_minutos",
-        "keybord_presale"
+        "keybord_presale",
+        "auto_fill_amount"
     ];
 
     protected static function boot()

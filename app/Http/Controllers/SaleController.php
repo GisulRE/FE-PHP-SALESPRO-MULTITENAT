@@ -77,6 +77,9 @@ class SaleController extends Controller
 {
     use SiatTrait, CufdTrait;
 
+    protected static $taxesCache = null;
+    protected static $unitsCache = null;
+
     private function writePosSiatDebug(string $event, array $context = []): void
     {
         try {
@@ -720,11 +723,10 @@ class SaleController extends Controller
             $data = $request->all();
             $data['user_id'] = Auth::id();
             $data['date_sell'] = $dateSell->format('Y-m-d H:i:s');
-            $last_ref = Sale::get()->last();
-
-            if ($last_ref != null) {
-                $nros = explode("-", $last_ref['reference_no']);
-                $nro = ltrim($nros[1], "0");
+            $last_ref = Sale::select('reference_no')->orderBy('id', 'desc')->first();
+            if ($last_ref != null && !empty($last_ref->reference_no)) {
+                $nros = explode("-", $last_ref->reference_no);
+                $nro = isset($nros[1]) ? (int) ltrim($nros[1], "0") : 0;
                 $nro++;
                 $nro = str_pad($nro, 8, "0", STR_PAD_LEFT);
             } else {
@@ -868,7 +870,7 @@ class SaleController extends Controller
             $stock_outsale = false;
 
             foreach ($product_id as $i => $id) {
-                $lims_product_data = Product::where('id', $id)->first();
+                $lims_product_data = Product::find($id);
                 $product_sale['variant_id'] = null;
                 if (
                     ($lims_product_data->type == 'combo' || $lims_product_data->type == 'producto_terminado')
@@ -1066,14 +1068,13 @@ class SaleController extends Controller
                 $message = ' Venta creada con éxito';
             }
 
-            if ($mail_data['email'] && $data['sale_status'] == 1) {
+            // Evitar congelar la caja POS con peticiones SMTP lentas (solo enviar si no es POS/AJAX)
+            if ($mail_data['email'] && $data['sale_status'] == 1 && empty($data['pos']) && !$is_ajax) {
                 try {
                     Mail::send('mail.sale_details', $mail_data, function ($message) use ($mail_data) {
                         $message->to($mail_data['email'])->subject('Sale Details');
                     });
-                } catch (\Exception $e) {
-                    // Silenciar error de correo
-                }
+                } catch (\Exception $e) {}
             }
 
             $role = Role::find(Auth::user()->role_id);
@@ -1692,9 +1693,11 @@ class SaleController extends Controller
                     $print_url = url('sales/gen_invoice/' . $lims_sale_data->id);
                     $print_html = '<iframe src="' . $print_url . '" style="width:100%; height:500px; border:none;"></iframe>';
                     return response()->json([
-                        'status'     => true,
-                        'sale_id'    => $lims_sale_data->id,
-                        'print_html' => $print_html,
+                        'status'          => true,
+                        'sale_id'         => $lims_sale_data->id,
+                        'reference_no'    => $lims_sale_data->reference_no,
+                        'print_sale_note' => (bool) ($lims_pos_setting_data->print ?? false),
+                        'print_html'      => $print_html,
                     ]);
                 }
 
@@ -1796,9 +1799,11 @@ class SaleController extends Controller
                 $print_url = url('sales/gen_invoice/' . $lims_sale_data->id);
                 $print_html = '<iframe src="' . $print_url . '" style="width:100%; height:500px; border:none;"></iframe>';
                 return response()->json([
-                    'status'     => true,
-                    'sale_id'    => $lims_sale_data->id,
-                    'print_html' => $print_html,
+                    'status'          => true,
+                    'sale_id'         => $lims_sale_data->id,
+                    'reference_no'    => $lims_sale_data->reference_no,
+                    'print_sale_note' => (bool) ($lims_pos_setting_data->print ?? false),
+                    'print_html'      => $print_html,
                 ]);
             }
             if ($lims_sale_data->sale_status == '1' || $lims_sale_data->sale_status == '4') {
@@ -2295,14 +2300,14 @@ class SaleController extends Controller
                             $data['lote_id'] = $lot->id;
                             $data['qty'] = $lot->stock;
                             $loteSale = LoteSale::create($data);
-                            $this->updateStockLote($lot->id, 0);
+                            $this->updateStockLote($lot->id, 0, $lot);
                         } else {
                             $data['sale_id'] = $id_sale;
                             $data['lote_id'] = $lot->id;
                             $data['qty'] = $qty - $total;
                             $loteSale = LoteSale::create($data);
                             $stock = $lot->stock - ($qty - $total);
-                            $this->updateStockLote($lot->id, $stock);
+                            $this->updateStockLote($lot->id, $stock, $lot);
                         }
                     }
                 } else {
@@ -2318,9 +2323,14 @@ class SaleController extends Controller
         }
     }
 
-    public function updateStockLote($id, $qty)
+    public function updateStockLote($id, $qty, $lote = null)
     {
-        $lote = ProductLote::find($id);
+        if (!$lote) {
+            $lote = ProductLote::find($id);
+        }
+        if (!$lote) {
+            return;
+        }
         if ($qty == 0) {
             $lote->status = 0;
         } else {
@@ -2608,284 +2618,345 @@ class SaleController extends Controller
 
     public function searchProduct(Request $request)
     {
+        $term = trim($request->input('term', ''));
+        if (mb_strlen($term) < 2) {
+            return response()->json([]);
+        }
+
         $data = $request->all();
         $lims_pos_setting_data = PosSetting::latest()->first();
-        // Modo proforma: true = listar todos, false = solo con stock o digitales
+        $cantDecimal = $lims_pos_setting_data->cant_decimal ?? 2;
         $modo_proforma = isset($data['modo_proforma']) && $data['modo_proforma'] == 'true';
-        
-        Log::info('[searchProduct] Parámetros recibidos:', [
-            'term' => $data['term'] ?? 'no term',
-            'id_customer' => $data['id_customer'] ?? 'no customer',
-            'id_warehouse' => $data['id_warehouse'] ?? 'no warehouse',
-            'modo_proforma' => $data['modo_proforma'] ?? 'no enviado',
-            'modo_proforma_bool' => $modo_proforma
-        ]);
-        
-        if ($lims_pos_setting_data->user_category) {
+        $warehouseId = $data['id_warehouse'] ?? null;
+        $customerId = $data['id_customer'] ?? null;
+
+        $listCategories = null;
+        if ($lims_pos_setting_data && $lims_pos_setting_data->user_category) {
             $listCategories = UserCategory::where("user_id", Auth::user()->id)->pluck('category_id');
         }
-        
-        // Inicializar customer_data con precio por defecto si no hay cliente
-        if ($data['id_customer'] != null && $data['id_customer'] != '') {
-            $customer_data = Customer::select('id', 'price_type')->find($data['id_customer']);
+
+        if ($customerId) {
+            $customer_data = Customer::select('id', 'price_type')->find($customerId);
         }
-        
-        // Si no hay cliente o no se encontró, usar precio por defecto (price_type = 0)
         if (!isset($customer_data) || $customer_data == null) {
             $customer_data = (object)['id' => null, 'price_type' => 0];
         }
-        
-        Log::info('[searchProduct] Customer price_type:', ['price_type' => $customer_data->price_type]);
 
-        if ($lims_pos_setting_data->user_category) {
-            $query_products = Product_Warehouse::select(
-                'product_warehouse.qty',
-                'product_warehouse.variant_id',
-                'products.code',
-                'products.name',
-                'products.type',
-                'products.id',
-                'products.product_list',
-                'products.qty_list',
-                'products.tax_id',
-                'products.tax_method',
-                'products.is_variant',
-                'products.unit_id',
-                'products.sale_unit_id',
-                'products.promotion',
-                'products.promotion_price',
-                'products.last_date',
-                'products.price',
-                'products.price_a',
-                'products.price_b',
-                'products.price_c',
-                'products.is_active'
-            )
-                ->join('products', 'products.id', '=', 'product_warehouse.product_id')
-                ->where('product_warehouse.warehouse_id', $data['id_warehouse'])
-                // En modo proforma no filtrar por stock, sin modo proforma sí filtrar
-                ->when(!$modo_proforma, function($query) {
-                    return $query->where('product_warehouse.qty', '>', 0);
-                })
-                ->where('products.is_active', true)
-                ->where('products.type', '=', 'standard')
-                ->whereIn('products.category_id', $listCategories)
-                ->where(function ($query) use ($data) {
-                    $query->where('products.code', 'LIKE', "%{$data['term']}%")
-                        ->orWhere('products.name', 'LIKE', "%{$data['term']}%");
-                })
-                ->orderBy('products.name', 'ASC')
-                ->limit(100);
-            $lims_products = $query_products->get();
-        } else {
-            $query_products = Product_Warehouse::select(
-                'product_warehouse.qty',
-                'product_warehouse.variant_id',
-                'products.code',
-                'products.name',
-                'products.type',
-                'products.id',
-                'products.product_list',
-                'products.qty_list',
-                'products.tax_id',
-                'products.tax_method',
-                'products.is_variant',
-                'products.unit_id',
-                'products.sale_unit_id',
-                'products.promotion',
-                'products.promotion_price',
-                'products.last_date',
-                'products.price',
-                'products.price_a',
-                'products.price_b',
-                'products.price_c',
-                'products.is_active'
-            )
-                ->join('products', 'products.id', '=', 'product_warehouse.product_id')
-                ->where('product_warehouse.warehouse_id', $data['id_warehouse'])
-                // En modo proforma no filtrar por stock, sin modo proforma sí filtrar
-                ->when(!$modo_proforma, function($query) {
-                    return $query->where('product_warehouse.qty', '>', 0);
-                })
-                ->where('products.is_active', true)
-                ->where('products.type', '=', 'standard')
-                ->where(function ($query) use ($data) {
-                    $query->where('products.code', 'LIKE', "%{$data['term']}%")
-                        ->orWhere('products.name', 'LIKE', "%{$data['term']}%");
-                })
-                ->orderBy('products.name', 'ASC')
-                ->limit(100);
-            $lims_products = $query_products->get();
+        // 1. Query standard products from Product_Warehouse
+        $queryWarehouse = Product_Warehouse::select(
+            'product_warehouse.qty',
+            'product_warehouse.variant_id',
+            'products.code',
+            'products.name',
+            'products.type',
+            'products.id',
+            'products.product_list',
+            'products.qty_list',
+            'products.tax_id',
+            'products.tax_method',
+            'products.is_variant',
+            'products.unit_id',
+            'products.sale_unit_id',
+            'products.promotion',
+            'products.promotion_price',
+            'products.last_date',
+            'products.price',
+            'products.price_a',
+            'products.price_b',
+            'products.price_c',
+            'products.is_active',
+            'products.courtesy',
+            'products.is_basicservice',
+            'products.commission_percentage'
+        )
+            ->join('products', 'products.id', '=', 'product_warehouse.product_id')
+            ->where('product_warehouse.warehouse_id', $warehouseId)
+            ->when(!$modo_proforma, function($query) {
+                return $query->where('product_warehouse.qty', '>', 0);
+            })
+            ->where('products.is_active', true)
+            ->where('products.type', '=', 'standard')
+            ->where(function ($query) use ($term) {
+                $query->where('products.code', 'LIKE', "%{$term}%")
+                    ->orWhere('products.name', 'LIKE', "%{$term}%")
+                    ->orWhereExists(function ($sub) use ($term) {
+                        $sub->select(DB::raw(1))
+                            ->from('product_variants')
+                            ->whereColumn('product_variants.product_id', 'products.id')
+                            ->where('product_variants.item_code', 'LIKE', "%{$term}%");
+                    });
+            });
+
+        if ($listCategories !== null) {
+            $queryWarehouse->whereIn('products.category_id', $listCategories);
         }
 
+        $standardProducts = $queryWarehouse->orderBy('products.name', 'ASC')
+            ->limit(25)
+            ->get();
 
-        if ($lims_pos_setting_data->user_category) {
-            $list_products_all = Product::select(
-                'qty',
-                'is_variant as variant_id',
-                'code',
-                'name',
-                'type',
-                'id',
-                'product_list',
-                'qty_list',
-                'tax_id',
-                'tax_method',
-                'is_variant',
-                'unit_id',
-                'sale_unit_id',
-                'promotion',
-                'promotion_price',
-                'last_date',
-                'price',
-                'price_a',
-                'price_b',
-                'price_c',
-                'is_active'
-            )
-                ->where('is_active', true)
-                ->whereNotIn('type', ['insumo', 'standard'])
-                ->whereIn('category_id', $listCategories)
-                ->where(function ($query) use ($data) {
-                    $query->where('code', 'LIKE', "%{$data['term']}%")
-                        ->orWhere('name', 'LIKE', "%{$data['term']}%");
-                })
-                ->orderBy('name', 'ASC')
-                ->limit(100)
-                ->get();
-        } else {
-            $list_products_all = Product::select(
-                'qty',
-                'is_variant as variant_id',
-                'code',
-                'name',
-                'type',
-                'id',
-                'product_list',
-                'qty_list',
-                'tax_id',
-                'tax_method',
-                'is_variant',
-                'unit_id',
-                'sale_unit_id',
-                'promotion',
-                'promotion_price',
-                'last_date',
-                'price',
-                'price_a',
-                'price_b',
-                'price_c',
-                'is_active'
-            )
-                ->where('is_active', true)
-                ->whereNotIn('type', ['insumo', 'standard'])
-                ->where(function ($query) use ($data) {
-                    $query->where('code', 'LIKE', "%{$data['term']}%")
-                        ->orWhere('name', 'LIKE', "%{$data['term']}%");
-                })
-                ->orderBy('name', 'ASC')
-                ->limit(100)
-                ->get();
+        // 2. Query non-standard products (digital, combo, etc.)
+        $queryOther = Product::select(
+            'qty',
+            DB::raw('NULL as variant_id'),
+            'code',
+            'name',
+            'type',
+            'id',
+            'product_list',
+            'qty_list',
+            'tax_id',
+            'tax_method',
+            'is_variant',
+            'unit_id',
+            'sale_unit_id',
+            'promotion',
+            'promotion_price',
+            'last_date',
+            'price',
+            'price_a',
+            'price_b',
+            'price_c',
+            'is_active',
+            'courtesy',
+            'is_basicservice',
+            'commission_percentage'
+        )
+            ->where('is_active', true)
+            ->whereNotIn('type', ['insumo', 'standard'])
+            ->where(function ($query) use ($term) {
+                $query->where('code', 'LIKE', "%{$term}%")
+                    ->orWhere('name', 'LIKE', "%{$term}%")
+                    ->orWhereExists(function ($sub) use ($term) {
+                        $sub->select(DB::raw(1))
+                            ->from('product_variants')
+                            ->whereColumn('product_variants.product_id', 'products.id')
+                            ->where('product_variants.item_code', 'LIKE', "%{$term}%");
+                    });
+            });
+
+        if ($listCategories !== null) {
+            $queryOther->whereIn('category_id', $listCategories);
         }
-        //$query1->union($query->toBase())->groupBy('id', 'code',  'name')->orderBy('name', 'ASC')->limit(100);
-        //$list_products_all = $query->union($query1)->get();
-        foreach ($list_products_all as $key => $lims_product_data) {
-            if ($lims_product_data->is_active == 1) {
-                // Sin modo proforma: filtrar productos standard sin stock
-                // Con modo proforma: permitir todos
-                // Siempre permitir productos digitales sin importar stock
-                if (!$modo_proforma && $lims_product_data->type == 'standard' && $lims_product_data->qty < 1) {
-                    $list_products_all->forget($key);
+
+        $otherProducts = $queryOther->orderBy('name', 'ASC')
+            ->limit(25)
+            ->get();
+
+        // Combine and limit to 25 unique products
+        $allProducts = $standardProducts->concat($otherProducts)->unique('id')->slice(0, 25)->values();
+
+        if ($allProducts->isEmpty()) {
+            return response()->json([]);
+        }
+
+        // 3. Batch load relations (Grouped queries, eliminate N+1)
+        $productIds = $allProducts->pluck('id')->toArray();
+        $taxIds = $allProducts->pluck('tax_id')->filter()->unique()->toArray();
+        $unitIds = $allProducts->pluck('unit_id')->filter()->unique()->toArray();
+        $saleUnitIds = $allProducts->pluck('sale_unit_id')->filter()->unique()->toArray();
+        $allUnitIds = array_unique(array_merge($unitIds, $saleUnitIds));
+        $variantProductIds = $allProducts->where('is_variant', true)->pluck('id')->toArray();
+
+        $taxes = !empty($taxIds) ? Tax::whereIn('id', $taxIds)->get()->keyBy('id') : collect();
+        $units = !empty($allUnitIds) ? Unit::where(function($q) use ($allUnitIds) {
+            $q->whereIn('id', $allUnitIds)->orWhereIn('base_unit', $allUnitIds);
+        })->get() : collect();
+        $unitsById = $units->keyBy('id');
+
+        $variantsByProduct = collect();
+        if (!empty($variantProductIds)) {
+            $variantsByProduct = ProductVariant::select('id', 'product_id', 'variant_id', 'item_code', 'additional_price')
+                ->whereIn('product_id', $variantProductIds)
+                ->get()
+                ->groupBy('product_id');
+        }
+
+        $courtesiesByProduct = collect();
+        $courtesyProductIds = $allProducts->where('courtesy', 'FALSE')->pluck('id')->toArray();
+        if (!empty($courtesyProductIds)) {
+            $courtesiesByProduct = ProductAssociated::join('products', 'product_associated.product_courtesy_id', 'products.id')
+                ->select('products.*', 'product_associated.id AS id_asoc', 'product_associated.product_associated_id')
+                ->whereIn('product_associated.product_associated_id', $courtesyProductIds)
+                ->get()
+                ->groupBy('product_associated_id');
+        }
+
+        $employeesList = null;
+        $hasDigitalOrCombo = $allProducts->first(function($p) {
+            return $p->type == 'digital' || ($p->type == 'combo' && $p->commission_percentage > 0);
+        });
+        if ($hasDigitalOrCombo) {
+            $employeesList = Employee::select('id', 'name')
+                ->where('is_active', true)
+                ->where(function($q) {
+                    $q->where('contract_type', 'COMISION_UNICA')
+                        ->orWhere('contract_type', 'COMISION_POR_SERVICIOS');
+                })->get();
+        }
+
+        // Batch pre-load combo digital child IDs to eliminate N+1 query inside loop
+        $allComboChildIds = [];
+        foreach ($allProducts as $prod) {
+            if ($prod->type == 'combo' && $prod->commission_percentage > 0 && !empty($prod->product_list)) {
+                $cIds = explode(',', $prod->product_list);
+                foreach ($cIds as $cid) {
+                    $cid = trim($cid);
+                    if ($cid !== '') {
+                        $allComboChildIds[] = $cid;
+                    }
                 }
-                if ($lims_product_data->is_variant) {
-                    $lims_product_variant_data = ProductVariant::select('item_code', 'additional_price')->FindExactProduct($lims_product_data->product_id, $lims_product_data->variant_id)->first();
-                    $lims_product_data->code = $lims_product_variant_data->item_code;
-                    $lims_product_data->price_value = $this->getPriceByProduct($lims_product_data, $lims_product_variant_data, $customer_data->price_type);
-                } else {
-                    if ($lims_product_data->type != 'standard') {
-                        switch ($customer_data->price_type) {
-                            case 0:
-                                $lims_product_data->price_value = $lims_product_data->price;
-                                break;
-                            case 1:
-                                $lims_product_data->price_value = $lims_product_data->price_a;
-                                break;
-                            case 2:
-                                $lims_product_data->price_value = $lims_product_data->price_b;
-                                break;
-                            case 3:
-                                $lims_product_data->price_value = $lims_product_data->price_c;
-                                break;
-                            default:
-                                $lims_product_data->price_value = $lims_product_data->price;
-                        }
-                    } else
-                        $lims_product_data->price_value = $this->getPriceByProduct($lims_product_data, null, $customer_data->price_type);
-                }
-                $lims_product_data->tax_value = $this->getTaxByProduct($lims_product_data);
-                $lims_product_data->unit_value = $this->getUnitByProduct($lims_product_data);
-                $lims_product_data->price_value = number_format($lims_product_data->price_value, $lims_pos_setting_data->cant_decimal, '.', '');
-            } else {
-                $list_products_all->forget($key);
             }
         }
+        $digitalComboChildIds = !empty($allComboChildIds)
+            ? Product::whereIn('id', array_unique($allComboChildIds))->where('type', 'digital')->pluck('id')->toArray()
+            : [];
+        $digitalComboChildIdsMap = array_flip($digitalComboChildIds);
 
-        foreach ($lims_products as $key => $lims_product_data) {
-            if ($lims_product_data->is_active == 1) {
-                // Sin modo proforma: filtrar productos standard sin stock
-                // Con modo proforma: permitir todos
-                if (!$modo_proforma && $lims_product_data->type == 'standard' && $lims_product_data->qty < 1) {
-                    $lims_products->forget($key);
+        $todayDate = date('Y-m-d');
+        $customerPriceType = $customer_data->price_type ?? 0;
+
+        foreach ($allProducts as $p) {
+            // Variant handling
+            $productVariantData = null;
+            $productVariantId = null;
+            if ($p->is_variant && isset($variantsByProduct[$p->id])) {
+                $productVariants = $variantsByProduct[$p->id];
+                $matchingVariant = $productVariants->first(function($v) use ($term) {
+                    return strcasecmp($v->item_code, $term) === 0;
+                }) ?: $productVariants->first(function($v) use ($term) {
+                    return stripos($v->item_code, $term) !== false;
+                });
+
+                if ($matchingVariant) {
+                    $productVariantData = $matchingVariant;
+                } elseif ($p->variant_id) {
+                    $productVariantData = $productVariants->firstWhere('variant_id', $p->variant_id)
+                        ?: $productVariants->firstWhere('id', $p->variant_id);
                 }
-                if ($lims_product_data->is_variant) {
-                    $lims_product_variant_data = ProductVariant::select('item_code', 'additional_price')->FindExactProduct($lims_product_data->product_id, $lims_product_data->variant_id)->first();
-                    $lims_product_data->code = $lims_product_variant_data->item_code;
-                    $lims_product_data->price_value = $this->getPriceByProduct($lims_product_data, $lims_product_variant_data, $customer_data->price_type);
-                } else {
-                    if ($lims_product_data->type != 'standard') {
-                        switch ($customer_data->price_type) {
-                            case 0:
-                                $lims_product_data->price_value = $lims_product_data->price;
-                                break;
-                            case 1:
-                                $lims_product_data->price_value = $lims_product_data->price_a;
-                                break;
-                            case 2:
-                                $lims_product_data->price_value = $lims_product_data->price_b;
-                                break;
-                            case 3:
-                                $lims_product_data->price_value = $lims_product_data->price_c;
-                                break;
-                            default:
-                                $lims_product_data->price_value = $lims_product_data->price;
-                        }
-                    } else
-                        $lims_product_data->price_value = $this->getPriceByProduct($lims_product_data, null, $customer_data->price_type);
+
+                if (!$productVariantData) {
+                    $productVariantData = $productVariants->first();
                 }
-                $lims_product_data->tax_value = $this->getTaxByProduct($lims_product_data);
-                $lims_product_data->unit_value = $this->getUnitByProduct($lims_product_data);
-                $lims_product_data->price_value = number_format($lims_product_data->price_value, $lims_pos_setting_data->cant_decimal, '.', '');
-            } else {
-                $lims_products->forget($key);
+
+                if ($productVariantData) {
+                    $p->code = $productVariantData->item_code;
+                    $productVariantId = $productVariantData->id ?? $productVariantData->variant_id;
+                }
             }
+
+            // Price calculation according to customer price_type and promotion
+            $additionalPrice = $productVariantData ? (float)$productVariantData->additional_price : 0;
+            if ($p->promotion && $todayDate <= $p->last_date) {
+                $basePrice = (float)$p->promotion_price;
+            } else {
+                switch ($customerPriceType) {
+                    case 1:
+                        $basePrice = (float)($p->price_a ?: $p->price);
+                        break;
+                    case 2:
+                        $basePrice = (float)($p->price_b ?: $p->price);
+                        break;
+                    case 3:
+                        $basePrice = (float)($p->price_c ?: $p->price);
+                        break;
+                    case 0:
+                    default:
+                        $basePrice = (float)$p->price;
+                        break;
+                }
+            }
+            $calculatedPrice = $basePrice + $additionalPrice;
+            $p->price_value = number_format($calculatedPrice, $cantDecimal, '.', '');
+
+            // Tax handling
+            $taxData = $p->tax_id && isset($taxes[$p->tax_id]) ? $taxes[$p->tax_id] : null;
+            $taxRate = $taxData ? (float)$taxData->rate : 0;
+            $taxName = $taxData ? $taxData->name : 'No Tax';
+            $p->tax_value = $taxRate;
+
+            // Unit handling
+            $unitNameStr = 'n/a,';
+            $unitOperatorStr = 'n/a,';
+            $unitOperationValueStr = 'n/a,';
+            if ($p->type == 'standard') {
+                $pUnits = $units->filter(function($u) use ($p) {
+                    return $u->base_unit == $p->unit_id || $u->id == $p->unit_id;
+                });
+                $unitNames = [];
+                $unitOperators = [];
+                $unitOperationValues = [];
+                foreach ($pUnits as $unit) {
+                    $unitBase = isset($unitsById[$unit->base_unit]) ? $unitsById[$unit->base_unit] : $unit;
+                    if ($p->sale_unit_id == $unit->id) {
+                        array_unshift($unitNames, $unit->unit_name);
+                        array_unshift($unitOperators, $unit->operator);
+                        array_unshift($unitOperationValues, $unit->operation_value);
+                    } else {
+                        $unitNames[] = $unitBase->unit_name;
+                        $unitOperators[] = $unitBase->operator;
+                        $unitOperationValues[] = $unitBase->operation_value;
+                    }
+                }
+                if (!empty($unitNames)) {
+                    $unitNameStr = implode(',', $unitNames) . ',';
+                    $unitOperatorStr = implode(',', $unitOperators) . ',';
+                    $unitOperationValueStr = implode(',', $unitOperationValues) . ',';
+                }
+            }
+            $p->unit_value = $unitNameStr;
+
+            // Courtesy handling
+            $courtesyList = ($p->courtesy == "FALSE" && isset($courtesiesByProduct[$p->id]))
+                ? $courtesiesByProduct[$p->id]
+                : null;
+
+            // Employee handling
+            $empList = null;
+            if ($p->type == "digital") {
+                $empList = $employeesList;
+            } elseif ($p->type == "combo" && $p->commission_percentage > 0 && !empty($p->product_list)) {
+                $comboChildIds = explode(",", $p->product_list);
+                $containsService = false;
+                foreach ($comboChildIds as $cid) {
+                    if (isset($digitalComboChildIdsMap[trim($cid)])) {
+                        $containsService = true;
+                        break;
+                    }
+                }
+                if ($containsService) {
+                    $empList = $employeesList;
+                }
+            }
+
+            // Combo/finished product lists
+            $productList = ($p->type == "combo" || $p->type == "producto_terminado") ? $p->product_list : [];
+            $qtyList = ($p->type == "combo" || $p->type == "producto_terminado") ? $p->qty_list : [];
+
+            // Precompute pos_data array (18 elements)
+            $p->pos_data = [
+                0 => $p->name,
+                1 => $p->code,
+                2 => $p->price_value,
+                3 => $taxRate,
+                4 => $taxName,
+                5 => $p->tax_method,
+                6 => $unitNameStr,
+                7 => $unitOperatorStr,
+                8 => $unitOperationValueStr,
+                9 => $p->id,
+                10 => $productVariantId,
+                11 => $courtesyList,
+                12 => $empList,
+                13 => $p->is_basicservice,
+                14 => $productList,
+                15 => $qtyList,
+                16 => $p->qty,
+                17 => $p->type
+            ];
         }
-        // Unir $list_products_all con $lims_products
-        $list_products_all = $list_products_all->concat($lims_products)->unique('id')->values();
-        
-        Log::info('[searchProduct] Resultados:', [
-            'total_productos' => $list_products_all->count(),
-            'modo_proforma' => $modo_proforma,
-            'productos' => $list_products_all->map(function($p) {
-                return [
-                    'code' => $p->code,
-                    'name' => $p->name,
-                    'qty' => $p->qty,
-                    'type' => $p->type
-                ];
-            })->toArray()
-        ]);
-        
-        return $list_products_all;
+
+        return response()->json($allProducts);
     }
 
     public function productFinish_Stock($code, $warehouse_id)
@@ -2923,7 +2994,14 @@ class SaleController extends Controller
     public function posSale()
     {
         $user = Auth::user();
-        $permissions = is_array(session('permissions')) ? session('permissions') : [];
+        $permissions = is_array(session('permissions')) && count(session('permissions')) > 2 ? session('permissions') : [];
+        if (empty($permissions) && $user && $user->role_id) {
+            $permissions = \DB::table('permissions')
+                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                ->where('role_id', $user->role_id)
+                ->pluck('name')
+                ->toArray();
+        }
         $hasPermission = ($user && $user->role_id <= 2) || in_array('sales-add', $permissions);
 
         if ($hasPermission) {
@@ -3337,11 +3415,11 @@ class SaleController extends Controller
         $customer_id = $request['data'][1];
         $product_variant_id = null;
         
-        Log::info('[limsProductSearch] Búsqueda de producto:', [
-            'product_code' => $product_code[0],
-            'customer_id' => $customer_id,
-            'modo_proforma' => $request->input('modo_proforma', 'no enviado')
-        ]);
+        // Log::info('[limsProductSearch] Búsqueda de producto:', [
+        //     'product_code' => $product_code[0],
+        //     'customer_id' => $customer_id,
+        //     'modo_proforma' => $request->input('modo_proforma', 'no enviado')
+        // ]);
         
         // Inicializar customer_data con precio por defecto si no hay cliente
         if ($customer_id != null && $customer_id != '') {
@@ -3354,21 +3432,23 @@ class SaleController extends Controller
         }
 
         $lims_product_data = Product::where('code', $product_code[0])->where('is_active', true)->first();
-        
         if (!$lims_product_data) {
-            Log::warning('[limsProductSearch] Producto no encontrado:', ['code' => $product_code[0]]);
-            return null;
+            // Buscar por código de variante si no coincide con producto principal
+            $lims_product_data = Product::join('product_variants', 'products.id', 'product_variants.product_id')
+                ->select('products.*', 'product_variants.id as product_variant_id', 'product_variants.item_code', 'product_variants.additional_price')
+                ->where('product_variants.item_code', $product_code[0])
+                ->where('products.is_active', true)
+                ->first();
+            if ($lims_product_data) {
+                $product_variant_id = $lims_product_data->product_variant_id;
+            }
         }
         
-        Log::info('[limsProductSearch] Producto encontrado:', [
-            'name' => $lims_product_data->name,
-            'code' => $lims_product_data->code,
-            'type' => $lims_product_data->type
-        ]);
         if (!$lims_product_data) {
             return null;
         }
-        if ($lims_product_data->is_variant) {
+
+        if ($lims_product_data->is_variant && !$product_variant_id) {
             $lims_product_data = Product::join('product_variants', 'products.id', 'product_variants.product_id')
                 ->select('products.*', 'product_variants.id as product_variant_id', 'product_variants.item_code', 'product_variants.additional_price')
                 ->where('product_variants.item_code', $product_code[0])->where('products.is_active', true)
@@ -3540,8 +3620,18 @@ class SaleController extends Controller
     {
         $product = [];
         if ($lims_product_data->tax_id) {
-            $lims_tax_data = Tax::find($lims_product_data->tax_id);
-            array_push($product, $lims_tax_data->rate, $lims_tax_data->name);
+            if (self::$taxesCache === null) {
+                self::$taxesCache = Tax::all()->keyBy('id');
+            }
+            $lims_tax_data = self::$taxesCache->get($lims_product_data->tax_id);
+            if (!$lims_tax_data) {
+                $lims_tax_data = Tax::find($lims_product_data->tax_id);
+            }
+            if ($lims_tax_data) {
+                array_push($product, $lims_tax_data->rate, $lims_tax_data->name);
+            } else {
+                array_push($product, 0, 'No Tax');
+            }
         } else {
             array_push($product, 0, 'No Tax');
         }
@@ -3552,9 +3642,13 @@ class SaleController extends Controller
     public function getUnitByProduct($lims_product_data)
     {
         if ($lims_product_data->type == 'standard') {
-            $units = Unit::where("base_unit", $lims_product_data->unit_id)
-                ->orWhere('id', $lims_product_data->unit_id)
-                ->get();
+            if (self::$unitsCache === null) {
+                self::$unitsCache = Unit::all();
+            }
+            $unit_id = $lims_product_data->unit_id;
+            $units = self::$unitsCache->filter(function ($unit) use ($unit_id) {
+                return $unit->base_unit == $unit_id || $unit->id == $unit_id;
+            });
             $unit_name = array();
             $unit_operator = array();
             $unit_operation_value = array();
@@ -3672,10 +3766,10 @@ class SaleController extends Controller
             $i++;
         }
         //return $unit;
-        $last_ref = Sale::get()->last();
-        if ($last_ref != null) {
-            $nros = explode("-", $last_ref['reference_no']);
-            $nro = ltrim($nros[1], "0");
+        $last_ref = Sale::select('reference_no')->orderBy('id', 'desc')->first();
+        if ($last_ref != null && !empty($last_ref->reference_no)) {
+            $nros = explode("-", $last_ref->reference_no);
+            $nro = isset($nros[1]) ? (int) ltrim($nros[1], "0") : 0;
             $nro++;
             $nro = str_pad($nro, 8, "0", STR_PAD_LEFT);
         } else {
@@ -6080,9 +6174,9 @@ class SaleController extends Controller
     {
         $costo = 0;
         if ($id_variant)
-            $item = ProductPurchase::select('id', 'purchase_id', 'net_unit_cost')->where([['status', true], ['product_id', $id_producto], ['variant_id', $id_variant]])->orderBy('created_at', 'desc')->first();
+            $item = ProductPurchase::select('id', 'purchase_id', 'net_unit_cost')->where([['status', true], ['product_id', $id_producto], ['variant_id', $id_variant]])->orderBy('id', 'desc')->first();
         else
-            $item = ProductPurchase::select('id', 'purchase_id', 'net_unit_cost')->where([['status', true], ['product_id', $id_producto]])->orderBy('created_at', 'desc')->first();
+            $item = ProductPurchase::select('id', 'purchase_id', 'net_unit_cost')->where([['status', true], ['product_id', $id_producto]])->orderBy('id', 'desc')->first();
         if ($item) {
             //Log::info("Purchase get Cost id:" . $item->purchase_id);
             $costo = $item->net_unit_cost;

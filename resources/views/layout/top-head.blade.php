@@ -41,8 +41,8 @@
     <link rel="stylesheet" href="/public/css/style.default.css" id="theme-stylesheet" type="text/css">
     <link rel="stylesheet" href="/public/css/dropzone.css">
     <link rel="stylesheet" href="/public/css/style.css">
-    <link rel="stylesheet" href="{{ url('public/css/modern-theme.css') }}?v={{ time() }}">
-    <link rel="stylesheet" href="{{ url('public/css/dark-mode.css') }}?v={{ time() }}">
+    <link rel="stylesheet" href="{{ url('public/css/modern-theme.css') }}?v=1.1.0">
+    <link rel="stylesheet" href="{{ url('public/css/dark-mode.css') }}?v=1.1.0">
 
     <script>
         (function() {
@@ -106,20 +106,28 @@
     <script type="text/javascript" src="/public/vendor/keyboard/js/jquery.keyboard.extension-autocomplete.js"></script>
     <script type="text/javascript" src="/public/js/grasp_mobile_progress_circle-1.0.0.min.js"></script>
     <script type="text/javascript" src="/public/vendor/jquery.cookie/jquery.cookie.js"></script>
+    @if(!request()->is('pos*'))
     <script type="text/javascript" src="/public/vendor/chart.js/Chart.min.js"></script>
+    <script type="text/javascript" src="/public/js/charts-custom.js"></script>
+    @endif
     <script type="text/javascript" src="/public/vendor/jquery-validation/jquery.validate.min.js"></script>
     <script type="text/javascript" src="/public/vendor/malihu-custom-scrollbar-plugin/jquery.mCustomScrollbar.concat.min.js"></script>
-    <script type="text/javascript" src="/public/js/charts-custom.js"></script>
     <script type="text/javascript" src="/public/js/front.js"></script>
     <script type="text/javascript" src="/public/vendor/daterange/js/moment.min.js"></script>
+    @if(!request()->is('pos*'))
     <script type="text/javascript" src="/public/vendor/daterange/js/knockout-3.4.2.js"></script>
+    @endif
     <script type="text/javascript" src="/public/vendor/daterange/js/daterangepicker.min.js"></script>
+    @if(!request()->is('pos*'))
     <script type="text/javascript" src="/public/vendor/tinymce/js/tinymce/tinymce.min.js"></script>
+    @endif
     <script type="text/javascript" src="/public/js/dropzone.js"></script>
 
     <!-- table sorter js-->
+    @if(!request()->is('pos*'))
     <script type="text/javascript" src="/public/vendor/datatable/pdfmake.min.js"></script>
     <script type="text/javascript" src="/public/vendor/datatable/vfs_fonts.js"></script>
+    @endif
     <script type="text/javascript" src="/public/vendor/datatable/jquery.dataTables.min.js"></script>
     <script type="text/javascript" src="/public/vendor/datatable/dataTables.bootstrap4.min.js"></script>
     <script type="text/javascript" src="/public/vendor/datatable/dataTables.buttons.min.js"></script>
@@ -142,7 +150,6 @@
     <!-- Custom stylesheet - for your changes -->
     <link rel="stylesheet" href="/public/css/custom-{{ $general_setting->theme }}" type="text/css" id="custom-style">
     <script type="text/javascript" src="/public/printjs/print.min.js"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.14.1/moment.min.js"></script>
     <style>
         .noselect {
             pointer-events: none;

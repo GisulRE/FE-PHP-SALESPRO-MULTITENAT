@@ -8,6 +8,7 @@ use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\WhatsAppSessionController;
 use App\Http\Controllers\WhatsAppMessageController;
+use App\Http\Controllers\Api\MobilePreSaleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -166,3 +167,18 @@ Route::delete('/whatsapp/session', [WhatsAppSessionController::class, 'deleteSes
 
 Route::post('/whatsapp/update-session-name', [WhatsAppSessionController::class, 'updateSessionName'])
     ->name('whatsapp.session.update-name');
+
+// ==================== Mobile Pre-Sale POS & Attendance API ====================
+Route::prefix('v1/mobile')->group(function () {
+    Route::get('/warehouses', [MobilePreSaleController::class, 'getWarehouses']);
+    Route::get('/employees', [MobilePreSaleController::class, 'getEmployees']);
+    Route::post('/auth/login-pin', [MobilePreSaleController::class, 'loginPin']);
+    Route::get('/attendance/status/{employeeId}', [MobilePreSaleController::class, 'attendanceStatus']);
+    Route::post('/attendance/toggle', [MobilePreSaleController::class, 'toggleAttendance']);
+    Route::get('/catalog', [MobilePreSaleController::class, 'getCatalog']);
+    Route::get('/customers/search', [MobilePreSaleController::class, 'searchCustomers']);
+    Route::post('/customers/quick-create', [MobilePreSaleController::class, 'quickCreateCustomer']);
+    Route::post('/presales', [MobilePreSaleController::class, 'storePreSale']);
+    Route::get('/presales/{id}/ticket', [MobilePreSaleController::class, 'getTicketPayload']);
+});
+
