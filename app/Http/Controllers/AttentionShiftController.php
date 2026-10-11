@@ -15,9 +15,12 @@ use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 use Pusher\Pusher;
+use App\Http\Traits\EmployeeImageTrait;
 
 class AttentionShiftController extends Controller
 {
+    use EmployeeImageTrait;
+
     private $date;
     /**
      * Display a listing of the resource.
@@ -41,7 +44,7 @@ class AttentionShiftController extends Controller
     public function list_Data(Request $request)
     {
         $this->date = date('Y-m-d');
-        $totalData = AttentionShift::whereDate('created_at', $this->date)->orderBy('created_at', 'desc')->count();
+        $totalData = AttentionShift::whereDate('created_at', $this->date)->count();
         $start = $request->input('start');
         $totalFiltered = $totalData;
         if ($request->input('length') != -1) {
@@ -49,17 +52,28 @@ class AttentionShiftController extends Controller
         } else {
             $limit = $totalData;
         }
-        $lims_turno_all = AttentionShift::whereDate('created_at', $this->date)->orderBy('created_at', 'desc')
-            ->offset($start)->limit($limit)->get();
+        $lims_turno_all = AttentionShift::with('employee')
+            ->whereDate('created_at', $this->date)
+            ->orderBy('created_at', 'desc')
+            ->offset($start)
+            ->limit($limit)
+            ->get();
         $data = array();
-        if (!empty($lims_turno_all)) {
+        if (!empty($lims_turno_all) && count($lims_turno_all) > 0) {
+            $shift_ids = $lims_turno_all->pluck('id')->toArray();
+            $presale_shift_ids = PreSale::whereIn('attentionshift_id', $shift_ids)
+                ->pluck('attentionshift_id')
+                ->flip()
+                ->toArray();
+
             foreach ($lims_turno_all as $key => $turno) {
                 $nestedData['id'] = $turno->id;
                 $nestedData['key'] = $key + 1;
                 $nestedData['reference_nro'] = $turno->reference_nro;
                 $nestedData['customer'] = $turno->customer_name;
-                if ($turno->employee_id) {
-                    $nestedData['employee'] = $turno->employee->name;
+                $employeeName = ($turno->employee_id && $turno->employee) ? $turno->employee->name : null;
+                if ($employeeName) {
+                    $nestedData['employee'] = $employeeName;
                 } else {
                     $nestedData['employee'] = 'Sin Asignar <button class="btn btn-success choose-emp"
                     onclick="choose_emp(' . $turno->id . ')" data-turno="' . $turno->id . '"><i class="dripicons-plus"></i></button>';
@@ -71,16 +85,17 @@ class AttentionShiftController extends Controller
                 } else {
                     $nestedData['status'] = '<div class="badge badge-warning">En Espera</div>';
                 }
-                $presale_data = PreSale::where('attentionshift_id', $turno->id)->whereDate('created_at', $this->date)->first();
+                $has_presale = isset($presale_shift_ids[$turno->id]);
                 if ($turno->status == 2 || $turno->status == 1) {
                     $employeeId   = $turno->employee_id ?? 0;
-                    $employeeName = $turno->employee_id ? $turno->employee->name : 'Sin Asignar';
+                    $empDisplayName = $employeeName ?: 'Sin Asignar';
+                    $safeEmpJs = htmlspecialchars(json_encode($empDisplayName), ENT_QUOTES, 'UTF-8');
                     $nestedData['options'] = '<div class="btn-group">';
-                    if ($presale_data) {
+                    if ($has_presale) {
                         $nestedData['options'] .= '<button type="button" class="btn btn-sm btn-danger" disabled><i class="dripicons-trash"></i> ' . trans("file.delete") . '</button>';
                     } else {
                         $nestedData['options'] .= '<button type="button" class="btn btn-sm btn-danger"
-                            onclick="openDeleteWithPin(' . $turno->id . ', ' . $employeeId . ', `' . addslashes($employeeName) . '`)">
+                            onclick="openDeleteWithPin(' . $turno->id . ', ' . $employeeId . ', ' . $safeEmpJs . ')">
                             <i class="dripicons-trash"></i> ' . trans("file.delete") . '</button>';
                     }
                     $nestedData['options'] .= '</div>';
@@ -145,50 +160,51 @@ class AttentionShiftController extends Controller
         $data = $request->all();
         $data['user_id'] = Auth::id();
         $this->date = date('Y-m-d');
-        $last_ref = AttentionShift::get()->last();
-        if ($last_ref != null) {
-            $nros = explode("-", $last_ref['reference_nro']);
-            $nro = ltrim($nros[1], "0");
+        $last_ref = AttentionShift::orderBy('id', 'desc')->first(['reference_nro']);
+        if ($last_ref != null && !empty($last_ref->reference_nro)) {
+            $nros = explode("-", $last_ref->reference_nro);
+            $nro = isset($nros[1]) ? (int) ltrim($nros[1], "0") : 0;
             $nro++;
             $nro = str_pad($nro, 8, "0", STR_PAD_LEFT);
         } else {
             $nro = str_pad(1, 8, "0", STR_PAD_LEFT);
         }
-        $statusEmployee = $this->findEmpShift($data['employee_id']);
-        if ($statusEmployee['enabled'] == false) {
-            $data['reference_nro'] = 'TRA-' . $nro;
-            if (!empty($data['customer_id'])) {
-                $customer = Customer::find($data['customer_id']);
-                if ($customer) {
-                    $data['customer_name'] = $customer->name;
-                }
-            } elseif (!empty($data['customer_name'])) {
-                $customer = Customer::where('name', $data['customer_name'])->first();
-                if ($customer) {
-                    $data['customer_id'] = $customer->id;
-                    $data['customer_name'] = $customer->name;
-                }
+        if (!empty($data['employee_id'])) {
+            $statusEmployee = $this->findEmpShift($data['employee_id']);
+            if ($statusEmployee['enabled'] == true) {
+                return redirect('attentionshift')->with('not_permitted', 'Fallido al asignar Turno, Empleado con turno activo, Intente de Nuevo');
             }
-            if ($data['employee_id'] == null) {
-                $data['status'] = 2;
-            } else {
-                $data['status'] = 1;
-                $employee_position = ShiftEmployee::where([['status', 1], ['employee_id', $data['employee_id']]])
-                    ->whereDate('created_at', $this->date)->first();
+        }
+        $data['reference_nro'] = 'TRA-' . $nro;
+        if (!empty($data['customer_id'])) {
+            $customer = Customer::find($data['customer_id']);
+            if ($customer) {
+                $data['customer_name'] = $customer->name;
+            }
+        } elseif (!empty($data['customer_name'])) {
+            $customer = Customer::where('name', $data['customer_name'])->first();
+            if ($customer) {
+                $data['customer_id'] = $customer->id;
+                $data['customer_name'] = $customer->name;
+            }
+        }
+        if (empty($data['employee_id'])) {
+            $data['status'] = 2;
+        } else {
+            $data['status'] = 1;
+            $employee_position = ShiftEmployee::where([['status', 1], ['employee_id', $data['employee_id']]])
+                ->whereDate('created_at', $this->date)->first();
+            if ($employee_position) {
                 $employee_position->status = 0;
                 $employee_position->save();
             }
-            $result = AttentionShift::create($data);
-            if ($result) {
-                return redirect('attentionshift')->with('message', 'Turno creado con éxito');
-            } else {
-                return redirect('attentionshift')->with('not_permitted', 'Fallido al asignar Turno, Intente de Nuevo');
-            }
-        } else {
-            return redirect('attentionshift')->with('not_permitted', 'Fallido al asignar Turno, Empleado con turno activo, Intente de Nuevo');
         }
-
-
+        $result = AttentionShift::create($data);
+        if ($result) {
+            return redirect('attentionshift')->with('message', 'Turno creado con éxito');
+        } else {
+            return redirect('attentionshift')->with('not_permitted', 'Fallido al asignar Turno, Intente de Nuevo');
+        }
     }
 
     /**
@@ -321,10 +337,22 @@ class AttentionShiftController extends Controller
     public function employeeFirst()
     {
         $this->date = date('Y-m-d');
-        $lims_employee = ShiftEmployee::select('shift_employee.id', 'shift_employee.employee_id', 'employees.name')
+        $active_emp_ids = AttentionShift::where('status', 1)
+            ->whereDate('created_at', $this->date)
+            ->whereNotNull('employee_id')
+            ->pluck('employee_id')
+            ->toArray();
+
+        $query = ShiftEmployee::select('shift_employee.id', 'shift_employee.employee_id', 'employees.name')
             ->join('employees', 'shift_employee.employee_id', '=', 'employees.id')
-            ->where([['shift_employee.status', 1]])->whereDate('shift_employee.created_at', $this->date)
-            ->orderBy('shift_employee.position', 'asc')->first();
+            ->where('shift_employee.status', 1)
+            ->whereDate('shift_employee.created_at', $this->date);
+
+        if (!empty($active_emp_ids)) {
+            $query->whereNotIn('shift_employee.employee_id', $active_emp_ids);
+        }
+
+        $lims_employee = $query->orderBy('shift_employee.position', 'asc')->first();
         return $lims_employee;
     }
 
@@ -336,18 +364,34 @@ class AttentionShiftController extends Controller
     public function employeeAll()
     {
         $this->date = date('Y-m-d');
-        $lims_employee = ShiftEmployee::select('shift_employee.employee_id', 'employees.name')
+        $active_emp_ids = AttentionShift::where('status', 1)
+            ->whereDate('created_at', $this->date)
+            ->whereNotNull('employee_id')
+            ->pluck('employee_id')
+            ->toArray();
+
+        $query = ShiftEmployee::select('shift_employee.employee_id', 'employees.name')
             ->join('employees', 'shift_employee.employee_id', '=', 'employees.id')
-            ->where([['shift_employee.status', 1]])->whereDate('shift_employee.created_at', $this->date)
-            ->orderBy('shift_employee.position', 'asc')->get();
+            ->where('shift_employee.status', 1)
+            ->whereDate('shift_employee.created_at', $this->date);
+
+        if (!empty($active_emp_ids)) {
+            $query->whereNotIn('shift_employee.employee_id', $active_emp_ids);
+        }
+
+        $lims_employee = $query->orderBy('shift_employee.position', 'asc')->get();
         return $lims_employee;
     }
 
     public function findEmpShift($id)
     {
+        if (empty($id)) {
+            return array('enabled' => false);
+        }
         $this->date = date('Y-m-d');
         $turno_data = AttentionShift::where([['employee_id', $id], ['status', 1]])
-            ->whereDate('created_at', $this->date)->first();
+            ->whereDate('created_at', $this->date)
+            ->first();
         if ($turno_data) {
             return array('enabled' => true);
         } else {
@@ -357,29 +401,49 @@ class AttentionShiftController extends Controller
     public function listemployeEnable()
     {
         $this->date = date('Y-m-d');
-        $lims_employee_list = ShiftEmployee::where([['status', 1]])->whereDate('created_at', $this->date)->orderBy('position', 'asc')->get();
+        $active_emp_ids = AttentionShift::where('status', 1)
+            ->whereDate('created_at', $this->date)
+            ->whereNotNull('employee_id')
+            ->pluck('employee_id')
+            ->toArray();
+
+        $query = ShiftEmployee::with('employee')
+            ->where('status', 1)
+            ->whereDate('created_at', $this->date);
+
+        if (!empty($active_emp_ids)) {
+            $query->whereNotIn('employee_id', $active_emp_ids);
+        }
+
+        $lims_employee_list = $query->orderBy('position', 'asc')->get();
         $totalFiltered = 0;
         $data = array();
-        if (!empty($lims_employee_list)) {
+        if ($lims_employee_list->isNotEmpty()) {
             foreach ($lims_employee_list as $key => $employee_turno) {
+                if (!$employee_turno->employee) {
+                    continue;
+                }
                 $totalFiltered = $totalFiltered + 1;
                 $key = $key + 1;
-                $nestedData['div'] = '<div class="col-md-3 attendance-img text-center" onclick="attendance(' . $employee_turno->employee->id . ', `' . $employee_turno->employee->name . '`)">';
+                $empId = $employee_turno->employee->id;
+                $empName = $employee_turno->employee->name;
+                $safeNameJs = htmlspecialchars(json_encode($empName), ENT_QUOTES, 'UTF-8');
+                $nestedData['div'] = '<div class="col-md-3 attendance-img text-center" onclick="attendance(' . $empId . ', ' . $safeNameJs . ')">';
                 if ($employee_turno->employee->image) {
-                    $nestedData['div'] .= '<img src="' . url('public/images/employee', $employee_turno->employee->image) . '"
-                style="border-style: double;" />';
+                    $imgUrl = $this->getEmployeeThumbnailUrl($employee_turno->employee->image);
                 } else {
-                    $nestedData['div'] .= '<img src="' . url('public/images/product/zummXD2dvAtI.png') . '"
-                style="border-style: double;" />';
+                    $imgUrl = url('public/images/product/zummXD2dvAtI.png');
                 }
-                $nestedData['div'] .= '<p class="text-center">' . $key . '.-' . $employee_turno->employee->name . '</p></div>';
+                $nestedData['div'] .= '<img src="' . $imgUrl . '" alt="' . htmlspecialchars($empName, ENT_QUOTES, 'UTF-8') . '" width="70" height="70" loading="lazy" decoding="async" style="border-style: double; width: 70px; height: 70px; object-fit: cover;" />';
+                $nestedData['div'] .= '<p class="text-center">' . $key . '.-' . htmlspecialchars($empName, ENT_QUOTES, 'UTF-8') . '</p></div>';
                 $data[] = $nestedData;
             }
-            if ($data == null) {
-                $data = '<div class="text-center info">No hay Empleados Disponibles</div>';
+            if (empty($data)) {
+                $nestedData['div'] = '<div class="col-12 text-center text-muted py-3">No hay Empleados Disponibles</div>';
+                $data[] = $nestedData;
             }
         } else {
-            $nestedData['div'] = '<div class="text-center info">No hay Empleados Disponibles</div>';
+            $nestedData['div'] = '<div class="col-12 text-center text-muted py-3">No hay Empleados Disponibles</div>';
             $data[] = $nestedData;
         }
         $json_data = array(
@@ -408,41 +472,38 @@ class AttentionShiftController extends Controller
 
     public function verifyBirthday(Request $request)
     {
-        setlocale(LC_TIME, 'es_ES.UTF-8');
-        setlocale(LC_TIME, 'spanish');
         $data = $request->all();
-        $customer = null;
-        if ($data['customer_name'] != null) {
-            $customer = Customer::where('name', $data['customer_name'])->first();
-            if ($customer && $customer->date_birh != null) {
-                $birthday = date('Y-') . date('m-d', strtotime($customer->date_birh));
-                $diff = abs(strtotime($birthday) - strtotime(date('Y-m-d')));
-                $years = floor($diff / (365 * 60 * 60 * 24));
-                $months = floor(($diff - $years * 365 * 60 * 60 * 24) / (30 * 60 * 60 * 24));
-                $days = floor(($diff - $years * 365 * 60 * 60 * 24 - $months * 30 * 60 * 60 * 24) / (60 * 60 * 24));
-                if ($years == 0 && ($months <= 1 && $days >= 0)) {
-                    //alertar
-                    if ($months == 0 && $days == 0) {
-                        return array(
-                            'birthday' => true,
-                            'message' => 'Felicidades esta de cumpleaños, Hoy!',
-                            'date' => date('m-d', strtotime($customer->date_birh))
-                        );
-                    } else {
-                        return array(
-                            'birthday' => true,
-                            'message' => 'Faltan ' . $months . ' mes y ' . $days . ' días para su cumpleaños! '.PHP_EOL.' Fecha de Cumpleaños: ' . date('d/m/Y', strtotime($customer->date_birh)),
-                            'date' => date('m-d', strtotime($customer->date_birh))
-                        );
-                    }
-                } else {
-                    return array('birthday' => false);
-                }
-            } else {
-                return array('birthday' => false);
-            }
-        } else {
+        $customerName = isset($data['customer_name']) ? trim($data['customer_name']) : '';
+        if (empty($customerName) || strcasecmp($customerName, 'Clientes Varios') === 0 || strcasecmp($customerName, 'Cliente Varios') === 0) {
             return array('birthday' => false);
         }
+
+        setlocale(LC_TIME, 'es_ES.UTF-8');
+        setlocale(LC_TIME, 'spanish');
+        $customer = Customer::where('name', $customerName)->first();
+        if ($customer && $customer->date_birh != null) {
+            $birthday = date('Y-') . date('m-d', strtotime($customer->date_birh));
+            $diff = abs(strtotime($birthday) - strtotime(date('Y-m-d')));
+            $years = floor($diff / (365 * 60 * 60 * 24));
+            $months = floor(($diff - $years * 365 * 60 * 60 * 24) / (30 * 60 * 60 * 24));
+            $days = floor(($diff - $years * 365 * 60 * 60 * 24 - $months * 30 * 60 * 60 * 24) / (60 * 60 * 24));
+            if ($years == 0 && ($months <= 1 && $days >= 0)) {
+                //alertar
+                if ($months == 0 && $days == 0) {
+                    return array(
+                        'birthday' => true,
+                        'message' => 'Felicidades esta de cumpleaños, Hoy!',
+                        'date' => date('m-d', strtotime($customer->date_birh))
+                    );
+                } else {
+                    return array(
+                        'birthday' => true,
+                        'message' => 'Faltan ' . $months . ' mes y ' . $days . ' días para su cumpleaños! '.PHP_EOL.' Fecha de Cumpleaños: ' . date('d/m/Y', strtotime($customer->date_birh)),
+                        'date' => date('m-d', strtotime($customer->date_birh))
+                    );
+                }
+            }
+        }
+        return array('birthday' => false);
     }
 }

@@ -14,10 +14,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use App\Http\Traits\EmployeeImageTrait;
 use Spatie\Permission\Models\Role;
 
 class EmployeeController extends Controller
 {
+    use EmployeeImageTrait;
 
     private function getReservationWindowLimits()
     {
@@ -130,6 +132,7 @@ class EmployeeController extends Controller
             $imageName = preg_replace('/[^a-zA-Z0-9]/', '', $request['email']);
             $imageName = $imageName . '.' . $ext;
             $image->move('public/images/employee', $imageName);
+            $this->generateEmployeeThumbnail($imageName);
             $data['image'] = $imageName;
         }
 
@@ -187,6 +190,7 @@ class EmployeeController extends Controller
             $imageName = preg_replace('/[^a-zA-Z0-9]/', '', $request['email']);
             $imageName = $imageName . '.' . $ext;
             $image->move('public/images/employee', $imageName);
+            $this->generateEmployeeThumbnail($imageName);
             $data['image'] = $imageName;
         }
         if (!isset($data['pay_commission'])) {

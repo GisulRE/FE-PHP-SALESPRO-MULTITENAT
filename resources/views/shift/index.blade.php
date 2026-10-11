@@ -8,7 +8,34 @@
         <div class="alert alert-danger alert-dismissible text-center"><button type="button" class="close" data-dismiss="alert"
                 aria-label="Close"><span aria-hidden="true">&times;</span></button>{{ session()->get('not_permitted') }}
         </div>
-    @endif
+    <style>
+        .emp_list {
+            min-height: 220px;
+        }
+        .emp_list .attendance-img {
+            min-height: 125px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            cursor: pointer;
+        }
+        .emp_list .attendance-img img {
+            width: 70px !important;
+            height: 70px !important;
+            object-fit: cover;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .emp_list .attendance-img p {
+            margin-top: 6px;
+            font-size: 13px;
+            line-height: 1.2;
+            word-break: break-word;
+            max-width: 100%;
+        }
+    </style>
 
     <section>
         <div class="container-fluid row">
@@ -284,68 +311,127 @@
             syncTurnoCustomer();
         }
 
-        $('.attendance-img').on('click', function() {
+        // --- OPTIMIZACIÓN: Prefetch de empleados en segundo plano y render atómico ---
+        var _cachedEmpListHtml = null;
+        var _prefetchEmpXhr = null;
+        var _prefetchCallbacks = [];
+
+        function prefetchEmployeeList(force, callback) {
+            if (typeof callback === 'function') {
+                _prefetchCallbacks.push(callback);
+            }
+            if (_cachedEmpListHtml !== null && !force) {
+                while (_prefetchCallbacks.length > 0) {
+                    var cb = _prefetchCallbacks.shift();
+                    try { cb(_cachedEmpListHtml); } catch (e) { console.error(e); }
+                }
+                return;
+            }
+            if (_prefetchEmpXhr) {
+                return;
+            }
+            _prefetchEmpXhr = $.get('attention/list-enable-emp', function(data) {
+                var html = '';
+                if (data && data.recordsFiltered > 0 && Array.isArray(data.data)) {
+                    data.data.forEach(function(emp) {
+                        if (emp && emp.div) {
+                            html += emp.div;
+                        }
+                    });
+                } else if (data && typeof data.data === 'string') {
+                    html = data.data;
+                } else {
+                    html = '<div class="col-12 text-center text-muted py-3">No hay Empleados Disponibles</div>';
+                }
+                _cachedEmpListHtml = html;
+                while (_prefetchCallbacks.length > 0) {
+                    var cb = _prefetchCallbacks.shift();
+                    try { cb(_cachedEmpListHtml); } catch (e) { console.error(e); }
+                }
+            }).fail(function() {
+                var fallbackHtml = '<div class="col-12 text-center text-danger py-3">Error al cargar empleados</div>';
+                while (_prefetchCallbacks.length > 0) {
+                    var cb = _prefetchCallbacks.shift();
+                    try { cb(fallbackHtml); } catch (e) { console.error(e); }
+                }
+            }).always(function() {
+                _prefetchEmpXhr = null;
+            });
+        }
+
+        // 1. Precarga inmediata al cargar la página
+        prefetchEmployeeList(false);
+
+        // 2. Precarga anticipada al abrir el modal principal de crear turno
+        $('#createModal').on('show.bs.modal', function() {
+            prefetchEmployeeList(true);
+        });
+
+        // Soporte de selección delegada además del onclick inline
+        $(document).on('click', '.emp_list .attendance-img', function() {
             var employee_id = $(this).data('employee');
             var employee_name = $(this).data('employee-name');
-            $("input[name='employee_id']").val(employee_id);
-            $("input[name='employee_name']").val(employee_name);
-            $('#attendance-modal').modal('hide')
-            $('body').removeClass('modal-open');
-            $('.modal-backdrop').remove();
+            if (employee_id) {
+                attendance(employee_id, employee_name);
+            }
         });
 
         function attendance(id, employee_name) {
             $("input[name='employee_id']").val(id);
             $("input[name='employee_name']").val(employee_name);
-            $('#attendance-modal').modal('hide')
+            $('#attendance-modal').modal('hide');
             $('body').removeClass('modal-open');
             $('.modal-backdrop').remove();
+            _cachedEmpListHtml = null;
+            prefetchEmployeeList(true);
         }
 
-
+        // Al hacer clic en "+ Empleado": renderizado atómico inmediato desde memoria
         $('#btn-attendance').on('click', function() {
-            $('.info').empty();
-            $(".emp_list").empty();
-            ///const div = document.createElement('emp_select');
-            $.get('attention/list-enable-emp', function(data) {
-                if (data.recordsFiltered > 0) {
-                    data.data.forEach(function(emp, counter) {
-                        $('.emp_list').append(emp.div);
-                    });
-                } else {
-                    $('#attendance-modal .modal-body').append(data.data);
-                }
-            });
+            if (_cachedEmpListHtml !== null) {
+                $(".emp_list").html(_cachedEmpListHtml);
+                // Sincronización en segundo plano por si hubo cambios
+                prefetchEmployeeList(true, function(freshHtml) {
+                    var isModalOpen = $('#attendance-modal').hasClass('show') || $('#attendance-modal').is(':visible');
+                    if (freshHtml && isModalOpen && $(".emp_list").html() !== freshHtml) {
+                        $(".emp_list").html(freshHtml);
+                    }
+                });
+            } else {
+                $(".emp_list").html('<div class="col-12 text-center text-muted py-3"><i class="dripicons-clockwise"></i> Cargando empleados...</div>');
+                prefetchEmployeeList(false, function(html) {
+                    $(".emp_list").html(html);
+                });
+            }
         });
-
 
         $('.firstemployee').on('click', function() {
             $.get('attention/employeefirst', function(data) {
-                if (data) {
+                if (data && data.employee_id) {
                     $("input[name='employee_id']").val(data.employee_id);
                     $("input[name='employee_name']").val(data.name);
-                    swal('Asignacion', "Empleado asignado con éxito", "success");
+                    _cachedEmpListHtml = null;
+                    prefetchEmployeeList(true);
+                    swal('Asignación', "Empleado asignado con éxito", "success");
                 } else {
-                    swal('Asignacion', "Fallo al asignar empleado, intente de nuevo!", "error");
+                    swal('Asignación', "Fallo al asignar empleado: no hay empleados disponibles con turno libre.", "info");
                 }
             });
         });
 
         function choose_emp(turno_id) {
             $("#employee_id_up").empty();
-            //var turno_id = $(this).data('turno');
             $("input[name='turno_id']").val(turno_id);
             $.get('attention/employeelist', function(data) {
-                if (data) {
+                if (data && data.length > 0) {
                     addOption("employee_id_up", data, 1);
+                    $('.selectpicker').selectpicker('refresh');
+                    $('#addemployee-modal').modal('show');
                 } else {
-                    swal('Asignacion', "Sin empleados disponibles, intente de nuevo!", "error");
+                    swal('Asignación', "Sin empleados disponibles, todos se encuentran ocupados o inactivos.", "info");
                 }
-                $('#addemployee-modal').modal('show');
-                $('.selectpicker').selectpicker('refresh');
             });
         }
-
 
         // Rutina para agregar opciones a un <select>
         function addOption(domElement, array, op) {
@@ -372,22 +458,32 @@
                         employee: idemployee
                     },
                     success: function(response) {
-                        //console.log(response);
-                        location.reload();
+                        $('#addemployee-modal').modal('hide');
+                        $('body').removeClass('modal-open');
+                        $('.modal-backdrop').remove();
+                        swal("Asignación", (response && response.message) ? response.message : "Turno actualizado con éxito", "success");
+                        _cachedEmpListHtml = null;
+                        prefetchEmployeeList(true);
+                        loadtable();
                     },
                     error: function(response) {
-                        //console.log(response);
-                        swal("Error",
-                            "Error en servidor o datos, Intente nuevamente ó contacte con soporte",
-                            "error")
+                        var errMsg = (response.responseJSON && response.responseJSON.message) ? response.responseJSON.message : "Error en servidor o datos, Intente nuevamente ó contacte con soporte";
+                        swal("Error", errMsg, "error");
                     },
                 });
             } else {
-                swal("Error", "No se seleccion empleado de servicio, intente mas tarde", "error")
+                swal("Error", "No se seleccionó empleado de servicio, intente más tarde", "error");
             }
         });
 
         function loadtable() {
+            if ($.fn.DataTable.isDataTable('#turno-table')) {
+                var table = $('#turno-table').DataTable();
+                if (table && table.ajax) {
+                    table.ajax.reload(null, false);
+                    return;
+                }
+            }
             $('#turno-table').DataTable({
                 destroy: true,
                 "processing": true,
@@ -525,7 +621,12 @@
 
         function birthday() {
             $('#btn_turno').attr('disabled', 'disabled');
-            var customer = $("input[name='customer_name']").val();
+            var rawCustomer = $("input[name='customer_name']").val() || '';
+            var customer = $.trim(rawCustomer.replace(/\s+/g, ' '));
+            if (!customer || customer.toLowerCase() === 'clientes varios' || customer.toLowerCase() === 'cliente varios') {
+                $('#frm_turno').submit();
+                return;
+            }
             $.ajax({
                 type: 'POST',
                 url: 'attentionshift/birthday',
@@ -656,6 +757,8 @@
                         $('body').removeClass('modal-open');
                         $('.modal-backdrop').remove();
                         swal('Eliminado', resp.message, 'success');
+                        _cachedEmpListHtml = null;
+                        prefetchEmployeeList(true);
                         loadtable();
                     } else {
                         $('#pinConfirmMsg').html('<div class="alert alert-danger">' + (resp.message || 'Error desconocido') + '</div>').show();
