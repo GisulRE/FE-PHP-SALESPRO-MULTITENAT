@@ -2246,17 +2246,15 @@
                                                                     <td>{{ $sale->grand_total }}</td>
                                                                     <td>
                                                                         <div class="btn-group">
-                                                                            @if ($venta_facturada->estado_factura != 'CONTINGENCIA')
+                                                                            @if ($venta_facturada->estado_factura != 'ANULADO')
                                                                                 <button type="button"
                                                                                     class="imprimir-factura-modal btn btn-info btn-sm"
                                                                                     data-id="{{ $sale->id }}"
                                                                                     data-toggle="modal"
                                                                                     data-target="#imprimir-factura-modal"
-                                                                                    title="Print">
+                                                                                    title="Imprimir Factura">
                                                                                     <i class="fa fa-print"></i>
                                                                                 </button>
-                                                                            @endif
-                                                                            @if ($venta_facturada->estado_factura == 'VIGENTE' || $venta_facturada->estado_factura == 'FACTURADA')
                                                                                 <button type="button"
                                                                                     class="emitir-nota-credito-debito-btn btn btn-warning btn-sm"
                                                                                     data-id="{{ $sale->id }}"

@@ -2464,14 +2464,20 @@
                                                                     <td>{{ $sale->grand_total }}</td>
                                                                     <td>
                                                                         <div class="btn-group">
-                                                                            @if ($venta_facturada->estado_factura != 'CONTINGENCIA')
+                                                                            @if ($venta_facturada->estado_factura != 'ANULADO')
                                                                                 <button type="button"
                                                                                     class="imprimir-factura-modal btn btn-info btn-sm"
                                                                                     data-id="{{ $sale->id }}"
                                                                                     data-toggle="modal"
                                                                                     data-target="#imprimir-factura-modal"
-                                                                                    title="Print">
+                                                                                    title="Imprimir Factura">
                                                                                     <i class="fa fa-print"></i>
+                                                                                </button>
+                                                                                <button type="button"
+                                                                                    class="emitir-nota-credito-debito-btn btn btn-warning btn-sm"
+                                                                                    data-id="{{ $sale->id }}"
+                                                                                    title="Emitir Nota de Crédito/Débito">
+                                                                                    <i class="fa fa-undo"></i>
                                                                                 </button>
                                                                             @endif
                                                                         </div>
@@ -2837,6 +2843,7 @@
         </div>
     </section>
     @include('sale.partials-sale-modal-tabla-coincidencia-nit')
+    @include('siat.modal_nota_credito_debito')
 
     <style>
         /* Header del POS: sticky dentro de su columna, no fixed en todo el viewport */
