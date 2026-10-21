@@ -5113,11 +5113,15 @@ Descripción: " . $data_response['descripcion'];
             ];
         }
 
-        // Normativa SIAT:
-        // montoTotalDevuelto: suma de montos brutos de los productos devueltos
+        // Normativa SIAT (Documento Sector 24 - Nota de Crédito-Débito):
+        // montoTotalDevuelto: suma total bruta de los productos devueltos
         // montoDescuentoCreditoDebito: descuento proporcional correspondiente a los productos devueltos
-        // montoEfectivoCreditoDebito: montoTotalDevuelto - montoDescuentoCreditoDebito (base imponible para SIAT!)
-        $montoEfectivoCreditoDebito = round($montoTotalDevuelto - $montoDescuentoCreditoDebito, 2);
+        // montoSujetoAjuste: monto neto sujeto a ajuste = montoTotalDevuelto - montoDescuentoCreditoDebito
+        // En la especificación XML SIAT (Validación Error 1031 de Impuestos Nacionales),
+        // el campo 'montoEfectivoCreditoDebito' es estrictamente el EFECTO FISCAL IVA (13% del monto sujeto a ajuste):
+        $montoSujetoAjuste = round($montoTotalDevuelto - $montoDescuentoCreditoDebito, 2);
+        $montoIVA = round($montoSujetoAjuste * 0.13, 2);
+        $montoEfectivoCreditoDebito = $montoIVA; // SIAT Error 1031 exige el 13% en este campo XML
 
         $codigo_cufd_val = $modo_centralizado ? "" : ($data_siat_cufd->codigo_cufd ?? '');
         $direccion_val = $data_siat_cufd->direccion ?? ($data_sucursal->direccion ?? '');
@@ -5169,8 +5173,9 @@ Descripción: " . $data_response['descripcion'];
                 'correlativo_notafiscal' => $correlativo_notafiscal,
                 'montoTotalDevuelto' => $montoTotalDevuelto,
                 'montoDescuentoCreditoDebito' => $montoDescuentoCreditoDebito,
+                'montoSujetoAjuste' => $montoSujetoAjuste,
                 'montoEfectivoCreditoDebito' => $montoEfectivoCreditoDebito,
-                'montoIVA' => round($montoEfectivoCreditoDebito * 0.13, 2),
+                'montoIVA' => $montoIVA,
             ]
         ];
 

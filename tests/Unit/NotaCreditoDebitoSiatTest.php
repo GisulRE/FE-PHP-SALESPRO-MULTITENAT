@@ -94,8 +94,12 @@ class NotaCreditoDebitoSiatTest extends TestCase
             ];
         }
 
-        $montoEfectivoCreditoDebito = round($montoTotalDevuelto - $montoDescuentoCreditoDebito, 2);
-        $montoIVA = round($montoEfectivoCreditoDebito * 0.13, 2);
+        $montoSujetoAjuste = round($montoTotalDevuelto - $montoDescuentoCreditoDebito, 2);
+        $montoIVA = round($montoSujetoAjuste * 0.13, 2);
+        // Según validación oficial del SIAT (Error 1031 de Impuestos Nacionales),
+        // el XML de Sector 24 exige que 'montoEfectivoCreditoDebito' sea exactamente
+        // el 13% de IVA (efecto fiscal de crédito o débito)
+        $montoEfectivoCreditoDebito = $montoIVA;
 
         // Verificaciones matemáticas normativas:
         // Ítem 1 bruto: 4 * 50 = 200. Descuento proporcional: 4 * 5 = 20.
@@ -106,12 +110,12 @@ class NotaCreditoDebitoSiatTest extends TestCase
         // Descuento total devuelto = 20.
         $this->assertEquals(20.00, $montoDescuentoCreditoDebito, 'montoDescuentoCreditoDebito debe calcular el descuento proporcional.');
 
-        // Monto Efectivo (Base Imponible) = 400 - 20 = 380.
-        $this->assertEquals(380.00, $montoEfectivoCreditoDebito, 'montoEfectivoCreditoDebito debe ser la base imponible neta.');
+        // Monto Neto Sujeto a Ajuste = 400 - 20 = 380.
+        $this->assertEquals(380.00, $montoSujetoAjuste, 'montoSujetoAjuste debe ser la base imponible neta.');
 
-        // Comprobación crítica: montoEfectivoCreditoDebito NUNCA debe ser igual al 13% de IVA (49.40)
+        // Comprobación crítica SIAT 1031: montoEfectivoCreditoDebito debe ser exactamente el 13% de IVA (49.40)
         $this->assertEquals(49.40, $montoIVA);
-        $this->assertNotEquals($montoIVA, $montoEfectivoCreditoDebito, 'CRÍTICO: montoEfectivoCreditoDebito no debe ser el 13% de IVA!');
+        $this->assertEquals($montoIVA, $montoEfectivoCreditoDebito, 'SIAT Error 1031: montoEfectivoCreditoDebito debe ser el 13% IVA enviado a SIAT.');
 
         // Herencia de códigos:
         $this->assertEquals('477300', $detalle_ajuste[0]['actividadEconomica']);

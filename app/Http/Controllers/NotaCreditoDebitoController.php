@@ -415,8 +415,9 @@ class NotaCreditoDebitoController extends Controller
                 return response()->json(['status' => false, 'message' => 'Debe seleccionar al menos un producto con cantidad mayor a 0 para devolver.'], 400);
             }
 
-            $montoEfectivoCreditoDebito = round($montoTotalDevuelto - $montoDescuentoCreditoDebito, 2);
-            $montoIVA = round($montoEfectivoCreditoDebito * 0.13, 2);
+            $montoSujetoAjuste = round($montoTotalDevuelto - $montoDescuentoCreditoDebito, 2);
+            $montoIVA = round($montoSujetoAjuste * 0.13, 2);
+            $montoEfectivoCreditoDebito = $montoIVA; // Para SIAT Sector 24 XML (Validación Error 1031)
 
             // Obtener cuenta/caja activa para asignar salida de dinero
             $account_id = null;
@@ -470,7 +471,7 @@ class NotaCreditoDebitoController extends Controller
                     'total_price' => $montoTotalDevuelto,
                     'order_tax_rate' => 0,
                     'order_tax' => 0,
-                    'grand_total' => $montoEfectivoCreditoDebito,
+                    'grand_total' => $montoSujetoAjuste,
                     'return_note' => 'Devolución de venta 100% Gift Card (Sin ajuste fiscal SIAT)',
                     'staff_note' => $staff_note,
                     'is_active' => true,
@@ -496,7 +497,7 @@ class NotaCreditoDebitoController extends Controller
                 }
 
                 // Restituir saldo a la Gift Card
-                $this->restituirSaldoGiftCard($sale->id, $montoEfectivoCreditoDebito);
+                $this->restituirSaldoGiftCard($sale->id, $montoSujetoAjuste);
 
                 DB::commit();
 
@@ -574,7 +575,7 @@ class NotaCreditoDebitoController extends Controller
                 'total_price' => $montoTotalDevuelto,
                 'order_tax_rate' => 13,
                 'order_tax' => $montoIVA,
-                'grand_total' => $montoEfectivoCreditoDebito,
+                'grand_total' => $montoSujetoAjuste,
                 'return_note' => 'Nota de Crédito/Débito SIAT N° ' . $nro_nota . ' (CUF: ' . $siat_data['cuf'] . ')',
                 'staff_note' => $staff_note,
                 'is_active' => true,
@@ -605,18 +606,18 @@ class NotaCreditoDebitoController extends Controller
             if ($refund_method === 'customer_balance') {
                 $customer = Customer::find($sale->customer_id);
                 if ($customer) {
-                    $customer->deposit += $montoEfectivoCreditoDebito;
+                    $customer->deposit += $montoSujetoAjuste;
                     $customer->save();
 
                     Deposit::create([
                         'customer_id' => $customer->id,
                         'user_id' => Auth::id() ?? 1,
-                        'amount' => $montoEfectivoCreditoDebito,
+                        'amount' => $montoSujetoAjuste,
                         'note' => 'Abono por Nota de Crédito/Débito N° ' . $nro_nota . ' (Ref: ' . $sale->reference_no . ')'
                     ]);
                 }
             } elseif ($refund_method === 'gift_card') {
-                $this->restituirSaldoGiftCard($sale->id, $montoEfectivoCreditoDebito);
+                $this->restituirSaldoGiftCard($sale->id, $montoSujetoAjuste);
             }
             // Si es 'cash', ya queda registrado el egreso en Returns asociado a account_id de la caja activa.
 
@@ -631,7 +632,9 @@ class NotaCreditoDebitoController extends Controller
                 'cuf' => $obj_nota_fiscal->cuf,
                 'monto_total_devuelto' => $montoTotalDevuelto,
                 'monto_descuento' => $montoDescuentoCreditoDebito,
-                'monto_efectivo' => $montoEfectivoCreditoDebito,
+                'monto_sujeto_ajuste' => $montoSujetoAjuste,
+                'monto_efectivo' => $montoSujetoAjuste,
+                'monto_efectivo_siat' => $montoEfectivoCreditoDebito,
                 'monto_iva' => $montoIVA,
             ]);
 
