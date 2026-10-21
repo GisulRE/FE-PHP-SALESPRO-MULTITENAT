@@ -365,7 +365,7 @@
                                 </div>
                             </div>
                             <div class="card-body p-0 position-relative" style="height: 520px; min-height: 520px;">
-                                <div id="ncd-pdf-loading" class="position-absolute w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-dark text-white" style="z-index: 5; opacity: 0.9; display: none;">
+                                <div id="ncd-pdf-loading">
                                     <div class="spinner-border text-light mb-2" role="status"></div>
                                     <span>Cargando documento PDF oficial SIAT...</span>
                                 </div>
@@ -519,6 +519,23 @@
     margin-top: 14px;
     position: relative;
     z-index: 1;
+}
+#ncd-pdf-loading {
+    display: none !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 15;
+    background: rgba(33, 37, 41, 0.88);
+    color: #fff;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+#ncd-pdf-loading.show-loading {
+    display: flex !important;
 }
 </style>
 
@@ -965,16 +982,17 @@
             // Cargar y mostrar PDF oficial SIAT en el visor integrado (estilo return-sale)
             var self = this;
             if (data.bytes) {
+                $('#ncd-pdf-loading').removeClass('show-loading');
                 self.loadPdfBytes(data.bytes, pdfUrl);
             } else if (data.customer_sale_id || data.sale_id) {
-                $('#ncd-pdf-loading').show();
+                $('#ncd-pdf-loading').addClass('show-loading');
                 var bytesUrl = "{{ url('nota-credito-debito/obtener-bytes') }}/" + (data.customer_sale_id || data.sale_id);
                 $.ajax({
                     url: bytesUrl,
                     type: "GET",
                     dataType: "json",
                     success: function(bResp) {
-                        $('#ncd-pdf-loading').hide();
+                        $('#ncd-pdf-loading').removeClass('show-loading');
                         if (bResp && bResp.bytes) {
                             self.loadPdfBytes(bResp.bytes, pdfUrl);
                         } else {
@@ -983,12 +1001,13 @@
                         }
                     },
                     error: function() {
-                        $('#ncd-pdf-loading').hide();
+                        $('#ncd-pdf-loading').removeClass('show-loading');
                         $('#ncd-pdf-embed').attr('src', pdfUrl + '?inline=1');
                         $('#ncd-pdf-object').attr('data', pdfUrl + '?inline=1');
                     }
                 });
             } else {
+                $('#ncd-pdf-loading').removeClass('show-loading');
                 $('#ncd-pdf-embed').attr('src', pdfUrl + '?inline=1');
                 $('#ncd-pdf-object').attr('data', pdfUrl + '?inline=1');
             }
@@ -1000,6 +1019,7 @@
         },
 
         loadPdfBytes: function(base64Bytes, fallbackUrl) {
+            $('#ncd-pdf-loading').removeClass('show-loading');
             var dataUri = 'data:application/pdf;base64,' + base64Bytes;
             $('#ncd-pdf-embed').attr('src', dataUri);
             $('#ncd-pdf-object').attr('data', dataUri);
@@ -1047,7 +1067,7 @@
             }
         },
 
-        openPreviewPdf: function(id) {
+        openPreviewPdf: function(id, extraData) {
             currentStep = 4;
             emittedResult = null;
             try { $('#recentTransaction').modal('hide'); } catch(e) {}
@@ -1058,10 +1078,21 @@
             $('.ncd-step-panel').hide();
             $('#ncd-step-4').show();
             $('#ncd-success-box').show();
+            $('#ncd-pdf-loading').addClass('show-loading');
             $('#modal-nota-credito-debito').modal('show');
 
             for (var s = 1; s <= 4; s++) {
                 $('#ncd-step-indicator-' + s).removeClass('active').addClass('completed');
+            }
+
+            if (extraData) {
+                if (extraData.nro) $('#ncd-succ-nro').text(extraData.nro);
+                if (extraData.cuf) $('#ncd-succ-cuf').text(extraData.cuf);
+                if (extraData.monto) $('#ncd-succ-monto').text('Bs. ' + parseFloat(extraData.monto).toFixed(2));
+            } else {
+                $('#ncd-succ-nro').text('-');
+                $('#ncd-succ-cuf').text('Consultando...');
+                $('#ncd-succ-monto').text('-');
             }
 
             var pdfUrl = "{{ url('nota-credito-debito/download-pdf') }}/" + id;
@@ -1074,14 +1105,24 @@
             $('#ncd-btn-download-pdf').attr('href', pdfUrl);
             $('#ncd-pdf-fallback-btn').attr('href', pdfUrl);
 
-            $('#ncd-pdf-loading').show();
             var self = this;
             $.ajax({
                 url: "{{ url('nota-credito-debito/obtener-bytes') }}/" + id,
                 type: "GET",
                 dataType: "json",
                 success: function(resp) {
-                    $('#ncd-pdf-loading').hide();
+                    $('#ncd-pdf-loading').removeClass('show-loading');
+                    if (resp) {
+                        if (resp.nro_factura) {
+                            $('#ncd-succ-nro').text(resp.nro_factura);
+                        }
+                        if (resp.cuf) {
+                            $('#ncd-succ-cuf').text(resp.cuf);
+                        }
+                        if (resp.monto_total) {
+                            $('#ncd-succ-monto').text('Bs. ' + parseFloat(resp.monto_total).toFixed(2));
+                        }
+                    }
                     if (resp && resp.bytes) {
                         self.loadPdfBytes(resp.bytes, pdfUrl);
                     } else {
@@ -1090,7 +1131,7 @@
                     }
                 },
                 error: function() {
-                    $('#ncd-pdf-loading').hide();
+                    $('#ncd-pdf-loading').removeClass('show-loading');
                     $('#ncd-pdf-embed').attr('src', pdfUrl + '?inline=1');
                     $('#ncd-pdf-object').attr('data', pdfUrl + '?inline=1');
                 }
@@ -1124,8 +1165,13 @@
         $(document).on('click', '.imprimir-ncd-btn', function(e) {
             e.preventDefault();
             var id = $(this).data('id');
+            var extraData = {
+                nro: $(this).data('nro'),
+                cuf: $(this).data('cuf'),
+                monto: $(this).data('monto')
+            };
             if (id) {
-                window.NotaCreditoDebitoWizard.openPreviewPdf(id);
+                window.NotaCreditoDebitoWizard.openPreviewPdf(id, extraData);
             }
         });
     });

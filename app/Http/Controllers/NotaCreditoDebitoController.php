@@ -1009,7 +1009,16 @@ class NotaCreditoDebitoController extends Controller
             }
 
             $data = $this->getImprimirFactura(null, $customer_sale->id);
-            return response()->json($data);
+            $bytes = $data['bytes'] ?? null;
+
+            return response()->json([
+                'status' => true,
+                'bytes' => $bytes,
+                'nro_factura' => $customer_sale->nro_factura,
+                'cuf' => $customer_sale->cuf,
+                'monto_total' => $customer_sale->monto_total ?? $customer_sale->monto_total_sujeto_iva ?? 0,
+                'customer_sale_id' => $customer_sale->id,
+            ]);
         } catch (\Throwable $e) {
             Log::error('Error en getBytesNota: ' . $e->getMessage());
             return response()->json(['status' => false, 'message' => $e->getMessage()], 500);

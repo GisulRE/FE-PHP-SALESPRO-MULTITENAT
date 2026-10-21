@@ -46,6 +46,9 @@
                             <button type="button"
                                 class="imprimir-ncd-btn btn btn-dark btn-sm ml-1"
                                 data-id="{{ $nota_credito->id }}"
+                                data-nro="{{ $nota_credito->nro_factura }}"
+                                data-cuf="{{ $nota_credito->cuf }}"
+                                data-monto="{{ $nota_credito->monto_total ?? $nota_credito->monto_total_sujeto_iva ?? 0 }}"
                                 title="Ver / Imprimir Nota Crédito-Débito SIAT #{{ $nota_credito->nro_factura }}">
                                 <i class="fa fa-file-pdf-o"></i>
                             </button>
