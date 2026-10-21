@@ -396,35 +396,38 @@
     // Caso Facturar, mostrar si desea facturar o no.
     // ademas de colocar como requeridos los campos en caso de facturar. 
     $('#toggle-event').change(function() {
-        console.log('Toggle: ' + $(this).prop('checked'))
-        if ($(this).prop('checked') == true) {
-            $('#ventana_nav').show();
-            $('#segundoTabContinue').show();
+        var isChecked = $(this).prop('checked');
+        console.log('Toggle Facturar: ' + isChecked);
+        if (isChecked) {
             $('#fact_manual').hide();
             $("input[name='bandera_factura_hidden']").val(1);
             $("input[name='bandera_codigo_excepcion_hidden']").val(0);
             $('input[name=sales_razon_social]').prop("required", true);
             $('input[name=sales_valor_documento]').prop("required", true);
             $('input[name=sales_email]').prop("required", true);
-            $("#submit-btn").addClass("disabled noselect");
-
+            $('#nav_tab_billing_li').show();
+            $('#segundoTabContinue').show();
+            if ($('#primerTab').hasClass('active') || $('#myTab .nav-link.active').attr('href') === '#primerTab') {
+                $('#submit-btn').html('<i class="fa fa-arrow-right"></i> Siguiente');
+            }
         } else {
-            $('#ventana_nav').hide();
-            $('#segundoTabContinue').hide();
-            $('#myTab a[href="#primerTab"]').tab('show');
             $('#fact_manual').show();
-            $("input[name='bandera_factura_hidden']").val("")
+            $("input[name='bandera_factura_hidden']").val("0");
             $('input[name=sales_razon_social]').prop("required", false);
             $('input[name=sales_valor_documento]').prop("required", false);
             $('input[name=sales_email]').prop("required", false);
-            $("#submit-btn").removeClass("disabled noselect");
+            $('#nav_tab_billing_li').hide();
+            $('#segundoTabContinue').hide();
+            if ($('#segundoTab').hasClass('active') || $('#myTab .nav-link.active').attr('href') === '#segundoTab') {
+                $('#myTab a[href="#primerTab"]').tab('show');
+            }
+            $('#submit-btn').html('<i class="fa fa-check"></i> Confirmar Venta');
         }
-    })
+    });
 
     // Nota: el cambio de modo Online/Offline es manejado por toggleModoPOS() en pos.blade.php
 
-    // Forzar Facturar siempre en POS
-    $('#toggle-event').prop('checked', true).change();
+    // Inicializar Facturar en POS
     $("input[name='bandera_factura_hidden']").val(1);
     $("input[name='bandera_codigo_excepcion_hidden']").val(0);
     $("input[name='invoice_no']").val(0);

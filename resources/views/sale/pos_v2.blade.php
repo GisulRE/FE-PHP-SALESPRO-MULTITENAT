@@ -4516,133 +4516,84 @@
                 }
             }
             
-            // 1) Sin SIAT: interceptar, crear venta via AJAX y abrir recibo en la misma página
-            if (!hasSiat) {
-                e.preventDefault();
-                $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
-                var formData = $('#formPayment').serializeArray();
-                formData.push({ name: 'ajax_preview', value: 1 });
-                formData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
-                try { $('#spinner-div').show(); } catch (err) {}
-                $.post('{{ url("sales/store-ajax") }}', formData)
-                    .done(function(res) {
-                        try { $('#spinner-div').hide(); } catch (err) {}
-                        if (res.status) {
-                            // Abrir recibo en la misma página (navega a gen_invoice)
-                            window.location.href = '{{ url("sales/gen_invoice") }}/' + res.sale_id;
-                        } else {
-                            Swal.fire('Error', res.message || 'Error al procesar la venta', 'error');
+            // En pos_v2: grabado directo y atómico vía AJAX
+            e.preventDefault();
+            var $confirmBtn = $('#confirm-pos-v2-btn');
+            $confirmBtn.prop('disabled', true);
+
+            var formData = $('#formPayment').serializeArray();
+            formData = formData.filter(function(item) { return item.name !== 'ajax_preview'; });
+            formData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
+
+            try { $('#spinner-div').show(); } catch (err) {}
+
+            $.post('{{ url("sales/store-ajax") }}', formData)
+                .done(function(res) {
+                    try { $('#spinner-div').hide(); } catch (err) {}
+                    $confirmBtn.prop('disabled', false);
+
+                    if (res.status) {
+                        $('#add-payment').modal('hide');
+                        $('body').removeClass('modal-open');
+                        $('.modal-backdrop').remove();
+
+                        // Limpiar pedido del POS
+                        try {
+                            product_price = [];
+                            product_discount = [];
+                            tax_rate = [];
+                            tax_name = [];
+                            tax_method = [];
+                            unit_name = [];
+                            unit_operator = [];
+                            unit_operation_value = [];
+                            product_description = [];
+
+                            $('table.order-list tbody').empty();
+                            $('input[name="total_qty"]').val(0);
+                            $('input[name="total_price"]').val('0.00');
+                            $('input[name="grand_total"]').val('0.00');
+                            $('#item').text(0);
+                            $('#subtotal').text('0.00');
+                            $('#grand-total').text('0.00');
+                            $('#tips').text('0.00');
+                            $('#discount').text('0.00');
+                            $('#tax').text('0.00');
+                            $('#shipping-cost').text('0.00');
+                            $('#coupon-text').text('0.00');
+                            emp_temp = false;
+                        } catch (err) {}
+
+                        var printUrl = res.print_url || (hasSiat ? ('{{ url("sales/imprimir_factura") }}/' + res.sale_id) : ('{{ url("sales/gen_invoice") }}/' + res.sale_id));
+
+                        if (res.siat_error) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Venta Registrada (Nota de Venta)',
+                                text: res.message || 'La venta fue registrada, pero la factura SIAT quedó pendiente.'
+                            });
                         }
-                    }).fail(function() {
-                        try { $('#spinner-div').hide(); } catch (err) {}
-                        Swal.fire('Error', 'Error de red', 'error');
-                    });
-                return;
-            }
 
-            // 1b) Con SIAT: primer paso -> crear venta en modo preview via AJAX y mostrar imprimible
-            if (hasSiat && $('#segundoTab').length && $('.tab-pane#primerTab').hasClass('show')) {
-                e.preventDefault();
-                $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
-                var formData = $('#formPayment').serializeArray();
-                formData.push({ name: 'ajax_preview', value: 1 });
-                formData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
-                try { $('#spinner-div').show(); } catch (err) {}
-                $.post('{{ url("sales/store-ajax") }}', formData)
-                    .done(function(res) {
-                        try { $('#spinner-div').hide(); } catch (err) {}
-                        if (res.status) {
-                            $('input[name="ajax_sale_id"]').val(res.sale_id);
-                            $('#print_preview_container').html(res.print_html);
-                            // habilitar pestañas siguientes
-                            $('#tab_preview').removeClass('disabled');
-                            $('#tab_billing').removeClass('disabled');
-                            $('#tab_final').removeClass('disabled');
-                            $('#myTab a[href="#segundoTab"]').tab('show');
-                        } else {
-                            Swal.fire('Error', res.message || 'Error al generar vista previa', 'error');
+                        // Abrir para impresión inmediata de factura o recibo
+                        try {
+                            window.open(printUrl, '_blank');
+                        } catch(e) {
+                            window.location.href = printUrl;
                         }
-                    }).fail(function() {
-                        try { $('#spinner-div').hide(); } catch (err) {}
-                        Swal.fire('Error', 'Error de red', 'error');
-                    });
-                return;
-            }
-
-            // 2) Si estamos en segundo paso (preview) -> avanzar a datos de facturación
-            if (hasSiat && $('#segundoTab').length && $('.tab-pane#segundoTab').hasClass('show')) {
-                e.preventDefault();
-                $('#myTab a[href="#tercerTab"]').tab('show');
-                return;
-            }
-
-            // 3) Si estamos en tercer paso -> finalizar facturación via AJAX y mostrar resultado
-            if (hasSiat && $('.tab-pane#tercerTab').hasClass('show')) {
-                e.preventDefault();
-                var finalizeData = $('#formPayment').serializeArray();
-                finalizeData.push({ name: 'sale_id', value: $('input[name="ajax_sale_id"]').val() });
-                finalizeData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
-                try { $('#spinner-div').show(); } catch (err) {}
-                $.post('{{ url("sales/finalize-ajax") }}', finalizeData)
-                    .done(function(res) {
-                        try { $('#spinner-div').hide(); } catch (err) {}
-                        if (res.status) {
-                            $('#final_print_message').text(res.message || 'Facturación completada');
-                            if (res.print_url) {
-                                // Render embebido para evitar inyectar HTML completo con estilos/botones externos.
-                                var printUrlEmbed = res.print_url + (res.print_url.indexOf('?') === -1 ? '?embed=1' : '&embed=1');
-                                var titulo = $('<div/>').text(res.message || 'Factura Generada Exitosamente').html();
-                                var htmlFinal = '' +
-                                    '<p class="text-center font-weight-bold mb-3" style="font-size:1.1rem; color:#28a745;">' + titulo + '</p>' +
-                                    '<iframe src="' + printUrlEmbed + '" style="display:block; width:100%; height:72vh; min-height:620px; border:none; border-radius:8px; background:#fff;"></iframe>';
-                                $('#final_print_container').html(htmlFinal);
-
-                                // Link de respaldo para abrir fuera del modal
-                                $('#final_print_link').attr('href', res.print_url).text('Abrir en nueva ventana').show();
-                            }
-                            $('#tab_final').removeClass('disabled');
-                            $('#myTab a[href="#cuartoTab"]').tab('show');
-                            // Cambiar texto del botón para indicar que cerrará el modal
-                            $('#submit-btn').text('Cerrar');
-                            // Reiniciar pedido: limpiar tabla y arreglos para evitar que queden productos después del pago
-                            try {
-                                // Limpiar arrays JS que mantienen el pedido
-                                product_price = [];
-                                product_discount = [];
-                                tax_rate = [];
-                                tax_name = [];
-                                tax_method = [];
-                                unit_name = [];
-                                unit_operator = [];
-                                unit_operation_value = [];
-                                product_description = [];
-
-                                // Vaciar tabla de items
-                                $('table.order-list tbody').empty();
-
-                                // Resetear totales visibles y campos ocultos
-                                $('input[name="total_qty"]').val(0);
-                                $('input[name="total_price"]').val('0.00');
-                                $('input[name="grand_total"]').val('0.00');
-                                $('#item').text(0);
-                                $('#subtotal').text('0.00');
-                                $('#grand-total').text('0.00');
-                                $('#tips').text('0.00');
-                                $('#discount').text('0.00');
-                                $('#tax').text('0.00');
-                                $('#shipping-cost').text('0.00');
-                                $('#coupon-text').text('0.00');
-                                emp_temp = false;
-                            } catch (err) {}
-                        } else {
-                            Swal.fire('Error', res.message || 'Error al finalizar facturación', 'error');
-                        }
-                    }).fail(function() {
-                        try { $('#spinner-div').hide(); } catch (err) {}
-                        Swal.fire('Error', 'Error de red', 'error');
-                    });
-                return;
-            }
+                    } else {
+                        Swal.fire('Error', res.message || 'Error al procesar la venta', 'error');
+                    }
+                })
+                .fail(function(xhr) {
+                    try { $('#spinner-div').hide(); } catch (err) {}
+                    $confirmBtn.prop('disabled', false);
+                    var errMsg = 'Error de conexión con el servidor';
+                    if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                        errMsg = xhr.responseJSON.message;
+                    }
+                    Swal.fire('Error', errMsg, 'error');
+                });
+            return;
 
             if ($("#number_card").prop('required') == true && ($("#number_card").val() == null || $("#number_card")
                     .val() == '' || $("#number_card").val().length < 19)) {

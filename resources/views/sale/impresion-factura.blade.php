@@ -106,21 +106,38 @@
             <div class="hidden-print" style="{{ $hiddenPrintStyle }}">
                 <table>
                     <tr>
-                        <td><a href="{{ route('sale.pos')}}" class="btn btn-info"><i class="fa fa-arrow-left"></i> Volver POS</a> </td>
+                        <td style="width: auto;"><a href="{{ route('sale.pos')}}" class="btn btn-info"><i class="fa fa-arrow-left"></i> Volver POS</a></td>
+                        <td style="width: auto;"><button type="button" onclick="imprimirFactura()" class="btn btn-primary"><i class="fa fa-print"></i> Imprimir Factura</button></td>
                     </tr>
                 </table>
                 <br>
             </div>
                 
             <div id="receipt-data">
-                <object>
-                        <embed id="pdfID" type="text/html" width="{{ $embedWidth }}" height="{{ $embedHeight }}" src="data:application/pdf;base64,{{$data['bytes']}}" />
-                </object>                                
+                <iframe id="pdfFrame" src="data:application/pdf;base64,{{$data['bytes']}}" width="{{ $embedWidth }}" height="{{ $embedHeight }}" style="border:none; width:{{ $embedWidth }}; height:{{ $embedHeight }}px; display:block; margin:0 auto;"></iframe>
             </div>
         </div>
 
         <script type="text/javascript">
-            
+            function imprimirFactura() {
+                try {
+                    var iframe = document.getElementById('pdfFrame');
+                    if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                        return;
+                    }
+                } catch (e) {}
+                window.print();
+            }
+
+            @if (!$isEmbed)
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    imprimirFactura();
+                }, 600);
+            });
+            @endif
         </script>
 
     </body>

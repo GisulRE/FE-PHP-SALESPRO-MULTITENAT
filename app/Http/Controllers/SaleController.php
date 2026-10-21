@@ -1534,13 +1534,20 @@ class SaleController extends Controller
 
             if (!empty($data['bandera_factura_hidden']) && ($data['sale_status'] ?? 0) != 4) {
 
-                $sales_tipo_doc = $data['sales_tipo_documento_hidden'] ?? ($data['documento_id_select'] ?? 1);
-                $sales_caso_esp = $data['sales_caso_especial_hidden'] ?? 1;
+                // Asegurar que exista token SIAT antes de emitir la factura
+                if (empty(session('token_siat')) || !session('auth_siat', false)) {
+                    try {
+                        $this->getToken();
+                    } catch (\Throwable $e) {}
+                }
+
+                $sales_tipo_doc = max(1, (int) ($data['sales_tipo_documento'] ?? $data['sales_tipo_documento_hidden'] ?? $data['documento_id_select'] ?? 1));
+                $sales_caso_esp = (int) ($data['sales_caso_especial'] ?? $data['sales_caso_especial_hidden'] ?? 1);
                 $sales_val_doc = $data['sales_valor_documento'] ?? ($data['sales_nit_ci'] ?? '0');
-                $sales_razon = $data['sales_razon_social'] ?? 'SN';
+                $sales_razon = !empty($data['sales_razon_social']) ? $data['sales_razon_social'] : 'SN';
                 $sales_mail = $data['sales_email'] ?? '';
-                $sales_excepcion = $data['bandera_codigo_excepcion_hidden'] ?? 0;
-                $sales_doc_sector = $data['bandera_codigo_documento_sector_hidden'] ?? 1;
+                $sales_excepcion = (int) ($data['bandera_codigo_excepcion_hidden'] ?? 0);
+                $sales_doc_sector = (int) ($data['bandera_codigo_documento_sector_hidden'] ?? 1);
 
                 if ($sales_tipo_doc != 1) {
                     $text_complemento_documento = null;
@@ -1784,6 +1791,15 @@ class SaleController extends Controller
                         } else {
                             \DB::commit();
                             $message .= " Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error SIAT') . ")";
+                            if ($is_ajax) {
+                                return response()->json([
+                                    'status'     => true,
+                                    'siat_error' => true,
+                                    'sale_id'    => $lims_sale_data->id,
+                                    'print_url'  => url('sales/gen_invoice/' . $lims_sale_data->id),
+                                    'message'    => "Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error contingencia SIAT') . ")"
+                                ]);
+                            }
                             return redirect('sales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
                         }
                     } else {
@@ -1835,6 +1851,15 @@ class SaleController extends Controller
                         } else {
                             \DB::commit();
                             $message .= " Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error SIAT') . ")";
+                            if ($is_ajax) {
+                                return response()->json([
+                                    'status'     => true,
+                                    'siat_error' => true,
+                                    'sale_id'    => $lims_sale_data->id,
+                                    'print_url'  => url('sales/gen_invoice/' . $lims_sale_data->id),
+                                    'message'    => "Venta registrada como Nota de Venta (Pendiente Facturación: " . ($respuesta['mensaje'] ?? 'Error SIAT') . ")"
+                                ]);
+                            }
                             return redirect('sales/gen_invoice/' . $lims_sale_data->id)->with('message', $message);
                         }
                     }
@@ -1849,6 +1874,7 @@ class SaleController extends Controller
                     'status'          => true,
                     'sale_id'         => $lims_sale_data->id,
                     'reference_no'    => $lims_sale_data->reference_no,
+                    'print_url'       => $print_url,
                     'print_sale_note' => (bool) ($lims_pos_setting_data->print ?? false),
                     'print_html'      => $print_html,
                 ]);
