@@ -4885,24 +4885,28 @@ Descripción: " . $data_response['descripcion'];
         return $respuesta;
     }
 
-    public function generaNotaFiscal($id, $factura, $return_data, $list_return, $lims_customer_data)
+    /**
+     * Prepara el cuerpo JSON según normativa SIAT (Documento Sector 24 - Nota de Crédito-Débito).
+     *
+     * @param int $id ID de la venta
+     * @param array $factura Datos de la factura original
+     * @param array $list_return Lista de ítems devueltos
+     * @param Customer $lims_customer_data Datos del cliente
+     * @param array $options Opciones adicionales
+     * @return array
+     */
+    public function prepararNotaCreditoDebito($id, $factura, $list_return, $lims_customer_data, $options = [])
     {
         $venta_id = $id;
-        $pos_setting = PosSetting::latest()->first();
-        $bearer = 'Bearer ' . Session::get('token_siat');
-        $host = $pos_setting->url_operaciones;
+        $pos_setting = PosSetting::latest()->first() ?? PosSetting::withoutGlobalScope('company')->latest()->first();
         $modo_centralizado = ($pos_setting->cufd_centralizado ?? 0) == 1;
-        // Nuevo servicio SIAT para notas de ajuste (crédito/débito) - reemplaza a
-        // /documento.ajuste/nota.ajuste, que ya no se utiliza.
-        $path = '/documento.ajuste/nota.ajuste.gestionado';
-        log::info('generaNotaFiscal - Modo centralizado: ' . ($modo_centralizado ? 'SI' : 'NO') . ' - Endpoint: ' . $host . $path);
 
-        $data_venta = Sale::where('id', $venta_id)->first();
-        $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
+        $data_venta = Sale::where('id', $venta_id)->first() ?? Sale::withoutGlobalScope('company')->where('id', $venta_id)->first();
+        $data_cliente = CustomerSale::where('sale_id', $venta_id)->first() ?? CustomerSale::withoutGlobalScope('company')->where('sale_id', $venta_id)->first();
         $data_biller = $data_venta ? Biller::where([['id', $data_venta->biller_id], ['is_active', true]])->first() : null;
 
-        $target_sucursal = $data_cliente->sucursal ?? ($data_biller->sucursal ?? 0);
-        $target_pv = $data_cliente->codigo_punto_venta ?? ($data_biller->punto_venta_siat ?? 0);
+        $target_sucursal = $options['sucursal'] ?? ($data_cliente->sucursal ?? ($data_biller->sucursal ?? 0));
+        $target_pv = $options['codigo_punto_venta'] ?? ($data_cliente->codigo_punto_venta ?? ($data_biller->punto_venta_siat ?? 0));
 
         $data_p_venta = SiatPuntoVenta::where([
             'sucursal' => $target_sucursal,
@@ -4916,7 +4920,7 @@ Descripción: " . $data_response['descripcion'];
         }
 
         if (!$data_p_venta) {
-            Log::error("generaNotaFiscal - No se encontró SiatPuntoVenta para sucursal={$target_sucursal} codigoPuntoVenta={$target_pv}");
+            Log::error("prepararNotaCreditoDebito - No se encontró SiatPuntoVenta para sucursal={$target_sucursal} codigoPuntoVenta={$target_pv}");
             return ['status' => false, 'mensaje' => 'No se encontró el Punto de Venta SIAT para la sucursal ' . $target_sucursal . ' y punto ' . $target_pv . '.'];
         }
 
@@ -4938,7 +4942,7 @@ Descripción: " . $data_response['descripcion'];
         }
 
         if (!$data_siat_cufd && !$modo_centralizado) {
-            Log::error("generaNotaFiscal - No se encontró CUFD vigente para sucursal={$data_p_venta->sucursal} codigoPuntoVenta={$data_p_venta->codigo_punto_venta}");
+            Log::error("prepararNotaCreditoDebito - No se encontró CUFD vigente para sucursal={$data_p_venta->sucursal} codigoPuntoVenta={$data_p_venta->codigo_punto_venta}");
             return ['status' => false, 'mensaje' => 'No se encontró un CUFD vigente para la sucursal ' . $data_p_venta->sucursal . ' y punto de venta ' . $data_p_venta->codigo_punto_venta . '. Debe renovar el CUFD.'];
         }
 
@@ -4951,58 +4955,176 @@ Descripción: " . $data_response['descripcion'];
             ];
         }
 
-        $tax = Tax::where('name', 'like', 'IVA%')->where('is_active', true)->first()
-            ?? Tax::where('is_active', true)->first()
-            ?? (object)['rate' => 13];
-
-        $correlativo_notafiscal = 0;
-        if ($data_p_venta->correlativo_nota_debcred != null && $data_p_venta->correlativo_nota_debcred > 0) {
-            $correlativo_notafiscal = $data_p_venta->correlativo_nota_debcred;
-        } else {
-            $correlativo_notafiscal = 1;
+        $correlativo_notafiscal = 1;
+        if (!empty($data_p_venta->correlativo_nota_debcred) && $data_p_venta->correlativo_nota_debcred > 0) {
+            $correlativo_notafiscal = (int) $data_p_venta->correlativo_nota_debcred;
         }
-        $array_payment_sales = DB::table('payments')->where('sale_id', '=', $venta_id)->get();
-        $nro_de_pagos = $array_payment_sales->count();
+
+        // Auto-sincronizar correlativo si en customer_sales ya existen notas con número mayor o igual
+        $max_existente = CustomerSale::withoutGlobalScope('company')
+            ->where('codigo_documento_sector', 24)
+            ->where('sucursal', $data_p_venta->sucursal)
+            ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
+            ->max('nro_factura');
+
+        if ($max_existente && $correlativo_notafiscal <= $max_existente) {
+            $correlativo_notafiscal = (int) $max_existente + 1;
+            Log::info("prepararNotaCreditoDebito - Sincronizado correlativo_nota_debcred a {$correlativo_notafiscal} (max existente: {$max_existente})");
+        }
+
         $leyendas = SiatLeyendaFactura::all();
         $data_leyenda = $this->pickRandomLeyenda($leyendas);
+
         $rawFechaFactura = $factura['fechaEmision'] ?? null;
         if (!empty($rawFechaFactura)) {
             $fechaemision = date("Y/m/d H:i:s.000", strtotime($rawFechaFactura));
         } else {
             $fechaemision = date("Y/m/d H:i:s.000");
         }
+
+        // Construir mapa de ítems originales para heredar actividadEconomica y codigoProductoSin
+        $orig_items_map = [];
         $list_items = [];
-        foreach ($factura["detalle"] as $item) {
-            $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $item["unidadMedida"])->where('tipo_clasificador', 'unidadMedida')->first();
-            $item_return = array(
-                "actividadEconomica" => $item["actividadEconomica"],
-                "cantidad" => $item["cantidad"],
-                "codigoDetalleTransaccion" => 1,
-                "codigoProducto" => $item["codigoProducto"],
-                "codigoProductoSin" => $item["codigoProductoSin"],
-                "descripcion" => $item["descripcion"],
-                "montoDescuento" => number_format((float) $item["montoDescuento"], 2, '.', ''),
-                "precioUnitario" => number_format((float) $item["precioUnitario"], 2, '.', ''),
-                "subTotal" => number_format((float) $item["subTotal"], 2, '.', ''),
-                "unidadMedida" => $info_par_unit['codigo_clasificador'],
-                "nombreUnidadMedida" => $info_par_unit['descripcion'],
-            );
-            $list_items[] = $item_return;
+        if (isset($factura["detalle"]) && is_array($factura["detalle"]) && count($factura["detalle"]) > 0) {
+            foreach ($factura["detalle"] as $item) {
+                $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $item["unidadMedida"])
+                    ->where('tipo_clasificador', 'unidadMedida')->first();
+                $item_orig = [
+                    "actividadEconomica" => (string) ($item["actividadEconomica"] ?? ''),
+                    "cantidad" => (float) $item["cantidad"],
+                    "codigoDetalleTransaccion" => 1,
+                    "codigoProducto" => (string) $item["codigoProducto"],
+                    "codigoProductoSin" => (int) ($item["codigoProductoSin"] ?? 0),
+                    "descripcion" => $item["descripcion"],
+                    "montoDescuento" => number_format((float) ($item["montoDescuento"] ?? 0), 2, '.', ''),
+                    "precioUnitario" => number_format((float) $item["precioUnitario"], 2, '.', ''),
+                    "subTotal" => number_format((float) $item["subTotal"], 2, '.', ''),
+                    "unidadMedida" => (int) ($info_par_unit ? $info_par_unit->codigo_clasificador : ($item["unidadMedida"] ?? 58)),
+                    "nombreUnidadMedida" => $info_par_unit ? $info_par_unit->descripcion : ($item["nombreUnidadMedida"] ?? 'UNIDAD'),
+                ];
+                $list_items[] = $item_orig;
+                $orig_items_map[trim((string)$item['codigoProducto'])] = $item;
+            }
+        } elseif ($data_venta && $data_venta->productSales) {
+            // Reconstrucción local desde productSales si SIAT no retornó detalle
+            foreach ($data_venta->productSales as $ps) {
+                $product = $ps->product;
+                $unit_id_val = 58;
+                $unit_name_val = 'UNIDAD';
+                if ($ps->sale_unit_id) {
+                    $u = Unit::find($ps->sale_unit_id);
+                    if ($u) {
+                        $unit_id_val = $u->codigo_clasificador_siat ?? 58;
+                        $unit_name_val = $u->unit_name;
+                    }
+                } elseif ($product && $product->unit) {
+                    $unit_id_val = $product->unit->codigo_clasificador_siat ?? 58;
+                    $unit_name_val = $product->unit->unit_name;
+                }
+
+                $pro_code = $product ? (string) $product->code : 'PROD-' . $ps->product_id;
+                $act = $product && !empty($product->codigo_actividad) ? (string) $product->codigo_actividad : '477300';
+                $sin = $product && !empty($product->codigo_producto_servicio) ? (int) $product->codigo_producto_servicio : 99100;
+                $cant_orig = (float) $ps->qty;
+                $pu_orig = (float) $ps->net_unit_price;
+                $desc_orig = (float) ($ps->discount ?? 0);
+                $sub_orig = round(($cant_orig * $pu_orig) - $desc_orig, 2);
+
+                $item_orig = [
+                    "actividadEconomica" => $act,
+                    "cantidad" => $cant_orig,
+                    "codigoDetalleTransaccion" => 1,
+                    "codigoProducto" => $pro_code,
+                    "codigoProductoSin" => $sin,
+                    "descripcion" => $product ? $product->name : ('Producto ' . $ps->product_id),
+                    "montoDescuento" => number_format($desc_orig, 2, '.', ''),
+                    "precioUnitario" => number_format($pu_orig, 2, '.', ''),
+                    "subTotal" => number_format($sub_orig, 2, '.', ''),
+                    "unidadMedida" => (int) $unit_id_val,
+                    "nombreUnidadMedida" => $unit_name_val,
+                ];
+                $list_items[] = $item_orig;
+                $orig_items_map[trim($pro_code)] = $item_orig;
+                $orig_items_map[(string)$ps->product_id] = $item_orig;
+            }
         }
 
+        // Procesar ítems devueltos (codigoDetalleTransaccion = 2)
+        $montoTotalDevuelto = 0;
+        $montoDescuentoCreditoDebito = 0;
+
         foreach ($list_return as $item_return) {
-            $list_items[] = $item_return;
+            $cant = (float) ($item_return['cantidad'] ?? $item_return['qty'] ?? 0);
+            $pu = (float) ($item_return['precioUnitario'] ?? $item_return['net_unit_price'] ?? 0);
+            $pro_code = trim((string)($item_return['codigoProducto'] ?? $item_return['product_code'] ?? ''));
+
+            // Buscar en mapa original para heredar códigos fiscales exactos
+            $orig = $orig_items_map[$pro_code] ?? null;
+            if (!$orig && !empty($item_return['product_id'])) {
+                $orig = $orig_items_map[(string)$item_return['product_id']] ?? null;
+            }
+            if (!$orig && !empty($item_return['product_id'])) {
+                $p = Product::find($item_return['product_id']) ?? Product::withoutGlobalScope('company')->find($item_return['product_id']);
+                if ($p && isset($orig_items_map[trim($p->code)])) {
+                    $orig = $orig_items_map[trim($p->code)];
+                }
+            }
+
+            $actividad = !empty($orig['actividadEconomica']) 
+                ? (string) $orig['actividadEconomica'] 
+                : (!empty($item_return['actividadEconomica']) && $item_return['actividadEconomica'] != '620100' ? (string)$item_return['actividadEconomica'] : '477300');
+            $codigoSin = !empty($orig['codigoProductoSin']) 
+                ? (int) $orig['codigoProductoSin'] 
+                : (!empty($item_return['codigoProductoSin']) && $item_return['codigoProductoSin'] != 83141 ? (int)$item_return['codigoProductoSin'] : 99100);
+
+            // Calcular descuento proporcional
+            $desc = 0;
+            if (isset($item_return['montoDescuento'])) {
+                $desc = (float) $item_return['montoDescuento'];
+            } elseif (isset($item_return['discount'])) {
+                $desc = (float) $item_return['discount'];
+            } elseif ($orig && (float)($orig['cantidad'] ?? 0) > 0 && (float)($orig['montoDescuento'] ?? 0) > 0) {
+                $desc_unit = (float)$orig['montoDescuento'] / (float)$orig['cantidad'];
+                $desc = round($desc_unit * $cant, 2);
+            }
+
+            $subtotal_bruto = round($cant * $pu, 2);
+            $subtotal_neto = round($subtotal_bruto - $desc, 2);
+
+            $montoTotalDevuelto += $subtotal_bruto;
+            $montoDescuentoCreditoDebito += $desc;
+
+            $unidadMedida = $orig['unidadMedida'] ?? ($item_return['unidadMedida'] ?? 58);
+            $info_par_unit = SiatParametricaVario::where('codigo_clasificador', $unidadMedida)
+                ->where('tipo_clasificador', 'unidadMedida')->first();
+
+            $list_items[] = [
+                "actividadEconomica" => $actividad,
+                "cantidad" => $cant,
+                "codigoDetalleTransaccion" => 2,
+                "codigoProducto" => $pro_code ?: ($orig['codigoProducto'] ?? '1'),
+                "codigoProductoSin" => $codigoSin,
+                "descripcion" => $item_return['descripcion'] ?? $item_return['product_name'] ?? ($orig['descripcion'] ?? 'Producto'),
+                "montoDescuento" => number_format((float) $desc, 2, '.', ''),
+                "precioUnitario" => number_format((float) $pu, 2, '.', ''),
+                "subTotal" => number_format((float) $subtotal_neto, 2, '.', ''),
+                "unidadMedida" => (int) ($info_par_unit ? $info_par_unit->codigo_clasificador : $unidadMedida),
+                "nombreUnidadMedida" => $info_par_unit ? $info_par_unit->descripcion : ($item_return['nombreUnidadMedida'] ?? ($orig['nombreUnidadMedida'] ?? 'UNIDAD')),
+            ];
         }
-        $montoDevuelto = 0;
-        foreach ($list_return as $item_return) {
-            $montoDevuelto += (float) $item_return['subTotal'];
-        }
-        $montoIVA = ($montoDevuelto * $tax->rate) / 100;
+
+        // Normativa SIAT:
+        // montoTotalDevuelto: suma de montos brutos de los productos devueltos
+        // montoDescuentoCreditoDebito: descuento proporcional correspondiente a los productos devueltos
+        // montoEfectivoCreditoDebito: montoTotalDevuelto - montoDescuentoCreditoDebito (base imponible para SIAT!)
+        $montoEfectivoCreditoDebito = round($montoTotalDevuelto - $montoDescuentoCreditoDebito, 2);
 
         $codigo_cufd_val = $modo_centralizado ? "" : ($data_siat_cufd->codigo_cufd ?? '');
         $direccion_val = $data_siat_cufd->direccion ?? ($data_sucursal->direccion ?? '');
 
-        // Construir data_body base - Nota Fiscal
+        $montoTotalOriginal = (float) ($factura['montoTotalMoneda'] ?? ($factura['montoTotal'] ?? ($data_venta ? $data_venta->grand_total : 0)));
+        $cuf_original = $factura['cuf'] ?? ($data_cliente->cuf ?? '');
+
         $data_body = [
             'codigoPuntoVenta' => (int) $data_p_venta->codigo_punto_venta,
             'nit' => $pos_setting->nit_emisor,
@@ -5013,97 +5135,165 @@ Descripción: " . $data_response['descripcion'];
                 "codigoExcepcion" => (int) ($data_cliente->codigo_excepcion ?? 0),
                 "codigoPuntoVenta" => (int) $data_p_venta->codigo_punto_venta,
                 "codigoSucursal" => (int) $data_p_venta->sucursal,
-                "codigoTipoDocumentoIdentidad" => (int) $lims_customer_data->tipo_documento,
-                "complemento" => $lims_customer_data->complemento_documento,
-                "cuf" => $factura['cuf'],
+                "codigoTipoDocumentoIdentidad" => (int) ($lims_customer_data->tipo_documento ?? 1),
+                "complemento" => $lims_customer_data->complemento_documento ?? '',
+                "cuf" => $cuf_original,
                 "cufd" => $codigo_cufd_val,
                 "direccion" => $direccion_val,
                 "fechaEmision" => date("Y-m-d H:i:s"),
                 "fechaEmisionFactura" => $fechaemision,
-                "leyenda" => $data_leyenda->descripcion_leyenda,
-                "montoDescuentoCreditoDebito" => 0,
-                "montoEfectivoCreditoDebito" => number_format((float) $montoIVA, 2, '.', ''),
-                "montoTotalDevuelto" => number_format($montoDevuelto, 2, '.', ''),
-                "montoTotalOriginal" => number_format($factura['montoTotalMoneda'] + ($factura['descuentoAdicional'] ?? 0), 2, '.', ''),
+                "leyenda" => $data_leyenda->descripcion_leyenda ?? 'Ley N° 453: Los servicios deben suministrarse en condiciones de inocuidad, calidad y seguridad.',
+                "montoDescuentoCreditoDebito" => number_format((float) $montoDescuentoCreditoDebito, 2, '.', ''),
+                "montoEfectivoCreditoDebito" => number_format((float) $montoEfectivoCreditoDebito, 2, '.', ''),
+                "montoTotalDevuelto" => number_format((float) $montoTotalDevuelto, 2, '.', ''),
+                "montoTotalOriginal" => number_format((float) $montoTotalOriginal, 2, '.', ''),
                 "municipio" => $data_sucursal->ciudad_municipio ?? 'LA PAZ',
                 "nitEmisor" => $pos_setting->nit_emisor,
-                "nombreRazonSocial" => $lims_customer_data->razon_social,
-                "numeroAutorizacionCuf" => $factura['cuf'],
-                "numeroDocumento" => $lims_customer_data->valor_documento,
-                "numeroFactura" => $data_cliente->nro_factura ?? 1,
+                "nombreRazonSocial" => $lims_customer_data->razon_social ?? ($lims_customer_data->name ?? 'SIN NOMBRE'),
+                "numeroAutorizacionCuf" => $cuf_original,
+                "numeroDocumento" => $lims_customer_data->valor_documento ?? '',
+                "numeroFactura" => $factura['numeroFactura'] ?? ($data_cliente->nro_factura ?? 1),
                 "numeroNotaCreditoDebito" => $correlativo_notafiscal,
                 'razonSocialEmisor' => $pos_setting->razon_social_emisor,
                 "telefono" => $data_sucursal->telefono ?? '0',
                 "usuario" => $data_cliente->usuario ?? (Auth::user()->name ?? 'ADMIN'),
-                "email" => $lims_customer_data->email,
+                "email" => $lims_customer_data->email ?? '',
                 "detalle" => $list_items,
             ],
+            '_meta' => [
+                'data_p_venta' => $data_p_venta,
+                'data_siat_cufd' => $data_siat_cufd,
+                'data_sucursal' => $data_sucursal,
+                'data_leyenda' => $data_leyenda,
+                'data_cliente' => $data_cliente,
+                'correlativo_notafiscal' => $correlativo_notafiscal,
+                'montoTotalDevuelto' => $montoTotalDevuelto,
+                'montoDescuentoCreditoDebito' => $montoDescuentoCreditoDebito,
+                'montoEfectivoCreditoDebito' => $montoEfectivoCreditoDebito,
+                'montoIVA' => round($montoEfectivoCreditoDebito * 0.13, 2),
+            ]
         ];
 
-        // El endpoint /documento.ajuste/nota.ajuste.gestionado no acepta
-        // codigoControl/codigoDocumento/cuis/formato a nivel raíz (no existen
-        // en su schema); el único "cufd" válido va dentro de notaFiscal.
-        log::info("generaNotaFiscal - URL => " . $host . $path);
-        log::info("generaNotaFiscal - Body => " . json_encode($data_body));
-        $response = Http::withHeaders([
-            'Authorization' => $bearer,
-        ])->post($host . $path, $data_body);
-        log::info("generaNotaFiscal - HTTP Status => " . $response->status());
-        log::info("generaNotaFiscal - Response => " . $response->body());
-        // entre 200 y 299
-        // procedemos a incrementar el correlativo factura
-        // y actualizamos los datos Cuf y Codigo Recepción de la Factura Exitosamente
-        $respuesta = array();
+        return ['status' => true, 'data_body' => $data_body];
+    }
+
+    /**
+     * Envía la Nota de Crédito-Débito (Sector 24) al backend SIAT Spring Boot.
+     *
+     * @param array $data_body
+     * @return array
+     */
+    public function enviarNotaCreditoDebito($data_body)
+    {
+        $meta = $data_body['_meta'] ?? [];
+        unset($data_body['_meta']);
+
+        $pos_setting = PosSetting::latest()->first() ?? PosSetting::withoutGlobalScope('company')->latest()->first();
+        $token = Session::get('token_siat');
+        if (!$token) {
+            $token = $this->getToken();
+        }
+        $bearer = 'Bearer ' . $token;
+        $host = $pos_setting->url_operaciones;
+        $path = '/documento.ajuste/nota.ajuste.gestionado';
+
+        Log::info("enviarNotaCreditoDebito - URL => " . $host . $path);
+        Log::info("enviarNotaCreditoDebito - Body => " . json_encode($data_body, JSON_UNESCAPED_UNICODE));
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $bearer,
+            ])->post($host . $path, $data_body);
+        } catch (\Exception $e) {
+            Log::error("enviarNotaCreditoDebito - Error de conexión: " . $e->getMessage());
+            return ['status' => false, 'mensaje' => 'Error de conexión con el servicio SIAT: ' . $e->getMessage()];
+        }
+
+        $http_status = $response->status();
+        Log::info("enviarNotaCreditoDebito - HTTP Status => " . $http_status);
+        Log::info("enviarNotaCreditoDebito - Response => " . $response->body());
+
         if ($response->successful()) {
             $data = $response->json();
-            log::info(json_encode($data));
+            if (!empty($meta['data_p_venta'])) {
+                $meta['data_p_venta']->correlativo_nota_debcred += 1;
+                $meta['data_p_venta']->save();
+            }
+            return [
+                'status' => true,
+                'data' => $data,
+                'meta' => $meta,
+                'correlativo' => $meta['correlativo_notafiscal'] ?? ($data_body['notaFiscal']['numeroNotaCreditoDebito'] ?? 1)
+            ];
+        } else {
+            $error = $response->json();
+            $titulo_error = $error['status'] ?? $http_status;
+            $descripcion = "";
+            if (isset($error['mensajesRecepcion']) && is_array($error['mensajesRecepcion'])) {
+                foreach ($error['mensajesRecepcion'] as $mensaje) {
+                    $descripcion .= " Código: " . ($mensaje['codigo'] ?? '') . " - Descripción: " . ($mensaje['descripcion'] ?? '');
+                }
+            } elseif (isset($error['message'])) {
+                $descripcion = $error['message'];
+            } elseif (isset($error['title'])) {
+                $descripcion = $error['title'];
+            } else {
+                $descripcion = $response->body();
+            }
+
+            $msj = 'Problemas en comunicación SIAT. Error ' . $titulo_error . ': ' . $descripcion;
+            Log::error("enviarNotaCreditoDebito - Falló emisión SIAT => " . $msj);
+            return [
+                'status' => false,
+                'status_code' => $titulo_error,
+                'mensaje' => $msj,
+                'error' => $error
+            ];
+        }
+    }
+
+    /**
+     * Emite la Nota Fiscal de Crédito-Débito compatible con implementaciones previas.
+     */
+    public function generaNotaFiscal($id, $factura, $return_data, $list_return, $lims_customer_data)
+    {
+        $prep = $this->prepararNotaCreditoDebito($id, $factura, $list_return, $lims_customer_data);
+        if (!$prep['status']) {
+            return $prep;
+        }
+
+        $result = $this->enviarNotaCreditoDebito($prep['data_body']);
+        if ($result['status']) {
+            $data = $result['data'];
+            $meta = $result['meta'] ?? [];
+            $data_cliente = $meta['data_cliente'] ?? null;
             $user = Auth::user();
             $obj_cliente = new CustomerSale();
-            $obj_cliente->sale_id = 0;
+            $obj_cliente->sale_id = $id; // FIX: Se asigna el ID real de la venta
             $obj_cliente->customer_id = $lims_customer_data->id;
-            $obj_cliente->razon_social = $lims_customer_data->razon_social;
+            $obj_cliente->razon_social = $lims_customer_data->razon_social ?? $lims_customer_data->name;
             $obj_cliente->email = $lims_customer_data->email;
             $obj_cliente->tipo_documento = $lims_customer_data->tipo_documento;
             $obj_cliente->valor_documento = $lims_customer_data->valor_documento;
             $obj_cliente->complemento_documento = $lims_customer_data->complemento_documento;
-            $obj_cliente->codigo_excepcion = $data_cliente->codigo_excepcion ?? 0;
+            $obj_cliente->codigo_excepcion = $data_cliente ? ($data_cliente->codigo_excepcion ?? 0) : ($lims_customer_data->codigo_excepcion ?? 0);
             $obj_cliente->codigo_documento_sector = 24;
-            $obj_cliente->nro_factura = $correlativo_notafiscal;
+            $obj_cliente->nro_factura = $result['correlativo'];
             $obj_cliente->tipo_caso_especial = false;
             $obj_cliente->estado_factura = "VIGENTE";
-            $obj_cliente->sucursal = $data_p_venta->sucursal;
-            $obj_cliente->codigo_punto_venta = $data_p_venta->codigo_punto_venta;
-            $obj_cliente->codigo_cufd = $data['cufd'] ?? ($data_siat_cufd->codigo_cufd ?? null);
+            $obj_cliente->sucursal = $meta['data_p_venta']->sucursal ?? 0;
+            $obj_cliente->codigo_punto_venta = $meta['data_p_venta']->codigo_punto_venta ?? 0;
+            $obj_cliente->codigo_cufd = $data['cufd'] ?? ($meta['data_siat_cufd']->codigo_cufd ?? null);
             $obj_cliente->cuf = $data['cuf'];
             $obj_cliente->codigo_recepcion = $data['codigo_recepcion'];
-            $obj_cliente->xml = $data['xmlfactura'];
-            $obj_cliente->usuario = $user->name;
+            $obj_cliente->xml = $data['xmlfactura'] ?? ($data['xml'] ?? '');
+            $obj_cliente->usuario = $user ? $user->name : 'ADMIN';
             $obj_cliente->save();
-            $data_p_venta->correlativo_nota_debcred += 1;
-            $data_p_venta->save();
-            $respuesta = array('data' => $data, 'customer_sale' => $obj_cliente, 'status' => true);
-        } else {
-            $error = $response->json();
-            $titulo_error = $error['status'];
-            if ($titulo_error == 500) {
-                log::error($response->json());
-                $respuesta = array('mensaje' => 'Error interno del servidor. ', 'status' => false);
-            } elseif ($titulo_error == 400) {
-                $mensajes_error = $error['mensajesRecepcion'];
-                log::warning("mensajes de Error => " . json_encode($mensajes_error));
-                $descripcion = "";
-                foreach ($mensajes_error as $mensaje) {
-                    $descripcion .= " Código: " . $mensaje['codigo'] . " - Descripción: " . $mensaje['descripcion'];
-                    log::info($descripcion);
-                }
-                $data_p_venta->correlativo_nota_debcred -= 1;
-                $data_p_venta->save();
-                $msj = 'Problemas de conexión Siat, la venta no ha sido facturada. Error: ' . $titulo_error . $descripcion;
-                $respuesta = array('mensaje' => $msj, 'status' => false);
-            }
+
+            return ['data' => $data, 'customer_sale' => $obj_cliente, 'status' => true];
         }
 
-        return $respuesta;
+        return $result;
     }
 
     public function anularNotaDebitoCredito($factura, $motivo, $customerSale)

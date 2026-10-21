@@ -135,6 +135,10 @@
                             <button class="btn btn-default btn-sm d-print-none"><i class="dripicons-mail"></i>
                                 {{ trans('file.Email') }}</button>
                             {{ Form::close() }}
+
+                            <button type="button" id="sale-details-ncd-btn" class="btn btn-outline-warning btn-sm d-print-none mt-1 emitir-nota-credito-debito-btn" data-id="" title="Emitir Nota de Crédito/Débito SIAT">
+                                <i class="fa fa-undo"></i> Nota Crédito/Débito
+                            </button>
                         </div>
                         <div class="col-md-6">
                             <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">
@@ -539,6 +543,8 @@
             </div>
         </div>
     </div>
+
+    @include('siat.modal_nota_credito_debito')
 
     <div id="imprimir-factura-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
         aria-hidden="true" class="modal fade text-left">
@@ -1381,6 +1387,7 @@
 
         function saleDetails(sale) {
             $("#sale-details input[name='sale_id']").val(sale[13]);
+            $('#sale-details-ncd-btn').data('id', sale[13]);
             currentSaleIdForPreview = sale[13];
             var htmltext = '<strong>{{ trans('file.Date') }}: </strong>' + sale[0] +
                 '<br><strong>{{ trans('file.reference') }}: </strong>' + sale[1] +

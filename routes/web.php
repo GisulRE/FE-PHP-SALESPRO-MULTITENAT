@@ -443,6 +443,12 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::get('return-sale/anula_nota/{id}/{id_motivo}', 'ReturnController@anularNotaFiscal')->name('return-sale.anula_nota');
 	Route::resource('return-sale', 'ReturnController');
 
+	// Rutas de Nota de Crédito-Débito SIAT (Documento Sector 24)
+	Route::get('nota-credito-debito/check-sale/{sale_id}', 'NotaCreditoDebitoController@checkSale')->name('nota-credito-debito.check');
+	Route::post('nota-credito-debito/emitir', 'NotaCreditoDebitoController@emitir')->name('nota-credito-debito.emitir');
+	Route::get('nota-credito-debito/print-80mm/{id}', 'NotaCreditoDebitoController@print80mm')->name('nota-credito-debito.print80mm');
+	Route::get('nota-credito-debito/download-pdf/{id}', 'NotaCreditoDebitoController@downloadPdf')->name('nota-credito-debito.downloadPdf');
+
 	Route::get('return-purchase/getcustomergroup/{id}', 'ReturnPurchaseController@getCustomerGroup')->name('return-purchase.getcustomergroup');
 	Route::post('return-purchase/sendmail', 'ReturnPurchaseController@sendMail')->name('return-purchase.sendmail');
 	Route::get('return-purchase/getproduct/{id}', 'ReturnPurchaseController@getProduct')->name('return-purchase.getproduct');

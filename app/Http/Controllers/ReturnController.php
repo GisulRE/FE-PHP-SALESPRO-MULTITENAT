@@ -140,8 +140,6 @@ class ReturnController extends Controller
                                     } elseif ($saleitem->total != $returnitem->total) {
                                         $saleitem->net_unit_price = $saleitem->net_unit_price - $returnitem->net_unit_price;
                                         $saleitem->total = $saleitem->total - $returnitem->total;
-                                    } else if ($saleitem->discount > 0) {
-                                        return redirect()->back()->with('not_permitted', 'Lo siento! FACTURA DE LA NOTA CREDITO DEBITO NO ES VALIDA PARA REALIZAR LA DEVOLUCION');
                                     } else {
                                         unset($list_saleitems[$key1]);
                                     }
@@ -153,9 +151,6 @@ class ReturnController extends Controller
                         }
                     }
                 }
-            }
-            if ($factura['montoGiftCard'] > 0) {
-                return redirect()->back()->with('not_permitted', 'Lo siento! No se permite devolucion en facturas con Gift Card');
             }
             $lims_customer_data = Customer::find($customer_sale->customer_id);
             $lims_tipodocumentos = SiatParametricaVario::select('id', 'codigo_clasificador', 'descripcion')->where([['tipo_clasificador', 'tipoDocumentoIdentidad'], ['codigo_punto_venta', 0]])->get();
@@ -306,15 +301,16 @@ class ReturnController extends Controller
 
             $lims_return_data = Returns::create($data);
             $lims_customer_data = Customer::find($data['customer_id']);
-            if (isset($data['cuf'])) {
-                $factura = $this->getFacturaData($data['cuf']);
-                $lims_customer_data->tipo_documento = $data['codigoTipoDocumentoIdentidad'];
-                $lims_customer_data->valor_documento = $data['numeroDocumento'];
-                $lims_customer_data->complemento_documento = $data['complemento'];
-                $lims_customer_data->razon_social = $data['nombreRazonSocial'];
-                $lims_customer_data->email = $data['email'];
-                $lims_customer_data->save();
-            }
+            // Do NOT overwrite master customer record
+            $customer_info = (object)[
+                'id' => $lims_customer_data ? $lims_customer_data->id : $data['customer_id'],
+                'name' => $lims_customer_data ? $lims_customer_data->name : 'N/A',
+                'tipo_documento' => $data['codigoTipoDocumentoIdentidad'] ?? ($lims_customer_data ? $lims_customer_data->tipo_documento : 1),
+                'valor_documento' => $data['numeroDocumento'] ?? ($lims_customer_data ? $lims_customer_data->valor_documento : ''),
+                'complemento_documento' => $data['complemento'] ?? ($lims_customer_data ? $lims_customer_data->complemento_documento : ''),
+                'razon_social' => $data['nombreRazonSocial'] ?? ($lims_customer_data ? ($lims_customer_data->razon_social ?: $lims_customer_data->name) : 'SIN NOMBRE'),
+                'email' => $data['email'] ?? ($lims_customer_data ? $lims_customer_data->email : ''),
+            ];
 
             //collecting male data
             $mail_data['email'] = $lims_customer_data->email;
@@ -429,24 +425,26 @@ class ReturnController extends Controller
                     $list_return[] = $item_return;
                 }
             }
-            \DB::commit();
-            $message = 'Retorno de Venta creado con éxito';
             if (isset($data['cuf'])) {
-                $factura['nombreRazonSocial'] = $data['nombreRazonSocial'];
-                $factura['numeroDocumento'] = $data['numeroDocumento'];
-                $factura['complemento'] = $data['complemento'];
-                $result = $this->generaNotaFiscal($data['sale_id'], $factura, $lims_return_data, $list_return, $lims_customer_data);
+                $factura = $this->getFacturaData($data['cuf']) ?? [];
+                $factura['cuf'] = $data['cuf'];
+                $factura['nombreRazonSocial'] = $data['nombreRazonSocial'] ?? ($customer_info->razon_social ?? '');
+                $factura['numeroDocumento'] = $data['numeroDocumento'] ?? ($customer_info->valor_documento ?? '');
+                $factura['complemento'] = $data['complemento'] ?? ($customer_info->complemento_documento ?? '');
+                $result = $this->generaNotaFiscal($data['sale_id'], $factura, $lims_return_data, $list_return, $customer_info);
                 if ($result['status'] == true) {
                     $customerSale = $result['customer_sale'];
                     $lims_return_data->customer_sale_id = $customerSale->id;
                     $lims_return_data->cuf = $factura['cuf'];
                     $lims_return_data->save();
                 } else {
-                    $this->destroy($lims_return_data->id);
-                    $message = "Error: " . $result['mensaje'];
+                    \DB::rollBack();
+                    $message = "Error SIAT: " . ($result['mensaje'] ?? 'No se pudo emitir la Nota de Crédito-Débito');
                     return redirect('return-sale')->with('not_permitted', $message);
                 }
             }
+            \DB::commit();
+            $message = 'Retorno de Venta creado con éxito';
             if ($mail_data['email']) {
                 try {
                     Mail::send('mail.return_details', $mail_data, function ($message) use ($mail_data) {

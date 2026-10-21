@@ -1197,6 +1197,12 @@
                                         Cargar Proforma</button>
                                 </div>
                             @endif
+                            <div class="column-5">
+                                <button id="pos-nota-credito-debito-btn" style="background-color: #e67e22;" type="button"
+                                    class="btn btn-custom" data-toggle="modal" data-target="#recentTransaction" title="Emitir Nota de Crédito/Débito">
+                                    <i class="fa fa-undo"></i>
+                                    Nota Crédito/Débito</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2176,6 +2182,9 @@
                         </div>
                     </div>
                 </div>
+
+                @include('siat.modal_nota_credito_debito')
+
                 <!-- recent transaction modal -->
                 <div id="recentTransaction" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
                     aria-hidden="true" class="modal fade text-left">
@@ -2245,6 +2254,14 @@
                                                                                     data-target="#imprimir-factura-modal"
                                                                                     title="Print">
                                                                                     <i class="fa fa-print"></i>
+                                                                                </button>
+                                                                            @endif
+                                                                            @if ($venta_facturada->estado_factura == 'VIGENTE' || $venta_facturada->estado_factura == 'FACTURADA')
+                                                                                <button type="button"
+                                                                                    class="emitir-nota-credito-debito-btn btn btn-warning btn-sm"
+                                                                                    data-id="{{ $sale->id }}"
+                                                                                    title="Emitir Nota de Crédito/Débito">
+                                                                                    <i class="fa fa-undo"></i>
                                                                                 </button>
                                                                             @endif
                                                                         </div>

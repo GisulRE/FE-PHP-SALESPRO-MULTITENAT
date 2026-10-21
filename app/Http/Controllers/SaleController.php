@@ -461,6 +461,14 @@ class SaleController extends Controller
                             </li>';
                     }
 
+                    if ($venta_facturada->estado_factura == 'VIGENTE' || $venta_facturada->estado_factura == 'FACTURADA') {
+                        // Vigente: mostrar botón Emitir Nota Crédito/Débito
+                        $nestedData['options'] .=
+                            '<li>
+                                <button type="button" class="emitir-nota-credito-debito-btn btn btn-link text-warning" data-id="' . $sale->id . '"><i class="fa fa-undo"></i> Emitir Nota Crédito/Débito</button>
+                            </li>';
+                    }
+
                     // Cerrar siempre el dropdown cuando existe registro de factura
                     $nestedData['options'] .= '
                             </ul>
