@@ -5378,6 +5378,7 @@
 
             mostrarPorcentaDesdeMontoManual();
             $('select[name="edit_unit"]').selectpicker('refresh');
+            $('select[name="edit_tax_rate"]').selectpicker('refresh');
         }
 
         function mostrarPorcentaDesdeMontoManual() {
