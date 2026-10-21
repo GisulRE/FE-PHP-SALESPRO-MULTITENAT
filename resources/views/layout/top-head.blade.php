@@ -116,8 +116,8 @@
     <script type="text/javascript" src="/public/vendor/daterange/js/moment.min.js"></script>
     @if(!request()->is('pos*'))
     <script type="text/javascript" src="/public/vendor/daterange/js/knockout-3.4.2.js"></script>
-    @endif
     <script type="text/javascript" src="/public/vendor/daterange/js/daterangepicker.min.js"></script>
+    @endif
     @if(!request()->is('pos*'))
     <script type="text/javascript" src="/public/vendor/tinymce/js/tinymce/tinymce.min.js"></script>
     @endif

@@ -5523,7 +5523,9 @@ class SaleController extends Controller
             $data_p_venta->save();
 
             $modo = $modoOffline ? 'Offline (Contingencia)' : 'Online';
-            Log::info("toggleModoContingencia: Biller {$biller_id} => {$modo}");
+            try {
+                Log::info("toggleModoContingencia: Biller {$biller_id} => {$modo}");
+            } catch (\Throwable $e) {}
 
             return response()->json([
                 'estado' => true,
@@ -5531,8 +5533,10 @@ class SaleController extends Controller
                 'mensaje' => "Modo cambiado a {$modo}.",
             ]);
         } catch (\Throwable $th) {
-            Log::error('toggleModoContingencia error: ' . $th->getMessage());
-            return response()->json(['estado' => false, 'mensaje' => 'Error al cambiar el modo.']);
+            try {
+                Log::error('toggleModoContingencia error: ' . $th->getMessage());
+            } catch (\Throwable $e) {}
+            return response()->json(['estado' => false, 'mensaje' => 'Error al cambiar el modo: ' . $th->getMessage()]);
         }
     }
 
