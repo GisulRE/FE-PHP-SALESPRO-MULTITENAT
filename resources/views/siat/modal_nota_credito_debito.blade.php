@@ -317,41 +317,81 @@
                         </div>
                     </div>
 
-                    <!-- Success Screen after emission -->
-                    <div id="ncd-success-box" class="text-center py-4" style="display: none;">
-                        <div class="mb-3 text-success">
-                            <i class="fa fa-check-circle" style="font-size: 5rem;"></i>
-                        </div>
-                        <h4 class="font-weight-bold text-success mb-2">¡Nota de Crédito-Débito Emitida con Éxito!</h4>
-                        <p class="text-muted mb-4">El documento fue validado y registrado en el Servicio de Impuestos Nacionales (SIAT).</p>
-
-                        <div class="card border-success mx-auto mb-4" style="max-width: 480px; background-color: #f8fff9;">
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-6 text-left">
-                                        <span class="small text-muted d-block">Nota Fiscal N°:</span>
-                                        <strong class="h5" id="ncd-succ-nro">-</strong>
-                                    </div>
-                                    <div class="col-6 text-right">
-                                        <span class="small text-muted d-block">Total Efectivo:</span>
-                                        <strong class="h5 text-primary" id="ncd-succ-monto">-</strong>
-                                    </div>
-                                    <div class="col-12 text-left mt-2">
-                                        <span class="small text-muted d-block">Código de Autorización (CUF):</span>
-                                        <code class="small text-break bg-white p-1 border rounded d-block" id="ncd-succ-cuf">-</code>
-                                    </div>
+                    <!-- Success Screen after emission (con Visor PDF Oficial SIAT) -->
+                    <div id="ncd-success-box" style="display: none;">
+                        <div class="alert alert-success d-flex align-items-center justify-content-between p-3 mb-3 shadow-sm rounded">
+                            <div class="d-flex align-items-center">
+                                <i class="fa fa-check-circle fa-2x mr-3 text-success"></i>
+                                <div>
+                                    <h5 class="font-weight-bold mb-0 text-success">¡Nota de Crédito-Débito Emitida con Éxito!</h5>
+                                    <small class="text-muted">Documento Sector 24 validado y registrado en el SIN (SIAT).</small>
                                 </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="badge badge-primary px-3 py-2 mr-1">
+                                    Nota N°: <strong id="ncd-succ-nro">-</strong>
+                                </span>
+                                <span class="badge badge-success px-3 py-2">
+                                    Monto Devuelto: <strong id="ncd-succ-monto">-</strong>
+                                </span>
                             </div>
                         </div>
 
-                        <div class="d-flex justify-content-center flex-wrap">
-                            <button type="button" class="btn btn-primary btn-lg px-4 mr-2 mb-2 font-weight-bold shadow-sm" id="ncd-btn-print-80mm">
-                                <i class="fa fa-print mr-2"></i> Imprimir Ticket 80mm
-                            </button>
-                            <a href="#" target="_blank" class="btn btn-outline-primary btn-lg px-4 mr-2 mb-2 font-weight-bold" id="ncd-btn-download-pdf">
-                                <i class="fa fa-file-pdf-o mr-2"></i> Descargar PDF
-                            </a>
-                            <button type="button" class="btn btn-secondary btn-lg px-4 mb-2 font-weight-bold" data-dismiss="modal">
+                        <!-- Gift Card Aviso (si aplica) -->
+                        <div id="ncd-succ-giftcard-notice" class="alert alert-warning mb-3" style="display: none;">
+                            <i class="fa fa-info-circle mr-2"></i>
+                            <strong>Devolución 100% Tarjeta de Regalo:</strong> El saldo fue restituido a la tarjeta del cliente. Al no haber base imponible sujeta a IVA original, no requiere emisión de documento fiscal Sector 24 ante el SIAT.
+                        </div>
+
+                        <!-- CUF pill -->
+                        <div class="mb-3 px-3 py-2 bg-light border rounded small d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="text-muted font-weight-bold mr-2">CUF:</span>
+                                <code id="ncd-succ-cuf" class="text-break text-dark select-all">-</code>
+                            </div>
+                        </div>
+
+                        <!-- PDF Viewer Embed (igual a return-sale) -->
+                        <div class="card border mb-3 shadow-sm" style="background-color: #525659;">
+                            <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
+                                <span class="small font-weight-bold"><i class="fa fa-file-pdf-o text-danger mr-1"></i> Documento Oficial SIAT (SIN)</span>
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-light py-0 px-2 mr-1" id="ncd-btn-print-direct" title="Imprimir PDF">
+                                        <i class="fa fa-print"></i> Imprimir
+                                    </button>
+                                    <a href="#" target="_blank" class="btn btn-sm btn-outline-light py-0 px-2" id="ncd-btn-open-tab" title="Abrir en pestaña nueva">
+                                        <i class="fa fa-external-link"></i> Abrir
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="card-body p-0 position-relative" style="height: 520px; min-height: 520px;">
+                                <div id="ncd-pdf-loading" class="position-absolute w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-dark text-white" style="z-index: 5; opacity: 0.9; display: none;">
+                                    <div class="spinner-border text-light mb-2" role="status"></div>
+                                    <span>Cargando documento PDF oficial SIAT...</span>
+                                </div>
+                                <object id="ncd-pdf-object" data="" type="application/pdf" width="100%" height="100%">
+                                    <embed id="ncd-pdf-embed" type="application/pdf" width="100%" height="100%" src="" />
+                                    <div class="p-4 text-center text-white">
+                                        <p>No se pudo cargar la vista previa directa del PDF.</p>
+                                        <a href="#" target="_blank" class="btn btn-primary" id="ncd-pdf-fallback-btn">
+                                            <i class="fa fa-download mr-1"></i> Abrir o Descargar PDF
+                                        </a>
+                                    </div>
+                                </object>
+                            </div>
+                        </div>
+
+                        <!-- Bottom action buttons -->
+                        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                            <div>
+                                <button type="button" class="btn btn-primary font-weight-bold mr-2" id="ncd-btn-print-80mm">
+                                    <i class="fa fa-print mr-1"></i> Imprimir Ticket 80mm
+                                </button>
+                                <a href="#" target="_blank" class="btn btn-outline-secondary font-weight-bold" id="ncd-btn-download-pdf">
+                                    <i class="fa fa-file-pdf-o mr-1"></i> Descargar PDF
+                                </a>
+                            </div>
+                            <button type="button" class="btn btn-secondary font-weight-bold px-4" data-dismiss="modal">
                                 Cerrar
                             </button>
                         </div>
@@ -509,6 +549,9 @@
             $('#ncd-alert-container').empty();
             $('#ncd-pre-emit-box').show();
             $('#ncd-success-box').hide();
+            $('#ncd-pdf-embed').attr('src', '');
+            $('#ncd-pdf-object').attr('data', '');
+            $('#ncd-pdf-loading').hide();
             $('#ncd-modal-footer').show();
             $('#modal-nota-credito-debito').modal('show');
 
@@ -555,6 +598,7 @@
             } else {
                 $('#ncd-loading').hide();
                 $('#ncd-modal-footer button').prop('disabled', false);
+                $('#ncd-step-' + currentStep).show();
             }
         },
 
@@ -865,12 +909,14 @@
                         }
                     } else {
                         self.updateStepper(4);
+                        $('#ncd-pre-emit-box').show();
                         self.showAlert('danger', resp.message || 'Error al emitir la Nota ante el SIAT.');
                     }
                 },
                 error: function(xhr) {
                     self.showLoading(false);
                     self.updateStepper(4);
+                    $('#ncd-pre-emit-box').show();
                     var msg = 'Error en la conexión con el servicio SIAT.';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         msg = xhr.responseJSON.message;
@@ -881,21 +927,32 @@
         },
 
         showSuccess: function(data) {
+            $('.ncd-step-panel').hide();
+            $('#ncd-step-4').show();
             $('#ncd-pre-emit-box').hide();
             $('#ncd-modal-footer').hide();
-            $('#ncd-success-box').fadeIn(250);
+            $('#ncd-alert-container').empty();
+            $('#ncd-success-box').fadeIn(200);
+
+            for (var s = 1; s <= 4; s++) {
+                $('#ncd-step-indicator-' + s).removeClass('active').addClass('completed');
+            }
 
             if (data.is_gift_card_only) {
                 $('#ncd-succ-nro').text('DEV-GC');
                 $('#ncd-succ-cuf').text('Sin ajuste fiscal SIAT (100% Tarjeta de Regalo - Saldo Restituido)');
+                $('#ncd-succ-giftcard-notice').show();
             } else {
                 $('#ncd-succ-nro').text(data.nro_factura || '1');
                 $('#ncd-succ-cuf').text(data.cuf || '-');
+                $('#ncd-succ-giftcard-notice').hide();
             }
-            $('#ncd-succ-monto').text('Bs. ' + (parseFloat(data.monto_efectivo) || calculatedFinancials.montoEfectivo).toFixed(2));
+            var monto = parseFloat(data.monto_efectivo) || (calculatedFinancials ? calculatedFinancials.montoEfectivo : 0);
+            $('#ncd-succ-monto').text('Bs. ' + monto.toFixed(2));
 
-            var printUrl = "{{ url('nota-credito-debito/print-80mm') }}/" + (data.customer_sale_id || data.return_id);
-            var pdfUrl = "{{ url('nota-credito-debito/download-pdf') }}/" + (data.customer_sale_id || data.return_id);
+            var targetId = data.customer_sale_id || data.return_id;
+            var printUrl = "{{ url('nota-credito-debito/print-80mm') }}/" + targetId;
+            var pdfUrl = "{{ url('nota-credito-debito/download-pdf') }}/" + targetId;
 
             $('#ncd-btn-print-80mm').off('click').on('click', function() {
                 var printWin = window.open(printUrl + '?print=1', '_blank', 'width=420,height=600');
@@ -903,11 +960,141 @@
             });
 
             $('#ncd-btn-download-pdf').attr('href', pdfUrl);
+            $('#ncd-pdf-fallback-btn').attr('href', pdfUrl);
+
+            // Cargar y mostrar PDF oficial SIAT en el visor integrado (estilo return-sale)
+            var self = this;
+            if (data.bytes) {
+                self.loadPdfBytes(data.bytes, pdfUrl);
+            } else if (data.customer_sale_id || data.sale_id) {
+                $('#ncd-pdf-loading').show();
+                var bytesUrl = "{{ url('nota-credito-debito/obtener-bytes') }}/" + (data.customer_sale_id || data.sale_id);
+                $.ajax({
+                    url: bytesUrl,
+                    type: "GET",
+                    dataType: "json",
+                    success: function(bResp) {
+                        $('#ncd-pdf-loading').hide();
+                        if (bResp && bResp.bytes) {
+                            self.loadPdfBytes(bResp.bytes, pdfUrl);
+                        } else {
+                            $('#ncd-pdf-embed').attr('src', pdfUrl + '?inline=1');
+                            $('#ncd-pdf-object').attr('data', pdfUrl + '?inline=1');
+                        }
+                    },
+                    error: function() {
+                        $('#ncd-pdf-loading').hide();
+                        $('#ncd-pdf-embed').attr('src', pdfUrl + '?inline=1');
+                        $('#ncd-pdf-object').attr('data', pdfUrl + '?inline=1');
+                    }
+                });
+            } else {
+                $('#ncd-pdf-embed').attr('src', pdfUrl + '?inline=1');
+                $('#ncd-pdf-object').attr('data', pdfUrl + '?inline=1');
+            }
 
             // Refrescar tabla de ventas o POS si está disponible
             if (typeof $('#sale-table').DataTable === 'function') {
                 try { $('#sale-table').DataTable().ajax.reload(null, false); } catch(e) {}
             }
+        },
+
+        loadPdfBytes: function(base64Bytes, fallbackUrl) {
+            var dataUri = 'data:application/pdf;base64,' + base64Bytes;
+            $('#ncd-pdf-embed').attr('src', dataUri);
+            $('#ncd-pdf-object').attr('data', dataUri);
+
+            try {
+                var byteCharacters = atob(base64Bytes);
+                var byteNumbers = new Array(byteCharacters.length);
+                for (var i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                var byteArray = new Uint8Array(byteNumbers);
+                var blob = new Blob([byteArray], { type: 'application/pdf' });
+                var blobUrl = URL.createObjectURL(blob);
+
+                $('#ncd-btn-open-tab').attr('href', blobUrl);
+                $('#ncd-btn-print-direct').off('click').on('click', function() {
+                    var iframe = document.getElementById('ncd-pdf-print-iframe');
+                    if (!iframe) {
+                        iframe = document.createElement('iframe');
+                        iframe.id = 'ncd-pdf-print-iframe';
+                        iframe.style.position = 'fixed';
+                        iframe.style.right = '0';
+                        iframe.style.bottom = '0';
+                        iframe.style.width = '0';
+                        iframe.style.height = '0';
+                        iframe.style.border = '0';
+                        document.body.appendChild(iframe);
+                    }
+                    iframe.src = blobUrl;
+                    iframe.onload = function() {
+                        try {
+                            iframe.contentWindow.focus();
+                            iframe.contentWindow.print();
+                        } catch(e) {
+                            window.open(blobUrl, '_blank');
+                        }
+                    };
+                });
+            } catch(e) {
+                console.warn('Error creando Blob URL del PDF:', e);
+                $('#ncd-btn-open-tab').attr('href', fallbackUrl || dataUri);
+                $('#ncd-btn-print-direct').off('click').on('click', function() {
+                    window.open(fallbackUrl || dataUri, '_blank');
+                });
+            }
+        },
+
+        openPreviewPdf: function(id) {
+            currentStep = 4;
+            emittedResult = null;
+            try { $('#recentTransaction').modal('hide'); } catch(e) {}
+            try { $('#sale-details').modal('hide'); } catch(e) {}
+            $('#ncd-alert-container').empty();
+            $('#ncd-pre-emit-box').hide();
+            $('#ncd-modal-footer').hide();
+            $('.ncd-step-panel').hide();
+            $('#ncd-step-4').show();
+            $('#ncd-success-box').show();
+            $('#modal-nota-credito-debito').modal('show');
+
+            for (var s = 1; s <= 4; s++) {
+                $('#ncd-step-indicator-' + s).removeClass('active').addClass('completed');
+            }
+
+            var pdfUrl = "{{ url('nota-credito-debito/download-pdf') }}/" + id;
+            var printUrl = "{{ url('nota-credito-debito/print-80mm') }}/" + id;
+
+            $('#ncd-btn-print-80mm').off('click').on('click', function() {
+                var printWin = window.open(printUrl + '?print=1', '_blank', 'width=420,height=600');
+                if (printWin) printWin.focus();
+            });
+            $('#ncd-btn-download-pdf').attr('href', pdfUrl);
+            $('#ncd-pdf-fallback-btn').attr('href', pdfUrl);
+
+            $('#ncd-pdf-loading').show();
+            var self = this;
+            $.ajax({
+                url: "{{ url('nota-credito-debito/obtener-bytes') }}/" + id,
+                type: "GET",
+                dataType: "json",
+                success: function(resp) {
+                    $('#ncd-pdf-loading').hide();
+                    if (resp && resp.bytes) {
+                        self.loadPdfBytes(resp.bytes, pdfUrl);
+                    } else {
+                        $('#ncd-pdf-embed').attr('src', pdfUrl + '?inline=1');
+                        $('#ncd-pdf-object').attr('data', pdfUrl + '?inline=1');
+                    }
+                },
+                error: function() {
+                    $('#ncd-pdf-loading').hide();
+                    $('#ncd-pdf-embed').attr('src', pdfUrl + '?inline=1');
+                    $('#ncd-pdf-object').attr('data', pdfUrl + '?inline=1');
+                }
+            });
         }
     };
 
@@ -931,6 +1118,14 @@
             var saleId = $(this).data('id');
             if (saleId) {
                 window.NotaCreditoDebitoWizard.open(saleId);
+            }
+        });
+
+        $(document).on('click', '.imprimir-ncd-btn', function(e) {
+            e.preventDefault();
+            var id = $(this).data('id');
+            if (id) {
+                window.NotaCreditoDebitoWizard.openPreviewPdf(id);
             }
         });
     });

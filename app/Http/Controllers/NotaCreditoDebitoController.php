@@ -623,6 +623,16 @@ class NotaCreditoDebitoController extends Controller
 
             DB::commit();
 
+            $pdf_bytes = null;
+            try {
+                $impresion = $this->getImprimirFactura(null, $obj_nota_fiscal->id);
+                if (!empty($impresion['bytes'])) {
+                    $pdf_bytes = $impresion['bytes'];
+                }
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo obtener bytes del PDF en emitirNotaCreditoDebito: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'status' => true,
                 'message' => 'Nota de Crédito-Débito N° ' . $nro_nota . ' emitida exitosamente ante el SIAT.',
@@ -630,6 +640,7 @@ class NotaCreditoDebitoController extends Controller
                 'customer_sale_id' => $obj_nota_fiscal->id,
                 'nro_factura' => $nro_nota,
                 'cuf' => $obj_nota_fiscal->cuf,
+                'bytes' => $pdf_bytes,
                 'monto_total_devuelto' => $montoTotalDevuelto,
                 'monto_descuento' => $montoDescuentoCreditoDebito,
                 'monto_sujeto_ajuste' => $montoSujetoAjuste,
@@ -875,6 +886,24 @@ class NotaCreditoDebitoController extends Controller
             abort(404, 'Nota de Crédito-Débito o Devolución no encontrada.');
         }
 
+        // Si existe documento fiscal SIAT emitido, retornar el PDF oficial generado por el SIAT
+        if ($customer_sale && !empty($customer_sale->cuf)) {
+            try {
+                $impresion = $this->getImprimirFactura(null, $customer_sale->id);
+                if (!empty($impresion['bytes'])) {
+                    $pdf_content = base64_decode($impresion['bytes']);
+                    $doc_num = $customer_sale->nro_factura ?? $id;
+                    $disposition = request()->get('inline') ? 'inline' : 'attachment';
+                    return response($pdf_content, 200, [
+                        'Content-Type' => 'application/pdf',
+                        'Content-Disposition' => $disposition . '; filename="Nota_Credito_Debito_' . $doc_num . '.pdf"'
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('downloadPdf: fallback a DomPDF por error al consultar SIAT: ' . $e->getMessage());
+            }
+        }
+
         $sale = null;
         if ($customer_sale) {
             $sale = Sale::find($customer_sale->sale_id);
@@ -955,5 +984,35 @@ class NotaCreditoDebitoController extends Controller
 
         $doc_num = $customer_sale ? $customer_sale->nro_factura : ($return->reference_no ?? $id);
         return $pdf->download('Nota_Credito_Debito_' . $doc_num . '.pdf');
+    }
+
+    /**
+     * Retorna los bytes base64 del PDF oficial SIAT de la Nota de Crédito-Débito
+     */
+    public function getBytesNota($id)
+    {
+        try {
+            $customer_sale = CustomerSale::where(function ($q) use ($id) {
+                $q->where('id', $id)
+                    ->orWhere('sale_id', $id);
+            })->where('codigo_documento_sector', 24)->orderBy('id', 'desc')->first();
+
+            if (!$customer_sale) {
+                $return = Returns::find($id);
+                if ($return && $return->customer_sale_id) {
+                    $customer_sale = CustomerSale::find($return->customer_sale_id);
+                }
+            }
+
+            if (!$customer_sale || empty($customer_sale->cuf)) {
+                return response()->json(['status' => false, 'message' => 'Nota fiscal no encontrada o sin CUF'], 404);
+            }
+
+            $data = $this->getImprimirFactura(null, $customer_sale->id);
+            return response()->json($data);
+        } catch (\Throwable $e) {
+            Log::error('Error en getBytesNota: ' . $e->getMessage());
+            return response()->json(['status' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 }

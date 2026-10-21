@@ -6,6 +6,11 @@
         $venta_facturada = isset($customerSales) && isset($customerSales[$sale->id]) 
             ? $customerSales[$sale->id] 
             : \DB::table('customer_sales')->where('sale_id', $sale->id)->first();
+        $nota_credito = \DB::table('customer_sales')
+            ->where('sale_id', $sale->id)
+            ->where('codigo_documento_sector', 24)
+            ->latest('id')
+            ->first();
     @endphp
     <tr>
         <td>{{ date('d-m-Y H:i', strtotime($sale->created_at)) }}</td>
@@ -37,6 +42,14 @@
                             title="Emitir Nota de Crédito/Débito">
                             <i class="fa fa-undo"></i>
                         </button>
+                        @if (!empty($nota_credito))
+                            <button type="button"
+                                class="imprimir-ncd-btn btn btn-dark btn-sm ml-1"
+                                data-id="{{ $nota_credito->id }}"
+                                title="Ver / Imprimir Nota Crédito-Débito SIAT #{{ $nota_credito->nro_factura }}">
+                                <i class="fa fa-file-pdf-o"></i>
+                            </button>
+                        @endif
                     @endif
                 </div>
             </td>

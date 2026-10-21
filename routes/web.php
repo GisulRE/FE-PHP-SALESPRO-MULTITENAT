@@ -449,6 +449,7 @@ Route::group(['middleware' => ['auth', 'active']], function () {
 	Route::post('nota-credito-debito/emitir', 'NotaCreditoDebitoController@emitir')->name('nota-credito-debito.emitir');
 	Route::get('nota-credito-debito/print-80mm/{id}', 'NotaCreditoDebitoController@print80mm')->name('nota-credito-debito.print80mm');
 	Route::get('nota-credito-debito/download-pdf/{id}', 'NotaCreditoDebitoController@downloadPdf')->name('nota-credito-debito.downloadPdf');
+	Route::get('nota-credito-debito/obtener-bytes/{id}', 'NotaCreditoDebitoController@getBytesNota')->name('nota-credito-debito.obtener-bytes');
 
 	Route::get('return-purchase/getcustomergroup/{id}', 'ReturnPurchaseController@getCustomerGroup')->name('return-purchase.getcustomergroup');
 	Route::post('return-purchase/sendmail', 'ReturnPurchaseController@sendMail')->name('return-purchase.sendmail');
