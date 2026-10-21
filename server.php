@@ -1,15 +1,40 @@
 <?php
 
-$uri = urldecode(
+$rawUri = urldecode(
     parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)
 );
 
-// Some views in this project reference assets with a "public/" prefix
-// (e.g. asset('public/css/app.css')). When running via `php artisan serve`,
-// the document root is already `public/`, so we normalize that here.
-if (strpos($uri, '/public/') === 0) {
-    $uri = substr($uri, 7);
+// If request begins with /public/, serve it directly if it exists under public/
+if (strpos($rawUri, '/public/') === 0) {
+    $relative = substr($rawUri, 7);
+    $filePath = __DIR__ . '/public' . $relative;
+    if (is_file($filePath)) {
+        $mimeTypes = [
+            'css'   => 'text/css',
+            'js'    => 'application/javascript',
+            'png'   => 'image/png',
+            'jpg'   => 'image/jpeg',
+            'jpeg'  => 'image/jpeg',
+            'gif'   => 'image/gif',
+            'svg'   => 'image/svg+xml',
+            'ico'   => 'image/x-icon',
+            'woff'  => 'font/woff',
+            'woff2' => 'font/woff2',
+            'ttf'   => 'font/ttf',
+            'eot'   => 'application/vnd.ms-fontobject',
+            'json'  => 'application/json',
+            'map'   => 'application/json',
+        ];
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $contentType = $mimeTypes[$ext] ?? (function_exists('mime_content_type') ? mime_content_type($filePath) : 'application/octet-stream');
+        header('Content-Type: ' . $contentType);
+        header('Content-Length: ' . filesize($filePath));
+        readfile($filePath);
+        exit;
+    }
 }
+
+$uri = $rawUri;
 
 // This file allows us to emulate Apache's "mod_rewrite" functionality from the
 // built-in PHP web server. This provides a convenient way to test a Laravel

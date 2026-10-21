@@ -55,7 +55,7 @@
                         <input type="hidden" name="sucursal_biller_id_hidden" value="{{ $data_biller->sucursal }}">
                         <select name="sucursal" id="sucursal" class="form-control selectpicker" title="Seleccionar...">
                             @foreach ($sucursales as $sucursal)
-                                <option value="{{ $sucursal->sucursal }}">{{ $sucursal->sucursal }} |
+                                <option value="{{ $sucursal->sucursal }}" {{ (isset($data_biller->sucursal) && (string)$data_biller->sucursal === (string)$sucursal->sucursal) ? 'selected' : '' }}>{{ $sucursal->sucursal }} |
                                     {{ $sucursal->nombre }}</option>
                             @endforeach
                         </select>
@@ -67,7 +67,7 @@
                         <select name="codigo_punto_venta" id="codigo_punto_venta" class="form-control selectpicker"
                             title="Seleccionar...">
                             @foreach ($data_p_venta as $p_venta)
-                                <option value="{{ $p_venta->codigo_punto_venta }}">{{ $p_venta->codigo_punto_venta }} -
+                                <option value="{{ $p_venta->codigo_punto_venta }}" {{ (isset($data_biller->punto_venta_siat) && (string)$data_biller->punto_venta_siat === (string)$p_venta->codigo_punto_venta) ? 'selected' : '' }}>{{ $p_venta->codigo_punto_venta }} -
                                     {{ $p_venta->nombre_punto_venta }}</option>
                             @endforeach
                         </select>
@@ -444,7 +444,7 @@
                                 <select name="sucursal_filtro" id="sucursal_filtro" class="form-control selectpicker"
                                     title="Seleccionar..." required>
                                     @foreach ($sucursales as $sucursal)
-                                        <option value="{{ $sucursal->sucursal }}">{{ $sucursal->sucursal }} |
+                                        <option value="{{ $sucursal->sucursal }}" {{ (isset($data_biller->sucursal) && (string)$data_biller->sucursal === (string)$sucursal->sucursal) ? 'selected' : '' }}>{{ $sucursal->sucursal }} |
                                             {{ $sucursal->nombre }}</option>
                                     @endforeach
                                 </select>
@@ -454,7 +454,7 @@
                                 <select name="codigo_punto_venta_filtro" id="codigo_punto_venta_filtro"
                                     class="form-control selectpicker" title="Seleccionar..." required>
                                     @foreach ($data_p_venta as $p_venta)
-                                        <option value="{{ $p_venta->codigo_punto_venta }}">
+                                        <option value="{{ $p_venta->codigo_punto_venta }}" {{ (isset($data_biller->punto_venta_siat) && (string)$data_biller->punto_venta_siat === (string)$p_venta->codigo_punto_venta) ? 'selected' : '' }}>
                                             {{ $p_venta->codigo_punto_venta }} -
                                             {{ $p_venta->nombre_punto_venta }}</option>
                                     @endforeach
@@ -806,7 +806,11 @@
             $('#sucursalarqcat_filtro').removeClass('noselect');
             $('#sucursalrev_filtro').removeClass('noselect');
             $('#operadorrev_filtro').removeClass('noselect');
-           // $('#codigo_punto_venta_filtro').removeClass('noselect');
+            if (!$('select[name="sucursal"]').val() && $("input[name='sucursal_biller_id_hidden']").val()) {
+                $('select[name="sucursal"]').val($("input[name='sucursal_biller_id_hidden']").val());
+                $('select[name="codigo_punto_venta"]').val($("input[name='punto_venta_biller_id_hidden']").val());
+                $('.selectpicker').selectpicker('refresh');
+            }
         }
 
         $.ajaxSetup({
@@ -814,95 +818,138 @@
                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
             }
         });
-        loadPuntoVenta();
 
-        function loadPuntoVenta() {
-            var id = $("select[name='sucursal']").val();
-            var url = '{{ route('getPuntosVentas', ':id') }}';
-            url = url.replace(':id', id);
-            $("select[name='codigo_punto_venta']").empty();
-            $.ajax({
+        function cargarPuntosVenta(sucursalId, targetSelectSelector, preferredValue) {
+            var $target = $(targetSelectSelector);
+            if ($target.length === 0) {
+                return;
+            }
+
+            if (sucursalId === null || sucursalId === undefined || String(sucursalId).trim() === '') {
+                $target.empty();
+                $target.selectpicker('refresh');
+                return;
+            }
+
+            var cleanId = String(sucursalId).trim();
+            if (cleanId.indexOf('|') !== -1) {
+                cleanId = cleanId.split('|')[0].trim();
+            }
+
+            // Capturar valor seleccionado previo ANTES de vaciar el select
+            var targetVal = (preferredValue !== undefined && preferredValue !== null && String(preferredValue).trim() !== '')
+                ? String(preferredValue).trim()
+                : String($target.val() || '').trim();
+
+            var baseUrl = '{{ url("sales/get_punto_venta") }}';
+            var url = baseUrl + '/' + encodeURIComponent(cleanId);
+            if (window.location.protocol === 'https:' && url.indexOf('http://') === 0) {
+                url = url.replace('http://', 'https://');
+            }
+
+            // Cancelar peticion previa en curso si existe
+            var prevXhr = $target.data('activeXhr');
+            if (prevXhr && prevXhr.readyState !== 4) {
+                prevXhr.abort();
+            }
+
+            var xhr = $.ajax({
                 url: url,
                 type: "GET",
+                dataType: "json",
                 success: function(data) {
-                    console.log(data);
-                    for (let i = 0; i < data.length; i++) {
-                        $("select[name='codigo_punto_venta']").append('<option value="' + data[i]
-                            .codigo_punto_venta + '">' + data[i].codigo_punto_venta + ' - ' + data[
-                                i].nombre_punto_venta + '</option>');
-                    };
-                    $('.selectpicker').selectpicker('refresh');
+                    var optionsHtml = '';
+                    if (!data || data.length === 0) {
+                        optionsHtml = '<option value="0" selected>0 - Punto de Venta Principal (0)</option>';
+                    } else {
+                        var matched = false;
+                        for (var i = 0; i < data.length; i++) {
+                            var pvCode = String(data[i].codigo_punto_venta !== undefined ? data[i].codigo_punto_venta : 0);
+                            var pvName = data[i].nombre_punto_venta || ('Punto ' + pvCode);
+                            var isSelected = (targetVal !== '' && targetVal === pvCode);
+                            if (isSelected) {
+                                matched = true;
+                            }
+                            optionsHtml += '<option value="' + pvCode + '"' + (isSelected ? ' selected' : '') + '>' +
+                                pvCode + ' - ' + pvName +
+                                '</option>';
+                        }
+                    }
 
+                    $target.html(optionsHtml);
+                    if (data && data.length > 0) {
+                        if (targetVal !== '' && $target.find('option[value="' + targetVal + '"]').length > 0) {
+                            $target.val(targetVal);
+                        } else {
+                            $target.val(String(data[0].codigo_punto_venta !== undefined ? data[0].codigo_punto_venta : 0));
+                        }
+                    } else {
+                        $target.val('0');
+                    }
+
+                    if ($target.data('selectpicker')) {
+                        $target.selectpicker('refresh');
+                    } else {
+                        $target.selectpicker();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    if (status === 'abort') {
+                        return;
+                    }
+                    console.error('Error cargando puntos de venta:', error, xhr.responseText);
+                    $target.empty();
+                    $target.append('<option value="0" selected>0 - Punto de Venta Principal (0)</option>');
+                    $target.val('0');
+                    $target.selectpicker('refresh');
                 }
             });
+
+            $target.data('activeXhr', xhr);
+        }
+
+        function loadPuntoVenta() {
+            var id = $("select[name='sucursal']").val() || $("input[name='sucursal_biller_id_hidden']").val();
+            var pv = $("select[name='codigo_punto_venta']").val() || $("input[name='punto_venta_biller_id_hidden']").val();
+            cargarPuntosVenta(id, "select[name='codigo_punto_venta']", pv);
         }
 
         function loadPuntoVentaReporte() {
-            var id = $("select[name='sucursal_filtro']").val();
-            var url = '{{ route('getPuntosVentas', ':id') }}';
-            url = url.replace(':id', id);
-            $("select[name='codigo_punto_venta_filtro']").empty();
-            $.ajax({
-                url: url,
-                type: "GET",
-                success: function(data) {
-                    console.log(data);
-                    for (let i = 0; i < data.length; i++) {
-                        $("select[name='codigo_punto_venta_filtro']").append('<option value="' + data[i]
-                            .codigo_punto_venta + '">' + data[i].codigo_punto_venta + ' - ' + data[
-                                i].nombre_punto_venta + '</option>');
-                    };
-                    $('.selectpicker').selectpicker('refresh');
-
-                }
-            });
+            var id = $("select[name='sucursal_filtro']").val() || $("input[name='sucursal_biller_id_hidden']").val();
+            var pv = $("select[name='codigo_punto_venta_filtro']").val() || $("input[name='punto_venta_biller_id_hidden']").val();
+            cargarPuntosVenta(id, "select[name='codigo_punto_venta_filtro']", pv);
         }
-        // Cuando se seleccione una sucursal, mostrar sus puntos de ventas respectivos. 
-        $('#sucursal').on('change', function() {
+
+        // Delegated change event listeners para bootstrap-select y nativo con proteccion contra doble disparo
+        $(document).on('change changed.bs.select', '#sucursal, select[name="sucursal"]', function() {
             var id = $(this).val();
-            var url = '{{ route('getPuntosVentas', ':id') }}';
-            url = url.replace(':id', id);
+            if (id === undefined || id === null) {
+                return;
+            }
+            if ($(this).data('last-loaded-val') === id) {
+                return;
+            }
+            $(this).data('last-loaded-val', id);
+            cargarPuntosVenta(id, "select[name='codigo_punto_venta']");
+        });
 
-            $("select[name='codigo_punto_venta']").empty();
-
-            $.ajax({
-                url: url,
-                type: "GET",
-                success: function(data) {
-                    console.log(data);
-                    for (let i = 0; i < data.length; i++) {
-                        $("select[name='codigo_punto_venta']").append('<option value="' + data[i]
-                            .codigo_punto_venta + '">' + data[i].codigo_punto_venta + ' - ' + data[
-                                i].nombre_punto_venta + '</option>');
-                    };
-                    $('.selectpicker').selectpicker('refresh');
-
-                }
-            });
-        })
-
-        $('#sucursal_filtro').on('change', function() {
+        $(document).on('change changed.bs.select', '#sucursal_filtro, select[name="sucursal_filtro"]', function() {
             var id = $(this).val();
-            var url = '{{ route('getPuntosVentas', ':id') }}';
-            url = url.replace(':id', id);
+            if (id === undefined || id === null) {
+                return;
+            }
+            if ($(this).data('last-loaded-val') === id) {
+                return;
+            }
+            $(this).data('last-loaded-val', id);
+            cargarPuntosVenta(id, "select[name='codigo_punto_venta_filtro']");
+        });
 
-            $("select[name='codigo_punto_venta_filtro']").empty();
-
-            $.ajax({
-                url: url,
-                type: "GET",
-                success: function(data) {
-                    console.log(data);
-                    for (let i = 0; i < data.length; i++) {
-                        $("select[name='codigo_punto_venta_filtro']").append('<option value="' + data[i]
-                            .codigo_punto_venta + '">' + data[i].codigo_punto_venta + ' - ' + data[
-                                i].nombre_punto_venta + '</option>');
-                    };
-                    $('.selectpicker').selectpicker('refresh');
-
-                }
-            });
-        })
+        // Asegurar que si el select de punto de venta estuviese vacío, se cargue con la sucursal actual
+        var initialSucursal = $('select[name="sucursal"]').val() || $("input[name='sucursal_biller_id_hidden']").val();
+        if (initialSucursal !== null && initialSucursal !== undefined && String(initialSucursal).trim() !== '' && $('select[name="codigo_punto_venta"] option').length <= 1) {
+            loadPuntoVenta();
+        }
 
         $('#facturas_modal').DataTable({
             "order": [],

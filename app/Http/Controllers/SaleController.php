@@ -98,7 +98,7 @@ class SaleController extends Controller
 
     private function resolveSucursalCode($value): ?int
     {
-        if ($value === null || $value === '') {
+        if ($value === null || $value === '' || $value === 'null' || $value === 'undefined') {
             return null;
         }
 
@@ -107,12 +107,16 @@ class SaleController extends Controller
         }
 
         $textValue = trim((string) $value);
-        if ($textValue === '') {
+        if ($textValue === '' || $textValue === 'null' || $textValue === 'undefined') {
             return null;
         }
 
         if (strpos($textValue, '|') !== false) {
             $textValue = trim(explode('|', $textValue)[0]);
+        }
+
+        if (is_numeric($textValue)) {
+            return (int) $textValue;
         }
 
         $upperValue = strtoupper($textValue);
@@ -5854,14 +5858,90 @@ class SaleController extends Controller
         $sucursalCode = $this->resolveSucursalCode($sucursal);
 
         if ($sucursalCode === null) {
-            return collect();
+            return response()->json([]);
         }
 
-        $puntos_ventas = $this->getPuntosVentaDesdeSiatApi($sucursalCode);
-        if ($puntos_ventas === null) {
-            $puntos_ventas = SiatPuntoVenta::where('sucursal', $sucursalCode)->get();
+        // Buscar puntos de venta locales
+        $query = SiatPuntoVenta::query();
+        if ($sucursalCode === 0) {
+            $query->where(function ($q) {
+                $q->where('sucursal', 0)->orWhereNull('sucursal');
+            });
+        } else {
+            $query->where('sucursal', $sucursalCode);
         }
-        return $puntos_ventas;
+
+        $puntos_ventas = (clone $query)->where('is_active', true)
+            ->orderBy('codigo_punto_venta', 'asc')
+            ->get();
+
+        if ($puntos_ventas->isEmpty()) {
+            $puntos_ventas = (clone $query)
+                ->orderBy('codigo_punto_venta', 'asc')
+                ->get();
+        }
+
+        // Si aún no hay registros locales, intentar sincronizar con SIAT
+        if ($puntos_ventas->isEmpty()) {
+            try {
+                $siat_pvs = $this->getPuntosVentaDesdeSiatApi($sucursalCode);
+                if ($siat_pvs && !$siat_pvs->isEmpty()) {
+                    $puntos_ventas = $siat_pvs;
+                }
+            } catch (\Throwable $e) {
+                \Log::warning("getPuntoVentaxSucursal: No se pudo sincronizar desde SIAT: " . $e->getMessage());
+            }
+        }
+
+        // Asegurar que siempre esté el Punto de Venta 0 (Casa Matriz / Principal)
+        $hasPunto0 = $puntos_ventas->contains(function ($pv) {
+            return (string) $pv->codigo_punto_venta === '0' || (int) $pv->codigo_punto_venta === 0;
+        });
+
+        if (!$hasPunto0) {
+            $punto0Query = SiatPuntoVenta::where(function ($q) {
+                $q->where('codigo_punto_venta', 0)->orWhere('codigo_punto_venta', '0');
+            });
+            if ($sucursalCode === 0) {
+                $punto0Query->where(function ($q) {
+                    $q->where('sucursal', 0)->orWhereNull('sucursal');
+                });
+            } else {
+                $punto0Query->where('sucursal', $sucursalCode);
+            }
+            $punto0 = $punto0Query->first();
+
+            if (!$punto0) {
+                try {
+                    $punto0 = SiatPuntoVenta::create([
+                        'codigo_punto_venta' => 0,
+                        'nombre_punto_venta' => 'Punto de Venta Principal (0)',
+                        'descripcion' => 'Punto de Venta Principal',
+                        'tipo_punto_venta' => 0,
+                        'sucursal' => $sucursalCode,
+                        'codigo_cuis' => 'CUIS-PENDIENTE',
+                        'fecha_vigencia_cuis' => date('Y-m-d H:i:s'),
+                        'is_siat' => true,
+                        'is_active' => true,
+                        'usuario_alta' => Auth::user() ? Auth::user()->id : 1,
+                    ]);
+                } catch (\Throwable $e) {
+                    \Log::warning("getPuntoVentaxSucursal: Error al crear punto 0: " . $e->getMessage());
+                    $punto0 = (object) [
+                        'codigo_punto_venta' => 0,
+                        'nombre_punto_venta' => 'Punto de Venta Principal (0)',
+                        'sucursal' => $sucursalCode,
+                        'codigo_cuis' => 'CUIS-PENDIENTE'
+                    ];
+                }
+            }
+
+            if ($punto0) {
+                $puntos_ventas = $puntos_ventas->prepend($punto0);
+            }
+        }
+
+        return response()->json($puntos_ventas->values());
     }
 
     public function getCorreoBiller($biller_id)
@@ -5884,10 +5964,24 @@ class SaleController extends Controller
                 $data_biller = (object)['sucursal' => 0, 'punto_venta_siat' => 0];
             }
             $data_p_venta = SiatPuntoVenta::select('codigo_punto_venta', 'nombre_punto_venta')
-                ->where([
-                    'sucursal' => $data_biller->sucursal ?? 0,
-                    'codigo_punto_venta' => $data_biller->punto_venta_siat ?? 0
-                ])->get();
+                ->where('sucursal', $data_biller->sucursal ?? 0)
+                ->orderBy('codigo_punto_venta', 'asc')
+                ->get();
+
+            if ($data_p_venta->isEmpty()) {
+                $punto0 = SiatPuntoVenta::select('codigo_punto_venta', 'nombre_punto_venta')
+                    ->where(function ($q) {
+                        $q->where('codigo_punto_venta', 0)->orWhere('codigo_punto_venta', '0');
+                    })->first();
+                if ($punto0) {
+                    $data_p_venta = collect([$punto0]);
+                } else {
+                    $data_p_venta = collect([(object)[
+                        'codigo_punto_venta' => 0,
+                        'nombre_punto_venta' => 'Punto de Venta Principal (0)'
+                    ]]);
+                }
+            }
 
             $usuarios = User::select('id', 'name')->where('is_active', true)->get();
             $sucursales = SiatSucursal::select('sucursal', 'nombre')->where('estado', true)->get();

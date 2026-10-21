@@ -102,15 +102,78 @@ class ControlContingenciaController extends Controller
 
     public function getPuntoVenta($sucursal)
     {
-        $puntos_ventas = $this->getPuntosVentaDesdeSiatApi($sucursal);
-        if ($puntos_ventas === null) {
-            $puntos_ventas = SiatPuntoVenta::where('sucursal', $sucursal)->where('modo_contingencia', false)->get();
-        } else {
-            $puntos_ventas = $puntos_ventas->filter(function($pv) {
-                return !$pv->modo_contingencia;
-            })->values();
+        $sucursalCode = null;
+        if ($sucursal !== null && $sucursal !== '' && $sucursal !== 'null' && $sucursal !== 'undefined') {
+            if (is_numeric($sucursal)) {
+                $sucursalCode = (int) $sucursal;
+            } else {
+                $textValue = trim((string) $sucursal);
+                if (strpos($textValue, '|') !== false) {
+                    $textValue = trim(explode('|', $textValue)[0]);
+                }
+                if (is_numeric($textValue)) {
+                    $sucursalCode = (int) $textValue;
+                } else {
+                    $suc_row = SiatSucursal::whereRaw('UPPER(nombre) = ?', [strtoupper($textValue)])
+                        ->orWhereRaw('UPPER(descripcion_sucursal) = ?', [strtoupper($textValue)])
+                        ->first();
+                    if ($suc_row) {
+                        $sucursalCode = (int) $suc_row->sucursal;
+                    }
+                }
+            }
         }
-        return $puntos_ventas;
+
+        if ($sucursalCode === null) {
+            return response()->json([]);
+        }
+
+        $puntos_ventas = SiatPuntoVenta::where('sucursal', $sucursalCode)
+            ->where('modo_contingencia', false)
+            ->orderBy('codigo_punto_venta', 'asc')
+            ->get();
+
+        if ($puntos_ventas->isEmpty()) {
+            $puntos_ventas = SiatPuntoVenta::where('sucursal', $sucursalCode)
+                ->orderBy('codigo_punto_venta', 'asc')
+                ->get();
+        }
+
+        if ($puntos_ventas->isEmpty()) {
+            $punto0 = SiatPuntoVenta::where('sucursal', $sucursalCode)
+                ->where(function ($q) {
+                    $q->where('codigo_punto_venta', 0)->orWhere('codigo_punto_venta', '0');
+                })->first();
+
+            if (!$punto0) {
+                try {
+                    $punto0 = SiatPuntoVenta::create([
+                        'codigo_punto_venta' => 0,
+                        'nombre_punto_venta' => 'Punto de Venta Principal (0)',
+                        'descripcion' => 'Punto de Venta Principal',
+                        'tipo_punto_venta' => 0,
+                        'sucursal' => $sucursalCode,
+                        'codigo_cuis' => 'CUIS-PENDIENTE',
+                        'fecha_vigencia_cuis' => date('Y-m-d H:i:s'),
+                        'is_siat' => true,
+                        'is_active' => true,
+                        'usuario_alta' => Auth::user() ? Auth::user()->id : 1,
+                    ]);
+                } catch (\Throwable $e) {
+                    $punto0 = (object) [
+                        'codigo_punto_venta' => 0,
+                        'nombre_punto_venta' => 'Punto de Venta Principal (0)',
+                        'sucursal' => $sucursalCode,
+                        'codigo_cuis' => 'CUIS-PENDIENTE'
+                    ];
+                }
+            }
+            if ($punto0) {
+                $puntos_ventas = collect([$punto0]);
+            }
+        }
+
+        return response()->json($puntos_ventas->values());
     }
 
     public function registrarEvento($id)
