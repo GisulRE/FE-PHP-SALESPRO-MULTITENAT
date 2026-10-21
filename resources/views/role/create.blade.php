@@ -46,7 +46,7 @@
                                 <li>
                                     <a href="{{ route('role.permission', $role->id) }}" class="btn btn-link"><i class="dripicons-lock-open"></i> {{trans('file.Change Permission')}}</a>
                                 </li>
-                                @if($role->id > 2)
+                                @if(!in_array(strtolower($role->name), ['admin', 'administrador']))
                                 {{ Form::open(['route' => ['role.destroy', $role->id], 'method' => 'DELETE'] ) }}
                                 <li>
                                     <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{trans('file.delete')}}</button>

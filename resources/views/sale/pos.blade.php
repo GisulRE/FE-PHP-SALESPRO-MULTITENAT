@@ -1250,7 +1250,7 @@
                                         data-on="Si" data-off="No" data-onstyle="success"
                                         data-offstyle="secondary" data-size="mini">
                                 </div>
-                                <div id="btn_modeOnline" class="d-flex align-items-center mr-3" style="display:none;">
+                                <div id="btn_modeOnline" class="d-flex align-items-center mr-3">
                                     <label class="modern-pos-switch" for="toggle-event-mode" title="Click para alternar entre Modo Online y Offline">
                                         <input type="checkbox" id="toggle-event-mode" checked>
                                         <span class="switch-slider">
@@ -3127,7 +3127,7 @@
             return estado;
         }
         
-        $('#btn_modeOnline').hide();
+        // $('#btn_modeOnline').hide();
 
         // Aseguramos que el valor inicial tenga el formato correcto
         const priceUnitInput = document.getElementById("edit_unit_price_mod");
@@ -3151,10 +3151,10 @@
             }
         });
         $(document).ready(function() {
-            //getEstadoSIN();
             console.log("Ready POS!");
             console.log("SIAT:" + bandera_siat);
             verificaEstadoPV();
+            sincronizarEstadoModoPOS();
             @if (session()->has('printsale') && session()->has('saleid'))
                 var id = '{{ session()->get('saleid') }}';
                 var win = window.open('sales/gen_invoice/' + id, '_blank');
@@ -4568,18 +4568,14 @@
                     $('#submit-btn').html('<i class="fa fa-check"></i> Confirmar Venta');
                 }
             } else if (target == '#segundoTab') {
-                if ($("input[name='codigo_emision_hidden']").val() == 1) {
-                    try { mostrarLabelContingencia(); } catch (e) {}
-                    try { getEstadoSIN(); } catch (e) {}
-                    try { determinarVigenciaCUFDxBiller(); } catch (e) {}
-                }
+                try { sincronizarEstadoModoPOS(); } catch (e) {}
                 $('#submit-btn').html('<i class="fa fa-print"></i> Grabar e Imprimir');
             } else if (target == '#tercerTab') {
                 $('#submit-btn').html('<i class="fa fa-check"></i> Nueva Venta / Cerrar');
             }
         });
 
-        // Función para imprimir factura desde iframe o link
+        // Función para imprimir factura directamente desde el iframe embebido en el modal
         function imprimirIframeFactura() {
             var iframeEl = document.getElementById('final_print_iframe');
             if (iframeEl && iframeEl.contentWindow) {
@@ -4587,11 +4583,9 @@
                     iframeEl.contentWindow.focus();
                     iframeEl.contentWindow.print();
                     return;
-                } catch (e) {}
-            }
-            var printUrl = $('#final_print_link').attr('href');
-            if (printUrl && printUrl !== '#' && printUrl !== '') {
-                window.open(printUrl, '_blank');
+                } catch (e) {
+                    console.warn('Error al imprimir iframe:', e);
+                }
             }
         }
 
@@ -4673,22 +4667,20 @@
                                 if (rawPhone) $('#final_whatsapp_phone').val(rawPhone);
                             }
 
-                            // DISPARAR IMPRESIÓN INMEDIATA ("debía imprimir la factura")
-                            try {
-                                var printWin = window.open(printUrl, '_blank');
-                                if (!printWin || printWin.closed || typeof printWin.closed === 'undefined') {
-                                    // Si bloqueó popup, se puede imprimir desde el iframe al cargarse
-                                    var iframeEl = document.getElementById('final_print_iframe');
-                                    if (iframeEl) {
-                                        iframeEl.onload = function() {
-                                            try {
-                                                iframeEl.contentWindow.focus();
-                                                iframeEl.contentWindow.print();
-                                            } catch (pe) {}
-                                        };
-                                    }
-                                }
-                            } catch (e) {}
+                            // Imprimir directamente en el modal mediante el iframe embebido (sin abrir otra pestaña)
+                            var iframeEl = document.getElementById('final_print_iframe');
+                            if (iframeEl) {
+                                iframeEl.onload = function() {
+                                    setTimeout(function() {
+                                        try {
+                                            iframeEl.contentWindow.focus();
+                                            iframeEl.contentWindow.print();
+                                        } catch (pe) {
+                                            console.log('Auto-print iframe bloqueado por navegador:', pe);
+                                        }
+                                    }, 800);
+                                };
+                            }
 
                             $('#submit-btn').html('<i class="fa fa-check"></i> Nueva Venta / Cerrar');
                             $btn.prop('disabled', false);
@@ -6505,120 +6497,41 @@
 
         });
 
-        // Funciones para determinar los servicios de Impuestos Nacionales
-        function getEstadoSIN() {
-            var url = '{{ route('estado_servicios_sin') }}';
-            console.log('funcion getEstadoSIN, para determinar los Servicios de Impuestos Nacionales');
-            $('#label_contingencia').hide();
-            $('#btn_modeOnline').show();
-            $.ajax({
-                url: url,
-                type: "GET",
-                async: false,
-                success: function(data) {
-                    if (data == true) {
-                        console.log('Servicios SIN en línea => ' + data);
-                        bandera_servicio_sin = true;
-                        sincronizarSwitchModoPOS();
-                    } else {
-                        console.log('Falso, los servicios no están funcionando, SIN caído => ' + data);
-                        bandera_servicio_sin = false;
-                        <?php if($hasSiat){ ?>
-                        alertaPuntoVentaContingencia();
-                        <?php } ?>
-                    }
-                }
-            });
-        }
-
-        function alertaPuntoVentaContingencia() {
+        // Control exclusivo de modo Online / Offline en el POS
+        function sincronizarEstadoModoPOS() {
             var id = $('select[name=biller_id]').val();
-            var url = '{{ route('estado_punto_venta_contingencia', ':id') }}';
-            url = url.replace(':id', id);
-
-            $.ajax({
-                url: url,
-                type: "GET",
-                success: function(data) {
-                    if (data == true) {
-                        // el punto de venta se encuentra en modo contingencia
-                        console.log('El punto de venta se encuentra en modo contingencia! ');
-                        bandera_puntoventa_contingencia = true;
-                    } else {
-                        bandera_puntoventa_contingencia = false;
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'Problemas de conexión con SIAT',
-                            html: 'Se recomienda activar <b>Modo Contingencia</b>, ' +
-                                '<a href="{{ route('contingencia.index') }}" target="_blank">casos especiales</a> ' +
-                                'para generar facturas. ',
-                        });
-                    }
-                }
-            });
-        }
-
-        function mostrarLabelContingencia() {
-            var id = $('select[name=biller_id]').val();
-            var url = '{{ route('estado_punto_venta_contingencia', ':id') }}';
-            url = url.replace(':id', id);
+            if (!id) return;
+            var url = '{{ route('estado_punto_venta_contingencia', ':id') }}'.replace(':id', id);
 
             $.ajax({
                 url: url,
                 type: "GET",
                 success: function(data) {
                     _toggleInicializando = true;
-                    if (data == true) {
-                        // el punto de venta se encuentra en modo contingencia
-                        console.log('mostrarLabelContingencia ')
-                        $('#label_contingencia').show();
-                        $('#btn_modeOnline').show();
-                        bandera_puntoventa_contingencia = true;
-                        sincronizarSwitchModoPOS();
-                        consultarEventoContingencia();
-                    } else {
-                        $('#label_contingencia').hide();
-                        $('#btn_modeOnline').show();
-                        bandera_puntoventa_contingencia = false;
-                        sincronizarSwitchModoPOS();
-                    }
+                    bandera_puntoventa_contingencia = (data === true || data === 1 || data === '1');
+                    $('#btn_modeOnline').show();
+                    sincronizarSwitchModoPOS();
                     _toggleInicializando = false;
                 }
             });
-
         }
-        // Fin Funciones para determinar los servicios de Impuestos Nacionales
+
+        function mostrarLabelContingencia() {
+            sincronizarEstadoModoPOS();
+        }
+
+        function getEstadoSIN() {
+            // El POS ya no controla contingencias complejas ni bloquea al usuario
+            sincronizarEstadoModoPOS();
+        }
+
+        function alertaPuntoVentaContingencia() {
+            // Desactivado: El POS solo alterna Online/Offline sin alertas de contingencia
+        }
 
         function consultarEventoContingencia() {
-            var id = $('select[name=biller_id]').val();
-            var url = '{{ route('get_tipo_evento_contingencia', ':id') }}';
-            url = url.replace(':id', id);
-
-            $.ajax({
-                url: url,
-                type: "GET",
-                success: function(data) {
-                    tipo_evento_contigencia = data;
-                    if (data >= 5) {
-                        // El evento registrado es especial, mostrar los input
-                        console.log('El evento de contingencia del punto de venta es => ' + data)
-                        $("#evento_contingencia_div").show();
-                        $('input[name=nro_factura_manual]').prop("required", true);
-                        $('input[name=fecha_manual]').prop("required", true);
-                        bandera_evento_contingencia = true;
-                        consultarMinimoFechaManualCafc();
-                    } else {
-                        // ocultar los input
-                        console.log('El evento es menor 5, evento dado => ' + data)
-                        $("#evento_contingencia_div").hide();
-                        $('input[name=nro_factura_manual]').prop("required", false);
-                        $("input[name='nro_factura_manual']").val("");
-                        $('input[name=fecha_manual]').prop("required", false);
-                        $("input[name='fecha_manual']").val("");
-                        bandera_evento_contingencia = false;
-                    }
-                }
-            });
+            // Desactivado: El POS solo emite Online u Offline sin eventos manuales
+            $("#evento_contingencia_div").hide();
         }
 
         function registraEventoContingencia() {
@@ -6686,11 +6599,9 @@
                         sincronizarSwitchModoPOS();
                         _toggleInicializando = false;
                         if (data.modo_contingencia) {
-                            $('#label_contingencia').show();
-                            _toastModo('warning', 'Modo Offline activado');
+                            _toastModo('warning', 'Modo OFFLINE activado (Facturación fuera de línea)');
                         } else {
-                            $('#label_contingencia').hide();
-                            _toastModo('success', 'Modo Online activado');
+                            _toastModo('success', 'Modo ONLINE activado (Facturación en línea)');
                         }
                     } else {
                         _toastModo('error', data.mensaje || 'Error al cambiar modo');

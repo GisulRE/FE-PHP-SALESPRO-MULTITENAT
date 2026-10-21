@@ -139,9 +139,44 @@ class CompanyController extends Controller
 
         $role = null;
         if (Schema::hasTable('roles')) {
-            $role = Role::where('name', 'Administrador')->first();
+            $role = Role::where('company_id', $company->id)->where('name', 'Administrador')->first();
             if (!$role) {
-                $role = Role::first();
+                $baseRoles = Role::where('company_id', 1)->where('is_active', 1)->get();
+                if ($baseRoles->isNotEmpty()) {
+                    foreach ($baseRoles as $baseRole) {
+                        $newRole = Role::create([
+                            'name' => $baseRole->name,
+                            'description' => $baseRole->description,
+                            'is_active' => $baseRole->is_active,
+                            'guard_name' => $baseRole->guard_name ?? 'web',
+                            'blocked_modules' => $baseRole->blocked_modules,
+                            'company_id' => $company->id,
+                        ]);
+
+                        if (strtolower($baseRole->name) === 'administrador' && !$role) {
+                            $role = $newRole;
+                        }
+
+                        $permissions = \DB::table('role_has_permissions')->where('role_id', $baseRole->id)->get();
+                        $insertPerms = [];
+                        foreach ($permissions as $p) {
+                            $insertPerms[] = [
+                                'permission_id' => $p->permission_id,
+                                'role_id' => $newRole->id,
+                            ];
+                        }
+                        if (!empty($insertPerms)) {
+                            foreach (array_chunk($insertPerms, 500) as $chunk) {
+                                \DB::table('role_has_permissions')->insert($chunk);
+                            }
+                        }
+                    }
+                } else {
+                    $role = Role::where('name', 'Administrador')->first();
+                    if (!$role) {
+                        $role = Role::first();
+                    }
+                }
             }
         }
         if (!$role) {

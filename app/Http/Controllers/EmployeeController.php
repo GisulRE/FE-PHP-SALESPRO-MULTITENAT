@@ -9,6 +9,7 @@ use App\EmployeeReservationSchedule;
 use App\PosSetting;
 use App\User;
 use App\Warehouse;
+use App\Roles;
 use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,7 @@ class EmployeeController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('employees-add')) {
-            $lims_role_list = Role::where('is_active', true)->get();
+            $lims_role_list = Roles::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
             $lims_department_list = Department::where('is_active', true)->get();

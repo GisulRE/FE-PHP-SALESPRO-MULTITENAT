@@ -107,8 +107,9 @@
                         <div class="form-group col-4">
                             <label>Año gestión *</label>
                             <select name="año" class="form-control" title="Seleccionar año..." required>
-                                @for ($i = 2000; $i <= 2100; $i++)
-                                    <option value="{{ $i }}">{{ $i }}</option>
+                                @php $currentYear = (int) date('Y'); @endphp
+                                @for ($i = 2020; $i <= 2035; $i++)
+                                    <option value="{{ $i }}" {{ $i == $currentYear ? 'selected' : '' }}>{{ $i }}</option>
                                 @endfor
                             </select>
                         </div>
@@ -196,28 +197,63 @@
             }
         });
 
-        // Cuando se seleccione una sucursal, mostrar sus puntos de ventas respectivos. 
-        $('#sucursal').on('change', function() {
-            var id = $(this).val();
-            var url = '{{ route('getPuntosVentas', ':id') }}';
-            url = url.replace(':id', id);
+        // Función para cargar los puntos de venta según la sucursal seleccionada
+        function cargarPuntosVentaCafc(sucursalId) {
+            if (sucursalId === undefined || sucursalId === null || sucursalId === '') {
+                sucursalId = $('#sucursal').val();
+            }
+            if (sucursalId === undefined || sucursalId === null || sucursalId === '') return;
 
-            $("select[name='codigo_punto_venta']").empty();
+            var url = '{{ route("getPuntosVentas", ":id") }}'.replace(':id', sucursalId);
+            var $pvSelect = $('#codigo_punto_venta');
+
+            $pvSelect.empty().append('<option value="">Cargando puntos de venta...</option>');
+            try { $pvSelect.selectpicker('refresh'); } catch (e) {}
 
             $.ajax({
                 url: url,
                 type: "GET",
+                dataType: "json",
                 success: function(data) {
-                    console.log(data);
-                    for (let i = 0; i < data.length; i++) {
-                        $("select[name='codigo_punto_venta']").append('<option value="' + data[i]
-                            .codigo_punto_venta + '">' + data[i].codigo_punto_venta + ' - ' + data[
-                                i].nombre_punto_venta + '</option>');
-                    };
-                    $('.selectpicker').selectpicker('refresh');
-
+                    $pvSelect.empty();
+                    if (data && data.length > 0) {
+                        for (let i = 0; i < data.length; i++) {
+                            var cod = data[i].codigo_punto_venta;
+                            var nom = data[i].nombre_punto_venta || ('Punto ' + cod);
+                            $pvSelect.append('<option value="' + cod + '">' + cod + ' - ' + nom + '</option>');
+                        }
+                    } else {
+                        $pvSelect.append('<option value="0">0 - Punto de Venta Principal</option>');
+                    }
+                    try {
+                        $pvSelect.selectpicker('refresh');
+                    } catch (e) {
+                        $pvSelect.selectpicker();
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error cargando puntos de venta:', xhr);
+                    $pvSelect.empty().append('<option value="0">0 - Punto de Venta Principal</option>');
+                    try { $pvSelect.selectpicker('refresh'); } catch (e) {}
                 }
             });
+        }
+
+        // Cargar puntos de venta al cambiar de sucursal
+        $('#sucursal').on('change', function() {
+            cargarPuntosVentaCafc($(this).val());
+        });
+
+        // Cargar puntos de venta automáticamente al abrir el modal de Registro de CAFC
+        $('#addCredencialCafc').on('shown.bs.modal', function () {
+            cargarPuntosVentaCafc($('#sucursal').val());
+        });
+
+        // Inicializar al cargar la página si ya hay una sucursal seleccionada
+        $(document).ready(function() {
+            if ($('#sucursal').val() !== '') {
+                cargarPuntosVentaCafc($('#sucursal').val());
+            }
         });
     </script>
 @endsection

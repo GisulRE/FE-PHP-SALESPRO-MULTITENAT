@@ -1762,20 +1762,16 @@ class SaleController extends Controller
                 if ($data['codigo_emision_hidden'] == 3) {
                     $message = $message . '\n Venta facturada en modo masiva. ';
                 } else {
-                    // Caso Modo Contingencia
+                    // Caso Modo Offline
                     if ($data_p_venta->modo_contingencia == true) {
-                        $codigoEvento = $this->getTipoEventoContingenciaPuntoVenta($data['biller_id']);
-                        if (!$codigoEvento) {
-                            $codigoEvento = 4;
-                        }
                         if ($obj_cliente->codigo_documento_sector == 1) {
-                            $respuesta = $this->generarFacturaIndividualOffline($lims_sale_data->id, $codigoEvento);
+                            $respuesta = $this->generarFacturaIndividualOffline($lims_sale_data->id, 1);
                         }
                         if ($obj_cliente->codigo_documento_sector == 13) {
-                            $respuesta = $this->generarFacturaServicioBasicoOffline($lims_sale_data->id, $codigoEvento);
+                            $respuesta = $this->generarFacturaServicioBasicoOffline($lims_sale_data->id, 1);
                         }
                         if ($obj_cliente->codigo_documento_sector == 2) {
-                            $respuesta = $this->generarFacturaAlquilerOffline($lims_sale_data->id, $codigoEvento);
+                            $respuesta = $this->generarFacturaAlquilerOffline($lims_sale_data->id, 1);
                         }
                         if ($respuesta['status']) {
                             $update_p_venta->save();
@@ -2178,27 +2174,22 @@ class SaleController extends Controller
             }
 
             if ($data_p_venta->modo_contingencia) {
-                $codigoEvento = $this->getTipoEventoContingenciaPuntoVenta($data['biller_id']);
-                if (!$codigoEvento) {
-                    $codigoEvento = 4;
-                }
-                Log::info('POS finalizeAjax: generación en contingencia', [
+                Log::info('POS finalizeAjax: generación en modo OFFLINE', [
                     'sale_id' => $sale_id,
                     'codigo_documento_sector' => $obj_cliente->codigo_documento_sector,
-                    'codigo_evento' => $codigoEvento,
                 ]);
                 if ($obj_cliente->codigo_documento_sector == 1) {
                     Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
                     $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaIndividualOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
-                    $respuesta = $this->generarFacturaIndividualOffline($sale_id, $codigoEvento);
+                    $respuesta = $this->generarFacturaIndividualOffline($sale_id, 1);
                 } elseif ($obj_cliente->codigo_documento_sector == 13) {
                     Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasicoOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
                     $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaServicioBasicoOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
-                    $respuesta = $this->generarFacturaServicioBasicoOffline($sale_id, $codigoEvento);
+                    $respuesta = $this->generarFacturaServicioBasicoOffline($sale_id, 1);
                 } elseif ($obj_cliente->codigo_documento_sector == 2) {
                     Log::info('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaAlquilerOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
                     $this->writePosSiatDebug('POS finalizeAjax: servicio SIAT seleccionado', ['sale_id' => $sale_id, 'metodo' => 'generarFacturaAlquilerOffline', 'endpoint' => '/factura.venta/factura.individual.offline/gestionada']);
-                    $respuesta = $this->generarFacturaAlquilerOffline($sale_id, $codigoEvento);
+                    $respuesta = $this->generarFacturaAlquilerOffline($sale_id, 1);
                 }
             } else {
                 $lims_pos_setting_data = PosSetting::latest()->first();
@@ -5633,7 +5624,29 @@ class SaleController extends Controller
     // Función para imprimir la factura de una venta determinada por ID, renderizada en una vista
     public function getFactura($venta_id)
     {
+        if (empty(session('token_siat')) || !session('auth_siat', false)) {
+            try {
+                $this->getToken();
+            } catch (\Throwable $e) {}
+        }
         $data = $this->getImprimirFactura($venta_id); //SIAT Trait
+
+        if (request()->boolean('embed') || request()->boolean('raw') || request()->boolean('pdf')) {
+            if (!empty($data['bytes'])) {
+                $customer_sale = CustomerSale::where('sale_id', $venta_id)->first();
+                $nro = $customer_sale->nro_factura ?? $venta_id;
+                $filename = 'Factura-' . $nro . '.pdf';
+                $pdfContent = base64_decode($data['bytes']);
+
+                return response($pdfContent, 200)
+                    ->header('Content-Type', 'application/pdf')
+                    ->header('Content-Disposition', 'inline; filename="' . $filename . '"')
+                    ->header('X-Frame-Options', 'SAMEORIGIN')
+                    ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                    ->header('Pragma', 'no-cache')
+                    ->header('Expires', '0');
+            }
+        }
 
         return view('sale.impresion-factura', compact('data'));
     }
@@ -5996,6 +6009,18 @@ class SaleController extends Controller
     public function listBooksales(Request $request)
     {
         try {
+            $user = Auth::user();
+            $role = ($user && $user->role_id) ? Role::find($user->role_id) : null;
+            $permissions = is_array(session('permissions')) ? session('permissions') : [];
+            $canDelete = ($user && $user->role_id <= 2)
+                || in_array('sales-delete', $permissions)
+                || ($role && method_exists($role, 'hasPermissionTo') && $role->hasPermissionTo('sales-delete'));
+
+            $list_invoices = collect();
+            $columns = array(
+                0 => 'numeroFactura'
+            );
+
             $data = $request->all();
             
             // Validar datos requeridos
@@ -6080,7 +6105,7 @@ class SaleController extends Controller
                 } else if ($list_facturas[$i]['pago'] != null && $list_facturas[$i]['estado'] != 'B') {
                     $op['options'] .= '<button type="button" class="revertir-factura-modal btn btn-secondary" style="background-color: darkorange;" data-id = "' . $list_facturas[$i]['cuf'] . '" title="Revertir Pago"><i class="fa fa-exchange"></i></button>';
                 }
-                if ($role->hasPermissionTo('sales-delete') && ($list_facturas[$i]['pago'] == null && $list_facturas[$i]['estado'] != 'B')) {
+                if ($canDelete && ($list_facturas[$i]['pago'] == null && $list_facturas[$i]['estado'] != 'B')) {
                     $op['options'] .= '<button type="button" class="anular-factura-modal btn btn-danger" data-id = "' . $list_facturas[$i]['cuf'] . '" data-ptoventa = "' . $list_facturas[$i]['codigoPuntoVenta'] . '" data-sucursal = "' . $list_facturas[$i]['codigoSucursal'] . '" data-toggle="modal" data-target="#anular-factura-modal" title="Anular Factura"><i class="fa fa-trash"></i></button>';
                 }
                 $op['options'] .= '<button type="button" class="reenviar-factura-modal btn btn-success" data-id = "' . $list_facturas[$i]['cuf'] . '" data-toggle="modal" data-target="#reenviar-factura-modal" title="Reenviar Factura"><i class="fa fa-whatsapp"></i></button>';
@@ -6112,7 +6137,8 @@ class SaleController extends Controller
                 break;
             }
         }
-        $order = $columns[$request->input('order.0.column', 0)];
+        $orderColumnIdx = $request->input('order.0.column', 0);
+        $order = isset($columns[$orderColumnIdx]) ? $columns[$orderColumnIdx] : 'numeroFactura';
         $dir = $request->input('order.0.dir', 'asc');
         switch ($order) {
             case 'numeroFactura': {

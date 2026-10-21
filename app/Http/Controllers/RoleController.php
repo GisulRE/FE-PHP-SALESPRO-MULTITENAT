@@ -13,15 +13,34 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RoleController extends Controller
 {
+    private function canManageRoles()
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return false;
+        }
+        if ($user->role_id <= 2) {
+            return true;
+        }
+        $role = Role::find($user->role_id);
+        return $role && in_array(strtolower($role->name ?? ''), [
+            'admin', 'superadmin', 'administrador', 'owner', 'propietario'
+        ]);
+    }
+
     public function index()
     {
-        if (Auth::user()->role_id <= 2) {
-            $lims_role_all = Roles::where('is_active', true)->get();
+        if ($this->canManageRoles()) {
+            $company_id = Auth::user()->company_id;
+            $lims_role_all = Roles::where('is_active', true)
+                ->when($company_id, function ($query) use ($company_id) {
+                    return $query->where('company_id', $company_id);
+                })
+                ->get();
             return view('role.create', compact('lims_role_all'));
         } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
-
     }
 
     public function create()
@@ -30,52 +49,84 @@ class RoleController extends Controller
 
     public function store(Request $request)
     {
+        if (!$this->canManageRoles()) {
+            return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
+
+        $company_id = Auth::user()->company_id;
+
         $this->validate($request, [
             'name' => [
                 'max:255',
-                Rule::unique('roles')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('roles')->where(function ($query) use ($company_id) {
+                    $q = $query->where('is_active', 1);
+                    if ($company_id) {
+                        $q->where('company_id', $company_id);
+                    }
+                    return $q;
                 }),
             ],
         ]);
 
         $data = $request->all();
+        if ($company_id && empty($data['company_id'])) {
+            $data['company_id'] = $company_id;
+        }
+        if (empty($data['guard_name'])) {
+            $data['guard_name'] = 'web';
+        }
         Roles::create($data);
         return redirect('role')->with('message', 'Data inserted successfully');
     }
 
     public function edit($id)
     {
-        if (Auth::user()->role_id <= 2) {
+        if ($this->canManageRoles()) {
             $lims_role_data = Roles::find($id);
             return $lims_role_data;
         } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
-
     }
 
     public function update(Request $request, $id)
     {
+        if (!$this->canManageRoles()) {
+            return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
+
+        $company_id = Auth::user()->company_id;
+
         $this->validate($request, [
             'name' => [
                 'max:255',
-                Rule::unique('roles')->ignore($request->role_id)->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('roles')->ignore($request->role_id)->where(function ($query) use ($company_id) {
+                    $q = $query->where('is_active', 1);
+                    if ($company_id) {
+                        $q->where('company_id', $company_id);
+                    }
+                    return $q;
                 }),
             ],
         ]);
 
         $input = $request->all();
         $lims_role_data = Roles::where('id', $input['role_id'])->first();
-        $lims_role_data->update($input);
-        return redirect('role')->with('message', 'Data updated successfully');
+        if ($lims_role_data) {
+            $lims_role_data->update($input);
+            return redirect('role')->with('message', 'Data updated successfully');
+        }
+        return redirect('role')->with('not_permitted', 'Rol no encontrado');
     }
 
     public function permission($id)
     {
-        if (Auth::user()->role_id <= 2) {
+        if ($this->canManageRoles()) {
             $lims_role_data = Roles::find($id);
+            if (!$lims_role_data) {
+                return redirect()->back()->with('not_permitted', 'Rol no encontrado');
+            }
+
             $all_permission = \DB::table('permissions')
                 ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
                 ->where('role_id', $id)
@@ -101,11 +152,14 @@ class RoleController extends Controller
         } else {
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
-
     }
 
     public function setPermission(Request $request)
     {
+        if (!$this->canManageRoles()) {
+            return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
+
         // 1) Reset de cache de permisos (clave para evitar PermissionDoesNotExist por cache viejo)
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
@@ -256,9 +310,19 @@ class RoleController extends Controller
 
     public function destroy($id)
     {
+        if (!$this->canManageRoles()) {
+            return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
+        }
+
         $lims_role_data = Roles::find($id);
-        $lims_role_data->is_active = false;
-        $lims_role_data->save();
-        return redirect('role')->with('not_permitted', 'Datos eliminado con éxito');
+        if ($lims_role_data) {
+            if (in_array(strtolower($lims_role_data->name), ['admin', 'administrador'])) {
+                return redirect('role')->with('not_permitted', 'No está permitido eliminar el rol de Administrador');
+            }
+            $lims_role_data->is_active = false;
+            $lims_role_data->save();
+            return redirect('role')->with('not_permitted', 'Datos eliminado con éxito');
+        }
+        return redirect('role')->with('not_permitted', 'Rol no encontrado');
     }
 }

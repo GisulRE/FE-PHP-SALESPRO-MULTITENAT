@@ -51,12 +51,12 @@ class CredencialCafc extends Model
     public function getNombreSucursal()
     {
         $sucursal = SiatSucursal::where('sucursal', $this->sucursal)->first();
-        return $sucursal->nombre;
+        return $sucursal ? $sucursal->nombre : ('Sucursal ' . $this->sucursal);
     }
 
     public function getNombrePuntoVenta()
     {
         $punto = SiatPuntoVenta::where('codigo_punto_venta', $this->codigo_punto_venta)->where('sucursal', $this->sucursal)->first();
-        return $punto->nombre_punto_venta;
+        return $punto ? $punto->nombre_punto_venta : ('Punto ' . $this->codigo_punto_venta);
     }
 }
