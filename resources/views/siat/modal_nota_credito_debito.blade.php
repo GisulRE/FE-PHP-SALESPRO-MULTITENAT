@@ -1,6 +1,6 @@
 <!-- Modal Wizard: Nota de Crédito-Débito SIAT (Documento Sector 24) -->
 <div id="modal-nota-credito-debito" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="ncdModalLabel" aria-hidden="true" data-backdrop="static">
-    <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 95vw !important; width: 1180px !important; margin: 1.5rem auto !important;">
         <div class="modal-content border-0 shadow-lg">
             
             <!-- Modal Header -->
@@ -381,6 +381,55 @@
 </div>
 
 <style>
+/* Ancho amplio responsivo para Bootstrap 4.0.0 */
+#modal-nota-credito-debito .modal-dialog {
+    max-width: 95vw !important;
+    width: 1180px !important;
+    margin: 1.5rem auto !important;
+}
+
+#modal-nota-credito-debito .modal-content {
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+#modal-nota-credito-debito .table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    width: 100% !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+#modal-nota-credito-debito table#ncd-items-table {
+    width: 100% !important;
+    min-width: 860px;
+    margin-bottom: 0;
+    table-layout: auto;
+}
+
+#modal-nota-credito-debito table#ncd-items-table th,
+#modal-nota-credito-debito table#ncd-items-table td {
+    vertical-align: middle !important;
+    padding: 0.65rem 0.5rem !important;
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
+#modal-nota-credito-debito table#ncd-items-table th:nth-child(2),
+#modal-nota-credito-debito table#ncd-items-table td:nth-child(2) {
+    white-space: normal !important;
+    min-width: 200px;
+    max-width: 300px;
+}
+
+#modal-nota-credito-debito .ncd-item-qty {
+    max-width: 85px !important;
+    margin: 0 auto;
+    font-weight: 700;
+    display: inline-block;
+}
+
 .ncd-stepper {
     position: relative;
 }
