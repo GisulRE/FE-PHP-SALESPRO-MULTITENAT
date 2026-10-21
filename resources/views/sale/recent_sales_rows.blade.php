@@ -11,6 +11,13 @@
             ->where('codigo_documento_sector', 24)
             ->latest('id')
             ->first();
+        $devolucion_monto = 0;
+        if (!empty($nota_credito)) {
+            $ret_rec = \DB::table('returns')->where('customer_sale_id', $nota_credito->id)->first();
+            if ($ret_rec) {
+                $devolucion_monto = $ret_rec->grand_total;
+            }
+        }
     @endphp
     <tr>
         <td>{{ date('d-m-Y H:i', strtotime($sale->created_at)) }}</td>
@@ -48,7 +55,7 @@
                                 data-id="{{ $nota_credito->id }}"
                                 data-nro="{{ $nota_credito->nro_factura }}"
                                 data-cuf="{{ $nota_credito->cuf }}"
-                                data-monto="{{ $nota_credito->monto_total ?? $nota_credito->monto_total_sujeto_iva ?? 0 }}"
+                                data-monto="{{ $devolucion_monto }}"
                                 title="Ver / Imprimir Nota Crédito-Débito SIAT #{{ $nota_credito->nro_factura }}">
                                 <i class="fa fa-file-pdf-o"></i>
                             </button>

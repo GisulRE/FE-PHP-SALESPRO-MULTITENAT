@@ -1008,6 +1008,17 @@ class NotaCreditoDebitoController extends Controller
                 return response()->json(['status' => false, 'message' => 'Nota fiscal no encontrada o sin CUF'], 404);
             }
 
+            $monto = 0;
+            $return = Returns::where('customer_sale_id', $customer_sale->id)->first();
+            if ($return) {
+                $monto = $return->grand_total;
+            } else {
+                $return = Returns::find($id);
+                if ($return) {
+                    $monto = $return->grand_total;
+                }
+            }
+
             $data = $this->getImprimirFactura(null, $customer_sale->id);
             $bytes = $data['bytes'] ?? null;
 
@@ -1016,7 +1027,7 @@ class NotaCreditoDebitoController extends Controller
                 'bytes' => $bytes,
                 'nro_factura' => $customer_sale->nro_factura,
                 'cuf' => $customer_sale->cuf,
-                'monto_total' => $customer_sale->monto_total ?? $customer_sale->monto_total_sujeto_iva ?? 0,
+                'monto_total' => (float)$monto,
                 'customer_sale_id' => $customer_sale->id,
             ]);
         } catch (\Throwable $e) {

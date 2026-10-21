@@ -1,17 +1,17 @@
 <!-- Modal Wizard: Nota de Crédito-Débito SIAT (Documento Sector 24) -->
 <div id="modal-nota-credito-debito" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="ncdModalLabel" aria-hidden="true" data-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 95vw !important; width: 1180px !important; margin: 1.5rem auto !important;">
-        <div class="modal-content border-0 shadow-lg">
+    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 95vw !important; width: 1100px !important; margin: 0.5rem auto !important;">
+        <div class="modal-content border-0 shadow-lg" style="max-height: 96vh; display: flex; flex-direction: column;">
             
             <!-- Modal Header -->
-            <div class="modal-header bg-primary text-white py-3">
+            <div class="modal-header bg-primary text-white py-2 px-3">
                 <div class="d-flex align-items-center">
-                    <i class="fa fa-undo fa-2x mr-3"></i>
+                    <i class="fa fa-undo mr-2"></i>
                     <div>
-                        <h5 class="modal-title font-weight-bold mb-0" id="ncdModalLabel">
+                        <h5 class="modal-title font-weight-bold mb-0" id="ncdModalLabel" style="font-size: 1.1rem;">
                             Emitir Nota de Crédito-Débito
                         </h5>
-                        <small class="text-white-50">Documento Sector 24 - Servicio de Impuestos Nacionales (SIAT)</small>
+                        <small class="text-white-50" style="font-size: 11px;">Documento Sector 24 - Servicio de Impuestos Nacionales (SIAT)</small>
                     </div>
                 </div>
                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
@@ -19,8 +19,8 @@
                 </button>
             </div>
 
-            <!-- Stepper Progress Bar -->
-            <div class="px-4 pt-3 pb-2 bg-light border-bottom">
+            <!-- Stepper Progress Bar (se oculta en Paso 4 / Impresión) -->
+            <div class="px-3 pt-2 pb-1 bg-light border-bottom" id="ncd-stepper-wrapper">
                 <div class="d-flex justify-content-between text-center ncd-stepper">
                     <div class="step-item active" id="ncd-step-indicator-1">
                         <span class="step-badge">1</span>
@@ -45,7 +45,7 @@
             </div>
 
             <!-- Modal Body with Steps -->
-            <div class="modal-body p-4 position-relative" style="min-height: 400px;">
+            <div class="modal-body p-3 position-relative" style="overflow-y: auto; max-height: calc(96vh - 60px);">
                 
                 <!-- Loading Spinner Overlay -->
                 <div id="ncd-loading" class="text-center py-5" style="display: none;">
@@ -319,41 +319,29 @@
 
                     <!-- Success Screen after emission (con Visor PDF Oficial SIAT) -->
                     <div id="ncd-success-box" style="display: none;">
-                        <div class="alert alert-success d-flex align-items-center justify-content-between p-3 mb-3 shadow-sm rounded">
-                            <div class="d-flex align-items-center">
-                                <i class="fa fa-check-circle fa-2x mr-3 text-success"></i>
-                                <div>
-                                    <h5 class="font-weight-bold mb-0 text-success">¡Nota de Crédito-Débito Emitida con Éxito!</h5>
-                                    <small class="text-muted">Documento Sector 24 validado y registrado en el SIN (SIAT).</small>
-                                </div>
+                        <div class="d-flex justify-content-between align-items-center bg-light border rounded px-3 py-1 mb-2">
+                            <div class="d-flex align-items-center text-truncate mr-2">
+                                <span class="badge badge-success px-2 py-1 mr-2"><i class="fa fa-check mr-1"></i> Emitida</span>
+                                <span class="font-weight-bold mr-2 text-dark">Nota N°: <span id="ncd-succ-nro" class="text-primary">-</span></span>
+                                <span class="text-muted small mr-1">CUF:</span>
+                                <code id="ncd-succ-cuf" class="text-dark small text-truncate d-inline-block align-middle" style="max-width: 440px; font-size: 11px;">-</code>
                             </div>
-                            <div class="text-right">
-                                <span class="badge badge-primary px-3 py-2 mr-1">
-                                    Nota N°: <strong id="ncd-succ-nro">-</strong>
-                                </span>
-                                <span class="badge badge-success px-3 py-2">
-                                    Monto Devuelto: <strong id="ncd-succ-monto">-</strong>
+                            <div class="flex-shrink-0">
+                                <span class="badge badge-primary px-2 py-1 font-weight-bold" style="font-size: 13px;">
+                                    Monto Devuelto: <span id="ncd-succ-monto">Bs. 0.00</span>
                                 </span>
                             </div>
                         </div>
 
                         <!-- Gift Card Aviso (si aplica) -->
-                        <div id="ncd-succ-giftcard-notice" class="alert alert-warning mb-3" style="display: none;">
-                            <i class="fa fa-info-circle mr-2"></i>
-                            <strong>Devolución 100% Tarjeta de Regalo:</strong> El saldo fue restituido a la tarjeta del cliente. Al no haber base imponible sujeta a IVA original, no requiere emisión de documento fiscal Sector 24 ante el SIAT.
-                        </div>
-
-                        <!-- CUF pill -->
-                        <div class="mb-3 px-3 py-2 bg-light border rounded small d-flex justify-content-between align-items-center">
-                            <div>
-                                <span class="text-muted font-weight-bold mr-2">CUF:</span>
-                                <code id="ncd-succ-cuf" class="text-break text-dark select-all">-</code>
-                            </div>
+                        <div id="ncd-succ-giftcard-notice" class="alert alert-warning py-1 px-2 mb-2 small" style="display: none;">
+                            <i class="fa fa-info-circle mr-1"></i>
+                            <strong>Devolución 100% Tarjeta de Regalo:</strong> El saldo fue restituido a la tarjeta del cliente (sin ajuste fiscal SIAT).
                         </div>
 
                         <!-- PDF Viewer Embed (igual a return-sale) -->
-                        <div class="card border mb-3 shadow-sm" style="background-color: #525659;">
-                            <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
+                        <div class="card border mb-2 shadow-sm" style="background-color: #525659;">
+                            <div class="card-header bg-dark text-white py-1 px-3 d-flex justify-content-between align-items-center" style="min-height: 36px;">
                                 <span class="small font-weight-bold"><i class="fa fa-file-pdf-o text-danger mr-1"></i> Documento Oficial SIAT (SIN)</span>
                                 <div>
                                     <button type="button" class="btn btn-sm btn-light py-0 px-2 mr-1" id="ncd-btn-print-direct" title="Imprimir PDF">
@@ -364,16 +352,16 @@
                                     </a>
                                 </div>
                             </div>
-                            <div class="card-body p-0 position-relative" style="height: 520px; min-height: 520px;">
+                            <div class="card-body p-0 position-relative" style="height: 52vh; min-height: 330px; max-height: 480px;">
                                 <div id="ncd-pdf-loading">
                                     <div class="spinner-border text-light mb-2" role="status"></div>
                                     <span>Cargando documento PDF oficial SIAT...</span>
                                 </div>
                                 <object id="ncd-pdf-object" data="" type="application/pdf" width="100%" height="100%">
                                     <embed id="ncd-pdf-embed" type="application/pdf" width="100%" height="100%" src="" />
-                                    <div class="p-4 text-center text-white">
-                                        <p>No se pudo cargar la vista previa directa del PDF.</p>
-                                        <a href="#" target="_blank" class="btn btn-primary" id="ncd-pdf-fallback-btn">
+                                    <div class="p-3 text-center text-white small">
+                                        <p class="mb-2">No se pudo cargar la vista previa directa del PDF.</p>
+                                        <a href="#" target="_blank" class="btn btn-sm btn-primary" id="ncd-pdf-fallback-btn">
                                             <i class="fa fa-download mr-1"></i> Abrir o Descargar PDF
                                         </a>
                                     </div>
@@ -382,7 +370,7 @@
                         </div>
 
                         <!-- Bottom action buttons -->
-                        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                             <div>
                                 <button type="button" class="btn btn-primary font-weight-bold mr-2" id="ncd-btn-print-80mm">
                                     <i class="fa fa-print mr-1"></i> Imprimir Ticket 80mm
@@ -424,14 +412,15 @@
 /* Ancho amplio responsivo para Bootstrap 4.0.0 */
 #modal-nota-credito-debito .modal-dialog {
     max-width: 95vw !important;
-    width: 1180px !important;
-    margin: 1.5rem auto !important;
+    width: 1100px !important;
+    margin: 0.5rem auto !important;
 }
 
 #modal-nota-credito-debito .modal-content {
     border-radius: 10px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
     overflow: hidden;
+    max-height: 98vh;
 }
 
 #modal-nota-credito-debito .table-responsive {
@@ -563,6 +552,7 @@
             try { $('#recentTransaction').modal('hide'); } catch(e) {}
             try { $('#sale-details').modal('hide'); } catch(e) {}
 
+            $('#ncd-stepper-wrapper').show();
             $('#ncd-alert-container').empty();
             $('#ncd-pre-emit-box').show();
             $('#ncd-success-box').hide();
@@ -945,6 +935,7 @@
 
         showSuccess: function(data) {
             $('.ncd-step-panel').hide();
+            $('#ncd-stepper-wrapper').hide();
             $('#ncd-step-4').show();
             $('#ncd-pre-emit-box').hide();
             $('#ncd-modal-footer').hide();
@@ -1072,6 +1063,7 @@
             emittedResult = null;
             try { $('#recentTransaction').modal('hide'); } catch(e) {}
             try { $('#sale-details').modal('hide'); } catch(e) {}
+            $('#ncd-stepper-wrapper').hide();
             $('#ncd-alert-container').empty();
             $('#ncd-pre-emit-box').hide();
             $('#ncd-modal-footer').hide();
@@ -1088,7 +1080,9 @@
             if (extraData) {
                 if (extraData.nro) $('#ncd-succ-nro').text(extraData.nro);
                 if (extraData.cuf) $('#ncd-succ-cuf').text(extraData.cuf);
-                if (extraData.monto) $('#ncd-succ-monto').text('Bs. ' + parseFloat(extraData.monto).toFixed(2));
+                if (extraData.monto !== undefined && extraData.monto !== null && extraData.monto !== '') {
+                    $('#ncd-succ-monto').text('Bs. ' + parseFloat(extraData.monto).toFixed(2));
+                }
             } else {
                 $('#ncd-succ-nro').text('-');
                 $('#ncd-succ-cuf').text('Consultando...');
@@ -1119,7 +1113,7 @@
                         if (resp.cuf) {
                             $('#ncd-succ-cuf').text(resp.cuf);
                         }
-                        if (resp.monto_total) {
+                        if (resp.monto_total !== undefined && resp.monto_total !== null && resp.monto_total !== '') {
                             $('#ncd-succ-monto').text('Bs. ' + parseFloat(resp.monto_total).toFixed(2));
                         }
                     }
