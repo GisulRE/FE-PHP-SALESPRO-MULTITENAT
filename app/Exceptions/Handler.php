@@ -41,7 +41,11 @@ class Handler extends ExceptionHandler
     }*/
     public function report(Throwable $exception) // <-- USE Throwable HERE
     {
-        parent::report($exception);
+        try {
+            parent::report($exception);
+        } catch (\Throwable $e) {
+            // Prevenir fallo fatal 500 en bucle si storage/logs no tiene permisos
+        }
     }
 
 

@@ -765,8 +765,8 @@
         $("ul#sale").addClass("show");
         $("ul#sale #sale-book-menu").addClass("active");
 
-        let startYear = 1800;
-        let endYear = new Date().getFullYear();
+        var startYear = 1800;
+        var endYear = new Date().getFullYear();
         for (i = endYear; i > startYear; i--) {
             $('#anioFiltroR').append($('<option />').val(i).html(i));
         }
