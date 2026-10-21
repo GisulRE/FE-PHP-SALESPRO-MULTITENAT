@@ -780,9 +780,12 @@ trait SiatTrait
             }
             // Redondear valores leídos de BD por si tienen decimales largos
             $qty_clean = number_format($product_sales->qty, 2, '.', '');
-            $price_clean = number_format($product_sales->net_unit_price, 2, '.', '');
-            $subtotal = $qty_clean * $price_clean;
-            $subtotal = number_format($subtotal, 2, '.', ''); // Redondear a 2 decimales
+            // En Bolivia la normativa SIAT exige que el precio unitario refleje el valor final con IVA incluido
+            $unit_price_final = ($product_sales->qty > 0)
+                ? (($product_sales->total + $product_sales->discount) / $product_sales->qty)
+                : $product_sales->net_unit_price;
+            $price_clean = number_format($unit_price_final, 2, '.', '');
+            $subtotal = number_format(($qty_clean * $unit_price_final) - $product_sales->discount, 2, '.', '');
             $totalVenta = $totalVenta + $subtotal;
             log::info("Subtotal: " . number_format($subtotal, 2, '.', ''));
             $data_product_sales[$nro_prod_sales] = array(
@@ -1054,9 +1057,12 @@ trait SiatTrait
 
             // Redondear valores leídos de BD por si tienen decimales largos
             $qty_clean = number_format($product_sales->qty, 2, '.', '');
-            $price_clean = number_format($product_sales->net_unit_price, 2, '.', '');
-            $subtotal = $qty_clean * $price_clean;
-            $subtotal = number_format($subtotal, 2, '.', ''); // Redondear a 2 decimales
+            // En Bolivia la normativa SIAT exige que el precio unitario refleje el valor final con IVA incluido
+            $unit_price_final = ($product_sales->qty > 0)
+                ? (($product_sales->total + $product_sales->discount) / $product_sales->qty)
+                : $product_sales->net_unit_price;
+            $price_clean = number_format($unit_price_final, 2, '.', '');
+            $subtotal = number_format(($qty_clean * $unit_price_final) - $product_sales->discount, 2, '.', '');
             $totalVenta = $totalVenta + $subtotal;
 
             // Construir detalle según formato SIAT
@@ -1359,8 +1365,11 @@ trait SiatTrait
             }
 
             $qty_clean = number_format($product_sales->qty, 2, '.', '');
-            $price_clean = number_format($product_sales->net_unit_price, 2, '.', '');
-            $subtotal = number_format($qty_clean * $price_clean, 2, '.', '');
+            $unit_price_final = ($product_sales->qty > 0)
+                ? (($product_sales->total + $product_sales->discount) / $product_sales->qty)
+                : $product_sales->net_unit_price;
+            $price_clean = number_format($unit_price_final, 2, '.', '');
+            $subtotal = number_format(($qty_clean * $unit_price_final) - $product_sales->discount, 2, '.', '');
             $totalVenta += $subtotal;
 
             $data_product_sales[$nro_prod_sales] = array(
