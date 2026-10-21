@@ -2190,9 +2190,13 @@
                     aria-hidden="true" class="modal fade text-left">
                     <div role="document" class="modal-dialog">
                         <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 id="exampleModalLabel" class="modal-title">{{ trans('file.Recent Transaction') }}
-                                    <div class="badge badge-primary">Últimas Ventas</div>
+                            <div class="modal-header d-flex justify-content-between align-items-center">
+                                <h5 id="exampleModalLabel" class="modal-title d-flex align-items-center">
+                                    {{ trans('file.Recent Transaction') }}
+                                    <span class="badge badge-primary ml-2">Últimas Ventas</span>
+                                    <button type="button" class="btn btn-sm btn-outline-info ml-3" id="btn-refresh-recent-sales" title="Actualizar lista de ventas">
+                                        <i class="fa fa-sync-alt"></i> Actualizar
+                                    </button>
                                 </h5>
                                 <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
                                         aria-hidden="true"><i class="dripicons-cross"></i></span></button>
@@ -2222,75 +2226,7 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    @foreach ($recent_sale as $sale)
-                                                        <?php $customer = DB::table('customers')->find($sale->customer_id); ?>
-                                                        <?php $venta_facturada = DB::table('customer_sales')
-                                                            ->where('sale_id', $sale->id)
-                                                            ->first(); ?>
-                                                        <tr>
-                                                            <td>{{ date('d-m-Y', strtotime($sale->created_at)) }}</td>
-                                                            @if (!empty($venta_facturada))
-                                                                @if ($venta_facturada->estado_factura != null)
-                                                                    <td>
-                                                                        @if ($venta_facturada->nro_factura != null)
-                                                                            {{ $sale->reference_no . ' [FACT#' . $venta_facturada->nro_factura . '|' . $venta_facturada->estado_factura . ']' }}
-                                                                        @else
-                                                                            {{-- la factura es manual --}}
-                                                                            {{ $sale->reference_no . ' [FACT-' }} <div
-                                                                                class="badge badge-info">Manual</div>
-                                                                            {{ '#' . $venta_facturada->nro_factura_manual . '|' . $venta_facturada->estado_factura . ']' }}
-                                                                        @endif
-                                                                    </td>
-                                                                    <td>{{ $venta_facturada->razon_social . ' - ' . $venta_facturada->email }}
-                                                                    </td>
-                                                                    <td>{{ $sale->grand_total }}</td>
-                                                                    <td>
-                                                                        <div class="btn-group">
-                                                                            @if ($venta_facturada->estado_factura != 'ANULADO')
-                                                                                <button type="button"
-                                                                                    class="imprimir-factura-modal btn btn-info btn-sm"
-                                                                                    data-id="{{ $sale->id }}"
-                                                                                    data-toggle="modal"
-                                                                                    data-target="#imprimir-factura-modal"
-                                                                                    title="Imprimir Factura">
-                                                                                    <i class="fa fa-print"></i>
-                                                                                </button>
-                                                                                <button type="button"
-                                                                                    class="emitir-nota-credito-debito-btn btn btn-warning btn-sm"
-                                                                                    data-id="{{ $sale->id }}"
-                                                                                    title="Emitir Nota de Crédito/Débito">
-                                                                                    <i class="fa fa-undo"></i>
-                                                                                </button>
-                                                                            @endif
-                                                                        </div>
-                                                                    </td>
-                                                                @endif
-                                                            @else
-                                                                <td>{{ $sale->reference_no }}</td>
-                                                                <td>{{ $customer->name }}</td>
-                                                                <td>{{ $sale->grand_total }}</td>
-                                                                <td>
-                                                                    <div class="btn-group">
-                                                                        @if (in_array('sales-edit', $all_permission))
-                                                                            <a href="{{ route('sales.edit', $sale->id) }}"
-                                                                                class="btn btn-success btn-sm"
-                                                                                title="Edit"><i
-                                                                                    class="dripicons-document-edit"></i></a>&nbsp;
-                                                                        @endif
-                                                                        @if (in_array('sales-delete', $all_permission))
-                                                                            {{ Form::open(['route' => ['sales.destroy', $sale->id], 'method' => 'DELETE']) }}
-                                                                            <button type="submit"
-                                                                                class="btn btn-danger btn-sm"
-                                                                                onclick="return confirmDelete()"
-                                                                                title="Delete"><i
-                                                                                    class="dripicons-trash"></i></button>
-                                                                            {{ Form::close() }}
-                                                                        @endif
-                                                                    </div>
-                                                                </td>
-                                                            @endif
-                                                        </tr>
-                                                    @endforeach
+                                                    @include('sale.recent_sales_rows')
                                                 </tbody>
                                             </table>
                                         </div>
@@ -4648,6 +4584,11 @@
                         // Limpiar pedido del POS para dejarlo listo inmediatamente
                         limpiarPedidoPOS();
 
+                        // Actualizar lista de ventas recientes inmediatamente en segundo plano
+                        if (typeof window.cargarVentasRecientes === 'function') {
+                            window.cargarVentasRecientes();
+                        }
+
                         var printUrl = res.print_url || (isSiat ? ('{{ url("sales/imprimir_factura") }}/' + res.sale_id) : ('{{ url("sales/gen_invoice") }}/' + res.sale_id));
 
                         if (res.siat_error) {
@@ -6791,24 +6732,70 @@
             $("#spinner-contingencia-div").hide();
         }
 
-        // Mostrar tabla con paginación de 5 items para botón ventasRecientes
-        $('#ventas-recientes-table').DataTable({
-            dom: 'rt<"d-flex align-items-baseline"lpi>',
-            'language': {
-                'lengthMenu': '_MENU_ {{ trans('file.records per page') }}',
-                "info": '<small>{{ trans('file.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
-                "search": '{{ trans('file.Search') }}',
-                'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
-                }
-            },
-            'lengthMenu': [
-                [5, 10, -1],
-                [5, 10, "All"]
-            ],
-            order: [],
+        function initVentasRecientesTable() {
+            if ($.fn.DataTable.isDataTable('#ventas-recientes-table')) {
+                $('#ventas-recientes-table').DataTable().destroy();
+            }
+            $('#ventas-recientes-table').DataTable({
+                dom: 'rt<"d-flex align-items-baseline"lpi>',
+                'language': {
+                    'lengthMenu': '_MENU_ {{ trans('file.records per page') }}',
+                    "info": '<small>{{ trans('file.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
+                    "search": '{{ trans('file.Search') }}',
+                    'paginate': {
+                        'previous': '<i class="dripicons-chevron-left"></i>',
+                        'next': '<i class="dripicons-chevron-right"></i>'
+                    }
+                },
+                'lengthMenu': [
+                    [5, 10, -1],
+                    [5, 10, "All"]
+                ],
+                order: [],
+            });
+        }
 
+        window.cargarVentasRecientes = function(callback) {
+            var $tbody = $('#ventas-recientes-table tbody');
+            var $btnRefresh = $('#btn-refresh-recent-sales');
+            $btnRefresh.prop('disabled', true).find('i').addClass('fa-spin');
+
+            $.ajax({
+                url: '{{ route("sales.recent-sales-ajax") }}',
+                type: 'GET',
+                dataType: 'json',
+                success: function(res) {
+                    if (res && res.html !== undefined) {
+                        if ($.fn.DataTable.isDataTable('#ventas-recientes-table')) {
+                            $('#ventas-recientes-table').DataTable().destroy();
+                        }
+                        $tbody.html(res.html);
+                        initVentasRecientesTable();
+                    }
+                    if (typeof callback === 'function') callback();
+                },
+                error: function(err) {
+                    console.error('Error al cargar ventas recientes:', err);
+                    if (typeof callback === 'function') callback();
+                },
+                complete: function() {
+                    $btnRefresh.prop('disabled', false).find('i').removeClass('fa-spin');
+                }
+            });
+        };
+
+        // Inicializar tabla de ventas recientes al cargar
+        initVentasRecientesTable();
+
+        // Al abrir modal de ventas recientes (#recentTransaction), recargar automáticamente
+        $('#recentTransaction').on('show.bs.modal', function() {
+            window.cargarVentasRecientes();
+        });
+
+        // Botón manual de actualizar ventas recientes
+        $(document).on('click', '#btn-refresh-recent-sales', function(e) {
+            e.preventDefault();
+            window.cargarVentasRecientes();
         });
 
         // Modal VentasRecientes, botón que permite mostrar/imprimir venta facturada 

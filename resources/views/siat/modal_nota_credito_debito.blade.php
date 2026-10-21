@@ -860,6 +860,9 @@
                     if (resp.status) {
                         emittedResult = resp;
                         self.showSuccess(resp);
+                        if (typeof window.cargarVentasRecientes === 'function') {
+                            try { window.cargarVentasRecientes(); } catch(e) {}
+                        }
                     } else {
                         self.updateStepper(4);
                         self.showAlert('danger', resp.message || 'Error al emitir la Nota ante el SIAT.');

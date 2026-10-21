@@ -2272,6 +2272,50 @@ class SaleController extends Controller
         }
     }
 
+    /**
+     * Devuelve el HTML actualizado de las últimas ventas para el modal de Ventas Recientes en POS
+     */
+    public function getRecentSalesAjax(Request $request)
+    {
+        if (!Auth::check()) {
+            return response()->json(['status' => false, 'message' => 'No autorizado'], 401);
+        }
+
+        $user = Auth::user();
+        $all_permission = [];
+        if ($user && $user->role_id) {
+            $all_permission = \DB::table('permissions')
+                ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                ->where('role_id', $user->role_id)
+                ->pluck('permissions.name')
+                ->toArray();
+        }
+
+        if ($user && $user->role_id > 2 && config('staff_access') == 'own') {
+            $recent_sale = Sale::select('id', 'reference_no', 'grand_total', 'customer_id', 'created_at')
+                ->where([
+                    ['sale_status', 1],
+                    ['user_id', $user->id],
+                ])->orderBy('id', 'desc')->take(20)->get();
+        } else {
+            $recent_sale = Sale::select('id', 'reference_no', 'grand_total', 'customer_id', 'created_at')
+                ->where('sale_status', 1)->orderBy('id', 'desc')->take(20)->get();
+        }
+
+        $saleIds = $recent_sale->pluck('id')->toArray();
+        $customerSales = \DB::table('customer_sales')->whereIn('sale_id', $saleIds)->get()->keyBy('sale_id');
+        $customerIds = $recent_sale->pluck('customer_id')->filter()->unique()->toArray();
+        $customers = \DB::table('customers')->whereIn('id', $customerIds)->get()->keyBy('id');
+
+        $html = view('sale.recent_sales_rows', compact('recent_sale', 'customerSales', 'customers', 'all_permission'))->render();
+
+        return response()->json([
+            'status' => true,
+            'html'   => $html,
+            'count'  => $recent_sale->count(),
+        ]);
+    }
+
     public function printPre_Order($id_print, $id_sale)
     {
         $lims_sale_data = Sale::find($id_sale);
