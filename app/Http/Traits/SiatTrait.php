@@ -673,7 +673,7 @@ trait SiatTrait
             return array('mensaje' => 'Error Punto de venta SIAT no encontrado, revise configuración. ', 'status' => false);
         }
 
-        $this->asegurarCufdVigente($data_p_venta);
+        if (method_exists($this, 'asegurarCufdVigente')) { $this->asegurarCufdVigente($data_p_venta); }
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
 
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
@@ -1298,7 +1298,7 @@ trait SiatTrait
         $data_siat_cufd = null;
 
         if (!$modo_centralizado) {
-            $this->asegurarCufdVigente($data_p_venta);
+            if (method_exists($this, 'asegurarCufdVigente')) { $this->asegurarCufdVigente($data_p_venta); }
 
             $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
                 ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
@@ -1535,7 +1535,7 @@ trait SiatTrait
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
-        $this->asegurarCufdVigente($data_p_venta);
+        if (method_exists($this, 'asegurarCufdVigente')) { $this->asegurarCufdVigente($data_p_venta); }
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
@@ -1780,7 +1780,7 @@ trait SiatTrait
         $data_siat_cufd = null;
 
         if (!$modo_centralizado) {
-            $this->asegurarCufdVigente($data_p_venta);
+            if (method_exists($this, 'asegurarCufdVigente')) { $this->asegurarCufdVigente($data_p_venta); }
 
             $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
                 ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
@@ -3192,7 +3192,7 @@ Descripción: " . $data_response['descripcion'];
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
-        $this->asegurarCufdVigente($data_p_venta);
+        if (method_exists($this, 'asegurarCufdVigente')) { $this->asegurarCufdVigente($data_p_venta); }
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
@@ -3394,7 +3394,7 @@ Descripción: " . $data_response['descripcion'];
             'sucursal' => $data_biller->sucursal,
             'codigo_punto_venta' => $data_biller->punto_venta_siat
         ])->first();
-        $this->asegurarCufdVigente($data_p_venta);
+        if (method_exists($this, 'asegurarCufdVigente')) { $this->asegurarCufdVigente($data_p_venta); }
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)->where('estado', true)->orderBy('fecha_registro', 'desc')->first();
         $data_sucursal = SiatSucursal::where('sucursal', $data_p_venta->sucursal)->first();
         $data_cliente = CustomerSale::where('sale_id', $venta_id)->first();
@@ -4924,7 +4924,7 @@ Descripción: " . $data_response['descripcion'];
             return ['status' => false, 'mensaje' => 'No se encontró el Punto de Venta SIAT para la sucursal ' . $target_sucursal . ' y punto ' . $target_pv . '.'];
         }
 
-        $this->asegurarCufdVigente($data_p_venta);
+        if (method_exists($this, 'asegurarCufdVigente')) { $this->asegurarCufdVigente($data_p_venta); }
 
         $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
             ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
@@ -5324,7 +5324,7 @@ Descripción: " . $data_response['descripcion'];
 
             if ($data_p_venta) {
                 $codigo_cuis_val = $data_p_venta->codigo_cuis ?? "";
-                $this->asegurarCufdVigente($data_p_venta);
+                if (method_exists($this, 'asegurarCufdVigente')) { $this->asegurarCufdVigente($data_p_venta); }
                 $data_siat_cufd = SiatCufd::where('sucursal', $data_p_venta->sucursal)
                     ->where('codigo_punto_venta', $data_p_venta->codigo_punto_venta)
                     ->where('estado', true)

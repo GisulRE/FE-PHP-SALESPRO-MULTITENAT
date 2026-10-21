@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Http\Traits\SiatTrait;
+use App\Http\Traits\CufdTrait;
 use App\Sale;
 use App\CustomerSale;
 use App\Product_Sale;
@@ -40,7 +41,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class NotaCreditoDebitoController extends Controller
 {
-    use SiatTrait;
+    use SiatTrait, CufdTrait;
 
     /**
      * Verifica la elegibilidad de una venta para emisión de Nota de Crédito-Débito (Sector 24).
