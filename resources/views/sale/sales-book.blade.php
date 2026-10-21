@@ -759,6 +759,8 @@
         </div>
     </section>
 
+    @include('siat.modal_nota_credito_debito')
+
     <script type="text/javascript">
         window.facturaAnulacionData = window.facturaAnulacionData || {};
         $("ul#sale").siblings('a').attr('aria-expanded', 'true');

@@ -49,22 +49,33 @@ class NotaCreditoDebitoController extends Controller
     public function checkSale($sale_id)
     {
         try {
+            $customer_sale = null;
+            if (!is_numeric($sale_id) || strlen((string)$sale_id) > 15) {
+                // Se pasó el CUF de la factura (ej: desde Libro de Ventas)
+                $customer_sale = CustomerSale::where('cuf', $sale_id)->first();
+                if ($customer_sale && $customer_sale->sale_id) {
+                    $sale_id = $customer_sale->sale_id;
+                }
+            }
+
             $sale = Sale::with(['customer', 'biller', 'warehouse', 'productSales.product.unit', 'payments'])->find($sale_id);
             if (!$sale) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'Venta no encontrada.'
+                    'message' => 'Venta asociada a la factura no encontrada.'
                 ], 404);
             }
 
-            // Buscar la factura asociada (soporta codigo_documento_sector null o != 24)
-            $customer_sale = CustomerSale::where('sale_id', $sale_id)
-                ->where(function($q) {
-                    $q->whereNull('codigo_documento_sector')
-                      ->orWhere('codigo_documento_sector', '!=', 24);
-                })
-                ->orderBy('id', 'desc')
-                ->first();
+            // Buscar la factura asociada (soporta codigo_documento_sector null o != 24) si no se obtuvo por CUF
+            if (!$customer_sale) {
+                $customer_sale = CustomerSale::where('sale_id', $sale_id)
+                    ->where(function($q) {
+                        $q->whereNull('codigo_documento_sector')
+                          ->orWhere('codigo_documento_sector', '!=', 24);
+                    })
+                    ->orderBy('id', 'desc')
+                    ->first();
+            }
 
             if (!$customer_sale || empty($customer_sale->cuf)) {
                 return response()->json([

@@ -6120,6 +6120,9 @@ class SaleController extends Controller
                 if ($canDelete && ($list_facturas[$i]['pago'] == null && $list_facturas[$i]['estado'] != 'B')) {
                     $op['options'] .= '<button type="button" class="anular-factura-modal btn btn-danger" data-id = "' . $list_facturas[$i]['cuf'] . '" data-ptoventa = "' . $list_facturas[$i]['codigoPuntoVenta'] . '" data-sucursal = "' . $list_facturas[$i]['codigoSucursal'] . '" data-toggle="modal" data-target="#anular-factura-modal" title="Anular Factura"><i class="fa fa-trash"></i></button>';
                 }
+                if ($list_facturas[$i]['estado'] != 'B' && ($list_facturas[$i]['codigoDocumentoSector'] ?? 1) != 24) {
+                    $op['options'] .= '<button type="button" class="emitir-nota-credito-debito-btn btn btn-dark" style="background-color: #6f42c1; border-color: #6f42c1; color: white;" data-id = "' . $list_facturas[$i]['cuf'] . '" title="Emitir Nota de Crédito/Débito SIAT"><i class="fa fa-undo"></i></button>';
+                }
                 $op['options'] .= '<button type="button" class="reenviar-factura-modal btn btn-success" data-id = "' . $list_facturas[$i]['cuf'] . '" data-toggle="modal" data-target="#reenviar-factura-modal" title="Reenviar Factura"><i class="fa fa-whatsapp"></i></button>';
 
                 $op['options'] .= '</div>';
