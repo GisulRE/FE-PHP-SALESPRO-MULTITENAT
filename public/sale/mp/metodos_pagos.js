@@ -1,7 +1,7 @@
 // onkeyup="this.value=this.value.replace(/[^0-9]/g,'');"
 window.pagoMultipleActivo = false;
 
-$('select[name="paid_by_id_select"]').on("change", function () {
+$(document).on("change", 'select[name="paid_by_id_select"]', function () {
 	if (window.pagoMultipleActivo) {
 		return;
 	}
@@ -11,22 +11,22 @@ $('select[name="paid_by_id_select"]').on("change", function () {
 	alertaTablaItem_o_Empleado_vacio();
 	var id = $(this).val();
 	$(".payment-form").off("submit");
-	if (checkStatusIntervalId) clearInterval(checkStatusIntervalId);
-	if (timerIntervalId) clearInterval(timerIntervalId);
-	if (id == 27) {
+	if (typeof checkStatusIntervalId !== "undefined" && checkStatusIntervalId) clearInterval(checkStatusIntervalId);
+	if (typeof timerIntervalId !== "undefined" && timerIntervalId) clearInterval(timerIntervalId);
+	if (id == 27 && typeof giftCard === "function") {
 		giftCard();
 	}
-	if (id == 2) {
+	if (id == 2 && typeof creditCard === "function") {
 		creditCard();
 	}
-	if (id == 3) {
+	if (id == 3 && typeof cheque === "function") {
 		cheque();
 	}
-	if (id == 1) {
-		unblockAmounts();
-	}
-	if (id == 8) {
+	if (id == 8 && typeof deposits === "function") {
 		deposits();
+	}
+	if (typeof unblockAmounts === "function") {
+		unblockAmounts();
 	}
 
 	metodosPago($(this));
@@ -34,30 +34,50 @@ $('select[name="paid_by_id_select"]').on("change", function () {
 
 function metodosPago(dom) {
 	return new Promise((resolve) => {
-		var descripcion = $("option:selected", dom).data("descripcion");
+		var $dom = $(dom);
+		var $opt = $("option:selected", $dom);
+		var descripcion = $opt.data("descripcion") || $opt.text() || "";
+		var descUpper = String(descripcion).toUpperCase();
 		const MPpagos = [
-			{ metodo: "TARJETA", id: "MPtarjeta" },
-			{ metodo: "GIFT", id: "MPgiftCard" },
-			{ metodo: "CHEQUE", id: "MPcheque" },
-			{ metodo: "VALE", id: "MPvale" },
-			{ metodo: "OTRO", id: "MPotros" },
-			{ metodo: "PAGO POSTERIOR", id: "MPpagoPosterior" },
-			{ metodo: "TRANSFERENCIA BANCARIA", id: "MPtransferenciaBancaria" },
-			{ metodo: "DEBITO AUTOMATICO", id: "MPdebitoAutomatico" },
-			{ metodo: "DEPOSITO", id: "MPdepositoCuenta" },
-			{ metodo: "SWIFT", id: "MPtransferenciaSwift" },
-			{ metodo: "CANAL", id: "MPcanalPago" },
-			{ metodo: "BILLETERA", id: "MPbilleteraMovil" },
-			{ metodo: "ONLINE", id: "MPpagoOnline" },
-			{ metodo: "EFECTIVO", id: "MPefectivo" },
+			{ metodo: "TARJETA", fn: MPtarjeta, id: "MP_tarjeta" },
+			{ metodo: "GIFT", fn: MPgiftCard, id: "MP_giftCard" },
+			{ metodo: "CHEQUE", fn: MPcheque, id: "MP_cheque" },
+			{ metodo: "VALE", fn: MPvale, id: "" },
+			{ metodo: "OTRO", fn: MPotros, id: "" },
+			{ metodo: "PAGO POSTERIOR", fn: MPpagoPosterior, id: "" },
+			{ metodo: "TRANSFERENCIA BANCARIA", fn: MPtransferenciaBancaria, id: "" },
+			{ metodo: "DEBITO AUTOMATICO", fn: MPdebitoAutomatico, id: "" },
+			{ metodo: "DEPOSITO", fn: MPdepositoCuenta, id: "" },
+			{ metodo: "SWIFT", fn: MPtransferenciaSwift, id: "" },
+			{ metodo: "CANAL", fn: MPcanalPago, id: "" },
+			{ metodo: "BILLETERA", fn: MPbilleteraMovil, id: "" },
+			{ metodo: "ONLINE", fn: MPpagoOnline, id: "" },
+			{ metodo: "EFECTIVO", fn: MPefectivo, id: "" },
 		];
-		MPpagos.map((x) => {
-			if (descripcion.includes(x.metodo)) {
-				window[x.id]();
+		var matched = false;
+		MPpagos.forEach((x) => {
+			if (descUpper.includes(x.metodo)) {
+				matched = true;
+				if (typeof x.fn === "function") {
+					x.fn();
+				}
+				if (x.id) $("#" + x.id).show();
 			} else {
-				$("#" + x.id).hide();
+				if (x.id) $("#" + x.id).hide();
 			}
 		});
+		if (!matched) {
+			var val = $dom.val();
+			if (val == 1) MPefectivo();
+			else if (val == 2 || val == 4) MPtarjeta();
+			else if (val == 3 || val == 5) MPcheque();
+			else if (val == 8 || val == 6 || val == 7) MPdepositoCuenta();
+			else if (val == 27) MPgiftCard();
+			else MPefectivo();
+		}
+		if (typeof unblockAmounts === "function") {
+			unblockAmounts();
+		}
 		ValidacionMetodoPago();
 		resolve(true);
 	});
@@ -183,11 +203,23 @@ window.activarPagoMultiple = function () {
 	$paidBySelect.prop("disabled", true);
 	$("#multiple-pay-selector").show();
 	cargarOpcionesPagoMultiple();
-	$("#multi_pay_method_1").val("");
+
+	const currentVal = $paidBySelect.val();
+	if (currentVal && $(`#multi_pay_method_1 option[value="${currentVal}"]`).length) {
+		$("#multi_pay_method_1").val(currentVal);
+	} else {
+		const firstOptionVal = $("#multi_pay_method_1 option:not([value='']):first").val();
+		if (firstOptionVal) {
+			$("#multi_pay_method_1").val(firstOptionVal);
+		}
+	}
 	$("#multi_pay_method_2").val("");
 	$("#multi_pay_method_3").val("");
 	$('select[name="paid_by_id_select"], #multi_pay_method_1, #multi_pay_method_2, #multi_pay_method_3').selectpicker("refresh");
 	aplicarPagoMultiple();
+	if (typeof unblockAmounts === "function") {
+		unblockAmounts();
+	}
 };
 
 window.desactivarPagoMultiple = function () {
@@ -201,6 +233,9 @@ window.desactivarPagoMultiple = function () {
 	$("#multi_pay_method_2").val("");
 	$("#multi_pay_method_3").val("");
 	$('select[name="paid_by_id_select"], #multi_pay_method_1, #multi_pay_method_2, #multi_pay_method_3').selectpicker("refresh");
+	if (typeof unblockAmounts === "function") {
+		unblockAmounts();
+	}
 };
 
 $(document).on("change", ".multi-pay-method", function () {
@@ -215,8 +250,11 @@ function ValidacionMetodoPago() {
 	if (isNaN(suma)) {
 		suma = 0;
 	}
-	var montoTotal = parseFloat($("#grand-total").text());
-	var montoCambio = false;
+	var montoTotal = parseFloat($("#grand-total").text().replace(/,/g, ""));
+	if (isNaN(montoTotal)) {
+		montoTotal = 0;
+	}
+	var hasMontoCambio = $("#montoCambio").length > 0;
 	var arrayID = [];
 	$("#html_montos_metodos_de_pago")
 		.find("input")
@@ -228,70 +266,73 @@ function ValidacionMetodoPago() {
 				const monto = parseFloat($(this).val());
 				suma = suma + (isNaN(monto) ? 0 : monto);
 			}
-			if ($(this).attr("id") !== "montoCambio") {
-				montoCambio = true;
-			}
 			arrayID.push($(this).attr("id"));
 		});
 	var total_balance = suma;
-	var totalus = total_balance / tc;
+	var currentTc = (typeof tc !== "undefined" && tc > 0) ? tc : (parseFloat($("#tc").text()) || 1);
+	var totalus = currentTc > 0 ? (total_balance / currentTc) : 0;
 	$('input[name="paying_amount"]').val(total_balance.toFixed(2));
 	$('input[name="paying_amount_us"]').val(totalus.toFixed(2));
 	$("#monto_total_pagado").val(total_balance.toFixed(2));
 
-	if (montoCambio) {
+	if (hasMontoCambio) {
 		let diferencia = suma - montoTotal;
 		if (diferencia <= 0) {
 			diferencia = 0;
 		}
 		suma = suma - diferencia;
 		$("#montoCambio").val(parseFloat(diferencia).toFixed(2));
-		$("#change").text(parseFloat(total_balance - montoTotal).toFixed(2));
+		$("#change").text(parseFloat(total_balance - montoTotal > 0 ? total_balance - montoTotal : 0).toFixed(2));
+	} else {
+		$("#change").text("0.00");
 	}
-
-	if (suma === montoTotal) {
+	if (Math.abs(suma - montoTotal) < 0.001) {
 		// Todo correcto
-		arrayID.map((x) => {
+		guardarMetodosPagos();
+		arrayID.forEach((x) => {
 			$("#" + x).removeClass("is-invalid");
 			$("#" + x).addClass("is-valid");
-			if ($("input[name='bandera_factura_hidden']").val() == true) {
-				$("#segundoTabContinue").removeClass("disabled noselect");
-				$('#myTab a[href="#segundoTab"]').removeClass("disabled noselect");
-			}
-			guardarMetodosPagos();
 		});
+		if ($("input[name='bandera_factura_hidden']").val() == 1 || $("input[name='bandera_factura_hidden']").val() == true) {
+			$("#segundoTabContinue").removeClass("disabled noselect");
+			$('#myTab a[href="#segundoTab"]').removeClass("disabled noselect");
+		}
+		$("#submit-btn").removeClass("disabled noselect");
 	} else {
 		// Todo incorrecto
-		arrayID.map((x) => {
+		arrayID.forEach((x) => {
 			$("#" + x).removeClass("is-valid");
 			$("#" + x).addClass("is-invalid");
-			if ($("input[name='bandera_factura_hidden']").val() == true) {
-				$("#segundoTabContinue").addClass("disabled noselect");
-				$('#myTab a[href="#segundoTab"]').addClass("disabled noselect");
-			}
 		});
+		if ($("input[name='bandera_factura_hidden']").val() == 1 || $("input[name='bandera_factura_hidden']").val() == true) {
+			$("#segundoTabContinue").addClass("disabled noselect");
+			$('#myTab a[href="#segundoTab"]').addClass("disabled noselect");
+		}
+		if ($('.tab-pane#primerTab').hasClass('show') || !$('#myTab').length) {
+			$("#submit-btn").addClass("disabled noselect");
+		}
 	}
 }
 
 function guardarMetodosPagos() {
-	$('input[name="monto_efectivo"]').val($("#montoEfectivo").val());
-	$('input[name="monto_tarjeta"]').val($("#montoTarjeta").val());
-	$('input[name="monto_cheque"]').val($("#montoCheque").val());
-	$('input[name="monto_vale"]').val($("#montoVale").val());
-	$('input[name="monto_otros"]').val($("#montoOtros").val());
-	$('input[name="monto_pago_posterior"]').val($("#montoPagoPosterior").val());
+	$('input[name="monto_efectivo"]').val($("#montoEfectivo").val() || "");
+	$('input[name="monto_tarjeta"]').val($("#montoTarjeta").val() || "");
+	$('input[name="monto_cheque"]').val($("#montoCheque").val() || "");
+	$('input[name="monto_vale"]').val($("#montoVale").val() || "");
+	$('input[name="monto_otros"]').val($("#montoOtros").val() || "");
+	$('input[name="monto_pago_posterior"]').val($("#montoPagoPosterior").val() || "");
 	$('input[name="monto_transferencia_bancaria"]').val(
-		$("#montoTransferenciaBancaria").val(),
+		$("#montoTransferenciaBancaria").val() || "",
 	);
-	$('input[name="monto_deposito"]').val($("#montoDepositoCuenta").val());
-	$('input[name="monto_swift"]').val($("#montoSwift").val());
-	$('input[name="monto_cambio"]').val($("#montoCambio").val());
+	$('input[name="monto_deposito"]').val($("#montoDepositoCuenta").val() || "");
+	$('input[name="monto_swift"]').val($("#montoSwift").val() || "");
+	$('input[name="monto_cambio"]').val($("#montoCambio").val() || "");
 
-	$('input[name="monto_canal_pago"]').val($("#montoCanalPago").val());
-	$('input[name="monto_billetera"]').val($("#montoBilleteraMovil").val());
-	$('input[name="monto_pago_online"]').val($("#montoPagoOnline").val());
+	$('input[name="monto_canal_pago"]').val($("#montoCanalPago").val() || "");
+	$('input[name="monto_billetera"]').val($("#montoBilleteraMovil").val() || "");
+	$('input[name="monto_pago_online"]').val($("#montoPagoOnline").val() || "");
 	$('input[name="monto_debito_automatico"]').val(
-		$("#montoDebitoAutomatico").val(),
+		$("#montoDebitoAutomatico").val() || "",
 	);
 }
 
@@ -305,13 +346,14 @@ function getMontoInicialAutoFill() {
 }
 
 function appendMontoItemHtml(label, inputId) {
+	if ($("#" + inputId).length > 0) return "";
 	let initialVal = getMontoInicialAutoFill();
 	return `
 		<div class="payment-list-item">
 			<div class="row">
 				<div class="col-md-12 form-group mb-0">
 					<label>${label}</label>
-					<input id="${inputId}" class="form-control payment-list-input" onkeyup="ValidacionMetodoPago()" type="number" step="0.01" min="0" max="1000000" value="${initialVal}"/>
+					<input id="${inputId}" class="form-control payment-list-input" oninput="ValidacionMetodoPago()" onkeyup="ValidacionMetodoPago()" onclick="this.select()" onfocus="this.select()" type="number" step="0.01" min="0" max="1000000" value="${initialVal}"/>
 				</div>
 			</div>
 		</div>`;
@@ -320,7 +362,7 @@ function appendMontoItemHtml(label, inputId) {
 function MPtarjeta() {
 	$("#MP_tarjeta").show();
 	let html = appendMontoItemHtml("Monto Tarjeta", "montoTarjeta");
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	$("#number_card").prop("required", true);
 	ValidacionMetodoPago();
 }
@@ -333,44 +375,46 @@ function MPgiftCard() {
 function MPcheque() {
 	$("#MP_cheque").show();
 	let html = appendMontoItemHtml("Monto Cheque", "montoCheque");
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
 function MPefectivo() {
-	let initialVal = getMontoInicialAutoFill();
-	let html = `
-	<div class="payment-list-item">
-		<div class="row">
-			<div class="col-md-7 form-group mb-0">
-				<label>Monto Efectivo</label>
-				<input id="montoEfectivo" class="form-control payment-list-input" onkeyup="ValidacionMetodoPago();" type="number" step="0.01" min="0" max="1000000" value="${initialVal}"/>
+	if ($("#montoEfectivo").length === 0) {
+		let initialVal = getMontoInicialAutoFill();
+		let html = `
+		<div class="payment-list-item">
+			<div class="row">
+				<div class="col-md-7 form-group mb-0">
+					<label>Monto Efectivo</label>
+					<input id="montoEfectivo" class="form-control payment-list-input" oninput="ValidacionMetodoPago()" onkeyup="ValidacionMetodoPago();" onclick="this.select()" onfocus="this.select()" type="number" step="0.01" min="0" max="1000000" value="${initialVal}"/>
+				</div>
+				<div class="col-md-5 form-group mb-0">
+					<label>Monto Cambio</label>
+					<input readonly id="montoCambio" class="form-control payment-list-input" type="number" step="0.01" min="0" max="1000000" value="0" />
+				</div>
 			</div>
-			<div class="col-md-5 form-group mb-0">
-				<label>Monto Cambio</label>
-				<input readonly id="montoCambio" class="form-control payment-list-input" type="number" step="0.01" min="0" max="1000000" value="0" />
-			</div>
-		</div>
-	</div>`;
-	$("#html_montos_metodos_de_pago").append(html);
+		</div>`;
+		$("#html_montos_metodos_de_pago").append(html);
+	}
 	ValidacionMetodoPago();
 }
 
 function MPvale() {
 	let html = appendMontoItemHtml("Monto Vale", "montoVale");
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
 function MPotros() {
 	let html = appendMontoItemHtml("Monto Otros", "montoOtros");
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
 function MPpagoPosterior() {
 	let html = appendMontoItemHtml("Monto Pago Posterior", "montoPagoPosterior");
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
@@ -379,25 +423,25 @@ function MPtransferenciaBancaria() {
 		"Monto Transferencia Bancaria",
 		"montoTransferenciaBancaria",
 	);
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
 function MPdepositoCuenta() {
 	let html = appendMontoItemHtml("Monto Dep. en Cuenta", "montoDepositoCuenta");
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
 function MPtransferenciaSwift() {
 	let html = appendMontoItemHtml("Monto Transferencia Swift", "montoSwift");
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
 function MPcanalPago() {
 	let html = appendMontoItemHtml("Monto Canal de Pago", "montoCanalPago");
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
@@ -406,13 +450,13 @@ function MPbilleteraMovil() {
 		"Monto Billetera Móvil",
 		"montoBilleteraMovil",
 	);
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
 function MPpagoOnline() {
 	let html = appendMontoItemHtml("Monto Pago Online", "montoPagoOnline");
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
 
@@ -421,6 +465,24 @@ function MPdebitoAutomatico() {
 		"Monto Débito Automático",
 		"montoDebitoAutomatico",
 	);
-	$("#html_montos_metodos_de_pago").append(html);
+	if (html) $("#html_montos_metodos_de_pago").append(html);
 	ValidacionMetodoPago();
 }
+
+window.MPtarjeta = MPtarjeta;
+window.MPgiftCard = MPgiftCard;
+window.MPcheque = MPcheque;
+window.MPefectivo = MPefectivo;
+window.MPvale = MPvale;
+window.MPotros = MPotros;
+window.MPpagoPosterior = MPpagoPosterior;
+window.MPtransferenciaBancaria = MPtransferenciaBancaria;
+window.MPdepositoCuenta = MPdepositoCuenta;
+window.MPtransferenciaSwift = MPtransferenciaSwift;
+window.MPcanalPago = MPcanalPago;
+window.MPbilleteraMovil = MPbilleteraMovil;
+window.MPpagoOnline = MPpagoOnline;
+window.MPdebitoAutomatico = MPdebitoAutomatico;
+window.ValidacionMetodoPago = ValidacionMetodoPago;
+window.metodosPago = metodosPago;
+window.aplicarPagoMultiple = aplicarPagoMultiple;

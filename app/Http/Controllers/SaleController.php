@@ -1452,6 +1452,53 @@ class SaleController extends Controller
                     $pago_efectivo->payment_note = $paying_method . ', monto entregado  de: ' . $data['monto_efectivo'] . ', Cambio: ' . ($data['monto_cambio'] ?? 0);
                     $pago_efectivo->save();
                 }
+
+                // GISUL-FIX: Respaldo si la venta tiene paid_amount > 0 pero ningún monto_* individual llegó > 0
+                if ((float) ($data['paid_amount'] ?? 0) > 0 && Payment::where('sale_id', $lims_sale_data->id)->count() === 0) {
+                    $tipo_btn_fb = $data['tipo_pago_btn'] ?? '';
+                    $paid_by_fb = (int) ($data['paid_by_id'] ?? 1);
+                    if ($tipo_btn_fb === 'qr' || in_array($paid_by_fb, [6, 11])) {
+                        $paying_method = 'Qr_simple';
+                    } elseif ($tipo_btn_fb === 'deposito' || in_array($paid_by_fb, [7, 8])) {
+                        $paying_method = 'Deposito';
+                    } elseif ($paid_by_fb === 2) {
+                        $paying_method = 'Tarjeta_Credito_Debito';
+                    } elseif ($paid_by_fb === 3) {
+                        $paying_method = 'Cheque';
+                    } else {
+                        $paying_method = 'Efectivo';
+                    }
+                    $account_id_fb = null;
+                    if ($user->biller_id != null) {
+                        $biller_data = Biller::find($user->biller_id);
+                        if ($biller_data) {
+                            $account_id_fb = $biller_data->account_id;
+                        }
+                    }
+                    if (!$account_id_fb) {
+                        $data_ant = AccountPayment::where([['is_active', true], ['methodpay_id', $paid_by_fb ?: 1]])->first();
+                        if ($data_ant) {
+                            $account_id_fb = $data_ant->account_id;
+                        } else {
+                            $default_acc = Account::where('is_default', true)->first() ?: Account::first();
+                            $account_id_fb = $default_acc ? $default_acc->id : 1;
+                        }
+                    }
+                    $paidAmt = (float) ($data['paid_amount'] ?? 0);
+                    $payingAmt = max($paidAmt, (float) ($data['paying_amount'] ?? $paidAmt));
+                    $changeAmt = max(0, $payingAmt - $paidAmt);
+                    $pago_fallback = new Payment();
+                    $pago_fallback->user_id = Auth::id();
+                    $pago_fallback->account_id = $account_id_fb;
+                    $pago_fallback->sale_id = $lims_sale_data->id;
+                    $data['payment_reference'] = 'spr-' . date("Ymd") . '-' . date("his");
+                    $pago_fallback->payment_reference = $data['payment_reference'];
+                    $pago_fallback->amount = number_format($payingAmt, 2, '.', '');
+                    $pago_fallback->change = number_format($changeAmt, 2, '.', '');
+                    $pago_fallback->paying_method = $paying_method;
+                    $pago_fallback->payment_note = $paying_method . ', monto entregado  de: ' . $pago_fallback->amount . ', Cambio: ' . $pago_fallback->change;
+                    $pago_fallback->save();
+                }
             }
 
             if ($lims_pos_setting_data->print_order != null || $lims_pos_setting_data->print_order != 0) {

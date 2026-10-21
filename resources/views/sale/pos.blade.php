@@ -1377,9 +1377,10 @@
                                                             <select name="paid_by_id_select"
                                                                 class="form-control selectpicker payment-select" data-live-search="true"
                                                                 data-live-search-style="contains"
-                                                                id="paid_by_id_select_select" disabled>
+                                                                id="paid_by_id_select_select">
                                                                 @foreach ($lims_methodpay_list as $method)
-                                                                    <option value="{{ $method->id }}">
+                                                                    <option value="{{ $method->id }}"
+                                                                        data-descripcion="{{ $method->name }}">
                                                                         {{ $method->name }}
                                                                     </option>
                                                                 @endforeach
@@ -4084,19 +4085,22 @@
             }
         }
 
-        // Cada botón de venta pasa por aquí
-        $(document).on("click", ".payment-btn", function(e) {
+        // Función común para preparar el modal de pago antes de configurar cada método
+        function prepararModalPago(e) {
             var rownumber = $('table.order-list tbody tr:last').index();
             if (rownumber < 0) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
                 Swal.fire("Carrito Vacío", "Por favor, agregue al menos un producto a la venta.", "warning");
                 return false;
             }
             var audio = $("#mysoundclip2")[0];
             safePlayAudio(audio);
             var totalbs = $("#grand-total").text();
-            var totalus = totalbs / tc;
+            var totalus = (typeof tc !== 'undefined' && tc > 0) ? (totalbs / tc) : 0;
 
             $('input[name="paid_amount"]').val($("#grand-total").text());
             $('input[name="paying_amount_us"]').val(0);
@@ -4105,6 +4109,20 @@
             alertaTablaItem_o_Empleado_vacio();
             refrescarMontos();
             hideDatosInputTexto();
+            unblockAmounts();
+            return true;
+        }
+
+        // Cada botón de venta valida el carrito
+        $(document).on("click", ".payment-btn", function(e) {
+            var rownumber = $('table.order-list tbody tr:last').index();
+            if (rownumber < 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                Swal.fire("Carrito Vacío", "Por favor, agregue al menos un producto a la venta.", "warning");
+                return false;
+            }
         });
 
         $("#draft-btn").on("click", function() {
@@ -4307,8 +4325,9 @@
 
         });
 
-        $("#gift-card-btn").on("click", function() {
-            $("#number_card").prop("required", false)
+        $("#gift-card-btn").on("click", function(e) {
+            if (!prepararModalPago(e)) return false;
+            $("#number_card").prop("required", false);
             if (bandera_siat == 1)
                 $('select[name="paid_by_id_select"]').val(27);
             else
@@ -4316,11 +4335,14 @@
 
             $('select[name="paid_by_id_select"]').selectpicker('refresh');
             giftCard();
+            MPgiftCard();
+            unblockAmounts();
             bloqueoSegundoTabs();
         });
 
-        $("#credit-card-btn").on("click", function() {
-            $("#number_card").prop("required", true)
+        $("#credit-card-btn").on("click", function(e) {
+            if (!prepararModalPago(e)) return false;
+            $("#number_card").prop("required", true);
             if (bandera_siat == 1)
                 $('select[name="paid_by_id_select"]').val(2);
             else
@@ -4329,11 +4351,13 @@
             $('select[name="paid_by_id_select"]').selectpicker('refresh');
             creditCard();
             MPtarjeta();
+            unblockAmounts();
             bloqueoSegundoTabs();
         });
 
-        $("#cheque-btn").on("click", function() {
-            $("#number_card").prop("required", false)
+        $("#cheque-btn").on("click", function(e) {
+            if (!prepararModalPago(e)) return false;
+            $("#number_card").prop("required", false);
             if (bandera_siat == 1)
                 $('select[name="paid_by_id_select"]').val(3);
             else
@@ -4342,11 +4366,13 @@
             $('select[name="paid_by_id_select"]').selectpicker('refresh');
             cheque();
             MPcheque();
+            unblockAmounts();
             bloqueoSegundoTabs();
         });
 
-        $("#cash-btn").on("click", function() {
-            $("#number_card").prop("required", false)
+        $("#cash-btn").on("click", function(e) {
+            if (!prepararModalPago(e)) return false;
+            $("#number_card").prop("required", false);
             if (window.desactivarPagoMultiple) {
                 window.desactivarPagoMultiple();
             }
@@ -4354,21 +4380,23 @@
             $('select[name="paid_by_id_select"]').selectpicker('refresh');
             MPefectivo();
             $('div.qc').show();
-            // unblockAmounts();
+            unblockAmounts();
             bloqueoSegundoTabs();
         });
 
-        $("#multiple-pay-btn").on("click", function() {
-            $("#number_card").prop("required", false)
+        $("#multiple-pay-btn").on("click", function(e) {
+            if (!prepararModalPago(e)) return false;
+            $("#number_card").prop("required", false);
             $('input[name="tipo_pago_btn"]').val('multiple');
             if (window.activarPagoMultiple) {
                 window.activarPagoMultiple();
             }
+            unblockAmounts();
             bloqueoSegundoTabs();
         });
 
         $("#proforma-btn").on("click", function() {
-            $("#number_card").prop("required", false)
+            $("#number_card").prop("required", false);
             $('select[name="quotation_statusModal"]').val(1);
             $('#date_validModal').val();
             $('#noteModal').val("");
@@ -4376,14 +4404,15 @@
         });
 
         function bloqueoSegundoTabs() {
-            if ($("input[name='bandera_factura_hidden']").val() == true) {
+            if ($("input[name='bandera_factura_hidden']").val() == 1 || $("input[name='bandera_factura_hidden']").val() == true) {
                 $("#segundoTabContinue").addClass("disabled noselect");
                 $('#myTab a[href="#segundoTab"]').addClass("disabled noselect");
             }
         }
 
-        $("#deposit-btn").on("click", function() {
-            $("#number_card").prop("required", false)
+        $("#deposit-btn").on("click", function(e) {
+            if (!prepararModalPago(e)) return false;
+            $("#number_card").prop("required", false);
             if (window.desactivarPagoMultiple) {
                 window.desactivarPagoMultiple();
             }
@@ -4396,11 +4425,13 @@
             $('select[name="paid_by_id_select"]').selectpicker('refresh');
             deposits();
             MPdepositoCuenta();
+            unblockAmounts();
             bloqueoSegundoTabs();
         });
 
-        $("#qrsimple-btn").on("click", function() {
-            $("#number_card").prop("required", false)
+        $("#qrsimple-btn").on("click", function(e) {
+            if (!prepararModalPago(e)) return false;
+            $("#number_card").prop("required", false);
             if (window.desactivarPagoMultiple) {
                 window.desactivarPagoMultiple();
             }
@@ -4412,11 +4443,14 @@
 
             $('select[name="paid_by_id_select"]').selectpicker('refresh');
             MPdepositoCuenta();
+            unblockAmounts();
+            bloqueoSegundoTabs();
         });
 
 
-        $("#qrcash-btn").on("click", function() {
-            $("#number_card").prop("required", false)
+        $("#qrcash-btn").on("click", function(e) {
+            if (!prepararModalPago(e)) return false;
+            $("#number_card").prop("required", false);
             if (window.desactivarPagoMultiple) {
                 window.desactivarPagoMultiple();
             }
@@ -4430,6 +4464,7 @@
             MPefectivo();
             $('div.qc').show();
             MPdepositoCuenta();
+            unblockAmounts();
             bloqueoSegundoTabs();
         });
 
@@ -4475,6 +4510,12 @@
         $('#add-payment').on('shown.bs.modal', function() {
             // activar primer paso
             $('#myTab a[href="#primerTab"]').tab('show');
+            unblockAmounts();
+            // si la lista de pagos quedó vacía, inicializar con el método seleccionado o Efectivo
+            if ($("#html_montos_metodos_de_pago").children().length === 0 && !window.pagoMultipleActivo) {
+                var selectedId = $('select[name="paid_by_id_select"]').val() || 1;
+                $('select[name="paid_by_id_select"]').val(selectedId).trigger('change');
+            }
             // re-deshabilitar tabs de pasos siguientes para un inicio limpio
             $('#tab_preview, #tab_billing, #tab_final').addClass('disabled');
             if (!hasSiat || !flag_print_nota_venta) {
@@ -4564,6 +4605,9 @@
                 $btn.prop('disabled', true);
 
                 $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
+                if (typeof guardarMetodosPagos === 'function') {
+                    try { guardarMetodosPagos(); } catch (err) {}
+                }
                 var formData = $('#formPayment').serializeArray();
                 formData.push({ name: 'ajax_preview', value: 1 });
                 formData.push({ name: '_token', value: $('meta[name="csrf-token"]').attr('content') });
@@ -4864,12 +4908,48 @@
         }
 
 
-        $('#add-payment input[name="paying_amount"]').on("input", function() {
-            change($(this).val(), $('input[name="paid_amount"]').val(), "BOB");
+        $('#add-payment input[name="paying_amount"]').on("input change", function() {
+            var val = parseFloat($(this).val()) || 0;
+            var $activeInputs = $("#html_montos_metodos_de_pago").find("input.payment-list-input").not("#montoCambio");
+            if ($activeInputs.length === 1) {
+                $activeInputs.val(val.toFixed(2));
+                if (typeof ValidacionMetodoPago === 'function') {
+                    ValidacionMetodoPago();
+                }
+            } else if ($("#montoEfectivo").length) {
+                $("#montoEfectivo").val(val.toFixed(2));
+                if (typeof ValidacionMetodoPago === 'function') {
+                    ValidacionMetodoPago();
+                }
+            } else {
+                change($(this).val(), $('input[name="paid_amount"]').val(), "BOB");
+            }
         });
 
-        $('#add-payment input[name="paying_amount_us"]').on("input", function() {
-            change($(this).val(), $('input[name="paid_amount"]').val(), "USD");
+        $('#add-payment input[name="paying_amount_us"]').on("input change", function() {
+            var valUs = parseFloat($(this).val()) || 0;
+            var currentTc = (typeof tc !== 'undefined' && tc > 0) ? tc : (parseFloat($("#tc").text()) || 1);
+            var bobVal = (valUs * currentTc).toFixed(2);
+            var $activeInputs = $("#html_montos_metodos_de_pago").find("input.payment-list-input").not("#montoCambio");
+            if ($activeInputs.length === 1) {
+                $activeInputs.val(bobVal);
+                if (typeof ValidacionMetodoPago === 'function') {
+                    ValidacionMetodoPago();
+                }
+            } else if ($("#montoEfectivo").length) {
+                $("#montoEfectivo").val(bobVal);
+                if (typeof ValidacionMetodoPago === 'function') {
+                    ValidacionMetodoPago();
+                }
+            } else {
+                change($(this).val(), $('input[name="paid_amount"]').val(), "USD");
+            }
+        });
+
+        $(document).on('input change keyup', '.payment-list-input', function() {
+            if (typeof ValidacionMetodoPago === 'function') {
+                ValidacionMetodoPago();
+            }
         });
 
         $('input[name="paid_amount"]').on("input", function() {
@@ -5912,6 +5992,9 @@
             }
             $('input[name="paid_by_id"]').val($('select[name="paid_by_id_select"]').val());
             $('input[name="order_tax_rate"]').val($('select[name="order_tax_rate_select"]').val());
+            if (typeof guardarMetodosPagos === 'function') {
+                try { guardarMetodosPagos(); } catch (err) {}
+            }
 
         });
 
@@ -7788,6 +7871,11 @@
     });
     </script>
     <script type="text/javascript" src="/public/sale/mp/metodos_pagos.js"></script>
+    <script type="text/javascript">
+        if (typeof MPefectivo === 'undefined') {
+            document.write('<script type="text/javascript" src="{{ asset("sale/mp/metodos_pagos.js") }}"><\/script>');
+        }
+    </script>
     <div id="imprimir-factura-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
         aria-hidden="true" class="modal fade text-left">
         <div class="modal-dialog ">
