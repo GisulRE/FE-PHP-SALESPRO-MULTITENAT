@@ -87,7 +87,7 @@
 <div class="row">
     <div class="col-md-5 mt-1">
         <label>Nombre Fiscal/Razón Social </label>
-        <input type="text" name="sales_razon_social" class="form-control ">
+        <input type="text" name="sales_razon_social" id="sales_razon_social" class="form-control" maxlength="191" autocomplete="off">
     </div>
     <div class="col-md-5 mt-1" id="sales_correo_electronico">
         <label>Email 
@@ -482,16 +482,17 @@
                     var item = data.table_data[0];
                     $('.valid-feedback').text('Datos recuperados de la última factura').show();
                     if (item.razon_social) {
-                        $("input[name='sales_razon_social']").val(item.razon_social);
+                        var razonRecuperada = String(item.razon_social).trim();
+                        $("input[name='sales_razon_social']").val(razonRecuperada);
                     }
                     if (item.email) {
-                        $("input[name='sales_email']").val(item.email);
+                        $("input[name='sales_email']").val(String(item.email).trim());
                     }
                     if (item.tipo_documento) {
                         $('select[name=sales_tipo_documento]').val(item.tipo_documento);
                     }
                     if (item.complemento_documento) {
-                        $('input[name=sales_complemento_documento]').val(item.complemento_documento);
+                        $('input[name=sales_complemento_documento]').val(String(item.complemento_documento).trim());
                     }
 
                     if (item.tipo_documento == 1) {
@@ -516,18 +517,23 @@
                         $("#tabla_busqueda_modal").find("tr:gt(0)").remove();
 
                         $.each(data.table_data, function(key, value) {
+                            var escRazon = String(value['razon_social'] || '').replace(/"/g, '&quot;');
+                            var escEmail = String(value['email'] || '').replace(/"/g, '&quot;');
+                            var escDoc = String(value['valor_documento'] || '').replace(/"/g, '&quot;');
+                            var escComp = String(value['complemento_documento'] || '').replace(/"/g, '&quot;');
+                            var escTipo = value['tipo_documento'] || 1;
+
                             var btnHtmlValorDocumento = '<td>' +
                                 '<button class="item-selected-btn btn btn-link" type="button" ' +
-                                'data-id = "' + key + '"' +
-                                'data-razon_social = "' + (value['razon_social'] || '') + '"' +
-                                'data-email = "' + (value['email'] || '') + '"' +
-                                'data-tipo_documento = "' + (value['tipo_documento'] || 1) + '"' +
-                                'data-valor_documento = "' + (value['valor_documento'] || '') + '"' +
-                                'data-complemento_documento = "' + (value['complemento_documento'] || '') + '"' +
-                                'data-toggle="modal" data-target="#busquedaModal"' +
-                                '>' +
+                                'data-id="' + key + '" ' +
+                                'data-razon_social="' + escRazon + '" ' +
+                                'data-email="' + escEmail + '" ' +
+                                'data-tipo_documento="' + escTipo + '" ' +
+                                'data-valor_documento="' + escDoc + '" ' +
+                                'data-complemento_documento="' + escComp + '" ' +
+                                'data-toggle="modal" data-target="#busquedaModal">' +
                                 '<i class="dripicons-document-edit"></i> ' +
-                                (value['valor_documento'] || '') +
+                                escDoc +
                                 '</button>' +
                                 '</td>';
 
@@ -538,7 +544,7 @@
                                 '<td>' + (value['email'] || '') + '</td>' +
                                 btnHtmlValorDocumento +
                                 '<td>' + text_complemento_documento + '</td>' +
-                                '<td>' + (value['tipo_documento'] || '') + '</td>' +
+                                '<td>' + escTipo + '</td>' +
                                 '</tr>';
 
                             $('#tabla_busqueda_modal tbody').append(htmlTags);
@@ -589,16 +595,25 @@
 
     // Rellenar datos del valor_documento seleccionado, desde "tabla modal con lista de coincidencias"
     $(document).on("click", ".item-selected-btn", function() {
-        $("input[name='sales_razon_social']").val($(this).data('razon_social'));
-        $("input[name='sales_email']").val($(this).data('email'));
-        $('select[name=sales_tipo_documento]').val($(this).data('tipo_documento'));
-        $('input[name=sales_valor_documento]').val($(this).data('valor_documento'));
-        $('input[name=sales_complemento_documento]').val($(this).data('complemento_documento'));
+        var selRazon = $(this).attr('data-razon_social') || $(this).data('razon_social') || '';
+        var selEmail = $(this).attr('data-email') || $(this).data('email') || '';
+        var selTipo = $(this).attr('data-tipo_documento') || $(this).data('tipo_documento') || 1;
+        var selDoc = $(this).attr('data-valor_documento') || $(this).data('valor_documento') || '';
+        var selComp = $(this).attr('data-complemento_documento') || $(this).data('complemento_documento') || '';
 
-        if ($(this).data('tipo_documento') == 1) {
+        $("input[name='sales_razon_social']").val(String(selRazon).trim());
+        $("input[name='sales_email']").val(String(selEmail).trim());
+        $('select[name=sales_tipo_documento]').val(selTipo);
+        $('input[name=sales_valor_documento]').val(String(selDoc).trim());
+        $('input[name=sales_complemento_documento]').val(String(selComp).trim());
+
+        if (selTipo == 1) {
             $('#sales_complemento').show();
+        } else {
+            $('#sales_complemento').hide();
+            $('input[name=sales_complemento_documento]').val("");
         }
-        if ($('select[name=sales_tipo_documento]').val() == 5) {
+        if (selTipo == 5) {
             sales_consultarNIT();
         }
 

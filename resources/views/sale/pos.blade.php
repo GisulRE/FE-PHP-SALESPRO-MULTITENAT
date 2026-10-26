@@ -6684,7 +6684,7 @@
         });
 
         // permite pulsar tecla enter y buscar coincidencias
-        $(document).on('keypress', 'input[name="sales_valor_documento"]', function(event) {
+        $(document).off('keypress', 'input[name="sales_valor_documento"]').on('keypress', 'input[name="sales_valor_documento"]', function(event) {
             var keycode = (event.keyCode ? event.keyCode : event.which);
             if (keycode == 13) {
                 event.preventDefault();

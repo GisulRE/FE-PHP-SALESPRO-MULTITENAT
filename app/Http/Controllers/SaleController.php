@@ -5811,10 +5811,23 @@ class SaleController extends Controller
 
                 // Si en customer_sales no había email pero sí en customer_nit, completar
                 if (empty($selected->email) && $exactNit && !empty($exactNit->email)) {
-                    $selected->email = $exactNit->email;
+                    $selected->email = trim($exactNit->email);
                 }
-                if (empty($selected->razon_social) && $exactNit && !empty($exactNit->razon_social)) {
-                    $selected->razon_social = $exactNit->razon_social;
+
+                // Si la razón social de la última factura es genérica ("Clientes Varios") o customer_nit tiene un nombre más completo, usar customer_nit
+                if ($exactNit && !empty($exactNit->razon_social)) {
+                    $nitRazon = trim($exactNit->razon_social);
+                    $currRazon = trim($selected->razon_social ?? '');
+                    if (empty($currRazon) || stripos($currRazon, 'Clientes Varios') !== false || mb_strlen($nitRazon) > mb_strlen($currRazon)) {
+                        $selected->razon_social = $nitRazon;
+                    }
+                }
+
+                if (!empty($selected->razon_social)) {
+                    $selected->razon_social = trim($selected->razon_social);
+                }
+                if (!empty($selected->email)) {
+                    $selected->email = trim($selected->email);
                 }
 
                 return response()->json([
@@ -5846,16 +5859,30 @@ class SaleController extends Controller
                 ->limit(25)
                 ->get(['tipo_documento', 'valor_documento', 'complemento_documento', 'razon_social', 'email']);
 
-            // Combinar y deduplicar por valor_documento priorizando la última factura emitida
+            // Combinar y deduplicar por valor_documento priorizando la razón social más completa y última factura
             $combined = collect();
             foreach ($salesMatches as $item) {
+                $obj = (object)(array)$item;
+                $obj->razon_social = trim($obj->razon_social ?? '');
+                $obj->email = trim($obj->email ?? '');
                 if (!$combined->has($item->valor_documento)) {
-                    $combined->put($item->valor_documento, (object)(array)$item);
+                    $combined->put($item->valor_documento, $obj);
                 }
             }
             foreach ($nitMatches as $item) {
+                $obj = (object)(array)$item;
+                $obj->razon_social = trim($obj->razon_social ?? '');
+                $obj->email = trim($obj->email ?? '');
                 if (!$combined->has($item->valor_documento)) {
-                    $combined->put($item->valor_documento, (object)(array)$item);
+                    $combined->put($item->valor_documento, $obj);
+                } else {
+                    $existing = $combined->get($item->valor_documento);
+                    if (empty($existing->email) && !empty($obj->email)) {
+                        $existing->email = $obj->email;
+                    }
+                    if (empty($existing->razon_social) || stripos($existing->razon_social, 'Clientes Varios') !== false || mb_strlen($obj->razon_social) > mb_strlen($existing->razon_social)) {
+                        $existing->razon_social = $obj->razon_social;
+                    }
                 }
             }
 
