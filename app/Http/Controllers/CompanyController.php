@@ -144,14 +144,17 @@ class CompanyController extends Controller
                 $baseRoles = Role::where('company_id', 1)->where('is_active', 1)->get();
                 if ($baseRoles->isNotEmpty()) {
                     foreach ($baseRoles as $baseRole) {
-                        $newRole = Role::create([
+                        $newRoleId = \DB::table('roles')->insertGetId([
                             'name' => $baseRole->name,
                             'description' => $baseRole->description,
                             'is_active' => $baseRole->is_active,
                             'guard_name' => $baseRole->guard_name ?? 'web',
                             'blocked_modules' => $baseRole->blocked_modules,
                             'company_id' => $company->id,
+                            'created_at' => now(),
+                            'updated_at' => now(),
                         ]);
+                        $newRole = Role::find($newRoleId);
 
                         if (strtolower($baseRole->name) === 'administrador' && !$role) {
                             $role = $newRole;
@@ -162,7 +165,7 @@ class CompanyController extends Controller
                         foreach ($permissions as $p) {
                             $insertPerms[] = [
                                 'permission_id' => $p->permission_id,
-                                'role_id' => $newRole->id,
+                                'role_id' => $newRoleId,
                             ];
                         }
                         if (!empty($insertPerms)) {
@@ -214,8 +217,12 @@ class CompanyController extends Controller
             ]);
         }
 
-        if (!$user->hasRole($role->name)) {
-            $user->assignRole($role->name);
+        if (!\DB::table('model_has_roles')->where('role_id', $role->id)->where('model_id', $user->id)->where('model_type', get_class($user))->exists()) {
+            \DB::table('model_has_roles')->insert([
+                'role_id' => $role->id,
+                'model_type' => get_class($user),
+                'model_id' => $user->id,
+            ]);
         }
 
         return ['id' => $user->id, 'name' => $username, 'email' => $email];

@@ -35,4 +35,15 @@ return [
         'secret' => env('STRIPE_SECRET'),
     ],
 
+    'whatsapp' => [
+        'provider' => env('WHATSAPP_PROVIDER', 'meta'), // 'meta' or 'legacy'
+        'token' => env('WHATSAPP_CLOUD_TOKEN', env('WHATSAPP_ACCESS_TOKEN', null)),
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID', null),
+        'business_account_id' => env('WHATSAPP_BUSINESS_ACCOUNT_ID', null),
+        'api_version' => env('WHATSAPP_API_VERSION', 'v21.0'),
+        'otp_template_name' => env('WHATSAPP_OTP_TEMPLATE_NAME', null),
+        'otp_template_lang' => env('WHATSAPP_OTP_TEMPLATE_LANG', 'es'),
+        'otp_button_type' => env('WHATSAPP_OTP_BUTTON_TYPE', null),
+    ],
+
 ];

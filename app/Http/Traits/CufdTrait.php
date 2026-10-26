@@ -33,6 +33,26 @@ trait CufdTrait
         }
     }
 
+    public function getPosSetting(?int $companyId = null, $p_venta = null)
+    {
+        $targetCompanyId = $companyId;
+        if (!$targetCompanyId && $p_venta && !empty($p_venta->company_id)) {
+            $targetCompanyId = $p_venta->company_id;
+        }
+        if (!$targetCompanyId && auth()->check()) {
+            $targetCompanyId = auth()->user()->company_id;
+        }
+
+        if ($targetCompanyId) {
+            $setting = PosSetting::withoutGlobalScope('company')->where('company_id', $targetCompanyId)->latest()->first();
+            if ($setting) {
+                return $setting;
+            }
+        }
+
+        return PosSetting::latest()->first();
+    }
+
     public function verificarCufd()
     {
         //listar todos los puntos de venta
@@ -60,7 +80,9 @@ trait CufdTrait
         if ($p_venta == null) {
             return;
         }
-        $response = $this->getResponseCufd($p_venta->sucursal, $p_venta->codigo_punto_venta, $p_venta->codigo_cuis);
+        $companyId = $p_venta->company_id ?? (auth()->check() ? auth()->user()->company_id : null);
+        $pos_setting = $this->getPosSetting($companyId, $p_venta);
+        $response = $this->getResponseCufd($p_venta->sucursal, $p_venta->codigo_punto_venta, $p_venta->codigo_cuis, $pos_setting);
         if ($response == null) {
             return;
         }
@@ -79,10 +101,14 @@ trait CufdTrait
         
         // PASO 1: DESACTIVAR TODOS LOS CUFDs ANTERIORES de este punto de venta
         Log::info('PASO 1: Desactivando CUFDs antiguos...');
-        $cufds_antiguos = SiatCufd::where('sucursal', $p_venta->sucursal)
+        $cufds_antiguos_query = SiatCufd::withoutGlobalScope('company')
+            ->where('sucursal', $p_venta->sucursal)
             ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
-            ->where('estado', true)
-            ->get();
+            ->where('estado', true);
+        if ($companyId) {
+            $cufds_antiguos_query->where('company_id', $companyId);
+        }
+        $cufds_antiguos = $cufds_antiguos_query->get();
         
         $count_desactivados = 0;
         foreach ($cufds_antiguos as $cufd_antiguo) {
@@ -107,6 +133,7 @@ trait CufdTrait
         $obj->codigo_punto_venta = $p_venta->codigo_punto_venta;
         $obj->estado = true;
         $obj->usuario_alta = 1;
+        $obj->company_id = $companyId;
         $obj->save();
         
         Log::info('  ✓ Nuevo CUFD guardado con ID=' . $obj->id);
@@ -136,7 +163,7 @@ trait CufdTrait
     // Devuelve true si hay un CUFD utilizable (vigente o recién renovado), false si no.
     public function asegurarCufdVigente($p_venta)
     {
-        $pos_setting = PosSetting::latest()->first();
+        $pos_setting = $this->getPosSetting(null, $p_venta);
         if (($pos_setting->cufd_centralizado ?? 0) == 1) {
             Log::info('asegurarCufdVigente: CUFD Centralizado activo (cufd_centralizado = 1), el servicio SIAT gestiona CUFD/CUIS internamente.');
             return true;
@@ -189,14 +216,18 @@ trait CufdTrait
 
     public function estaVigenteCUFD($p_venta)
     {
-        $registro = SiatCufd::where('sucursal', $p_venta->sucursal)->where('codigo_punto_venta', $p_venta->codigo_punto_venta)->where('estado', true)->first();
-        if ($registro == null) {
-            $registro = SiatCufd::withoutGlobalScope('company')
-                ->where('sucursal', $p_venta->sucursal)
-                ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
-                ->where('estado', true)
-                ->first();
+        $companyId = $p_venta->company_id ?? (auth()->check() ? auth()->user()->company_id : null);
+
+        $query = SiatCufd::withoutGlobalScope('company')
+            ->where('sucursal', $p_venta->sucursal)
+            ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
+            ->where('estado', true);
+
+        if ($companyId) {
+            $query->where('company_id', $companyId);
         }
+
+        $registro = $query->first();
 
         // en caso 0, no exista, retorna false
         if ($registro == null) {
@@ -227,16 +258,17 @@ trait CufdTrait
     }
 
     // retorna el response del endpoint
-    public function getResponseCufd($sucursal_id, $p_venta, $cuis)
+    public function getResponseCufd($sucursal_id, $p_venta, $cuis, $pos_setting = null)
     {
-        //http://66.94.100.10:5014/obtencion.codigos/cufd?codigoPuntoVenta=0&cuis=FD520714&nit=388615026&sucursal=0
-        $pos_setting = PosSetting::latest()->first();
+        if (!$pos_setting) {
+            $pos_setting = $this->getPosSetting();
+        }
         $bearer = 'Bearer ' . Session::get('token_siat');
-        $host = $pos_setting->url_operaciones;
+        $host = $pos_setting->url_operaciones ?? '';
         $path = '/obtencion.codigos/cufd';
         $punto_venta = '?codigoPuntoVenta=' . $p_venta;
         $codigo_cuis = '&cuis=' . $cuis;
-        $nit_emisor = '&nit=' . $pos_setting->nit_emisor;
+        $nit_emisor = '&nit=' . ($pos_setting->nit_emisor ?? '');
         $sucursal = '&sucursal=' . $sucursal_id;
         $query = $punto_venta . $codigo_cuis . $nit_emisor . $sucursal;
 
@@ -307,17 +339,22 @@ trait CufdTrait
             return;
         }
 
+        $companyId = $p_venta->company_id ?? (auth()->check() ? auth()->user()->company_id : null);
+        $pos_setting = $this->getPosSetting($companyId, $p_venta);
+
         $this->writeCufdDebug('CUFD taskRenovarCUFD: inicio', [
             'sucursal' => $p_venta->sucursal,
             'codigo_punto_venta' => $p_venta->codigo_punto_venta,
             'codigo_cuis' => $p_venta->codigo_cuis,
+            'company_id' => $companyId,
         ]);
 
-        $response = $this->getResponseCufdTask($p_venta->sucursal, $p_venta->codigo_punto_venta, $p_venta->codigo_cuis);
+        $response = $this->getResponseCufdTask($p_venta->sucursal, $p_venta->codigo_punto_venta, $p_venta->codigo_cuis, $pos_setting);
         if ($response == null) {
             $this->writeCufdDebug('CUFD taskRenovarCUFD: respuesta nula', [
                 'sucursal' => $p_venta->sucursal,
                 'codigo_punto_venta' => $p_venta->codigo_punto_venta,
+                'company_id' => $companyId,
             ]);
             return;
         }
@@ -331,10 +368,14 @@ trait CufdTrait
         // Desactivar los CUFD anteriores antes de insertar el nuevo, para no dejar
         // varios registros con estado=true simultáneamente (rompe la referencia que
         // usa "Registrar Evento" para saber cuál era el CUFD vigente antes de renovar).
-        SiatCufd::where('sucursal', $p_venta->sucursal)
+        $deactQuery = SiatCufd::withoutGlobalScope('company')
+            ->where('sucursal', $p_venta->sucursal)
             ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
-            ->where('estado', true)
-            ->update(['estado' => false]);
+            ->where('estado', true);
+        if ($companyId) {
+            $deactQuery->where('company_id', $companyId);
+        }
+        $deactQuery->update(['estado' => false]);
 
         // proceso de guardar registro de cufd por punto de venta.
         $obj = new SiatCufd();
@@ -348,6 +389,7 @@ trait CufdTrait
         $obj->sucursal = $p_venta->sucursal;
         $obj->codigo_punto_venta = $p_venta->codigo_punto_venta;
         $obj->estado = true;
+        $obj->company_id = $companyId;
         $obj->save();
 
         $this->writeCufdDebug('CUFD taskRenovarCUFD: renovacion exitosa', [
@@ -355,6 +397,7 @@ trait CufdTrait
             'codigo_punto_venta' => $p_venta->codigo_punto_venta,
             'siat_cufd_id' => $obj->id,
             'fecha_vigencia' => $obj->fecha_vigencia,
+            'company_id' => $companyId,
         ]);
 
         log::info('Renovación CUFD exitosa para el Punto de Venta => ' . $p_venta->codigo_punto_venta . ' de la Sucursal => ' . $p_venta->sucursal);
@@ -362,24 +405,27 @@ trait CufdTrait
     }
 
     // retorna el response para Tarea Programada
-    public function getResponseCufdTask($sucursal_id, $p_venta, $cuis)
+    public function getResponseCufdTask($sucursal_id, $p_venta, $cuis, $pos_setting = null)
     {
         $this->lastSiatCufdError = null;
 
-        $token_siat = $this->getTokenTask();
+        if (!$pos_setting) {
+            $pos_setting = $this->getPosSetting();
+        }
+
+        $token_siat = $this->getTokenTask($pos_setting);
         if ($token_siat == null) {
             log::warning('Error: no ha obtenido el token   | archivo CufdTrait, operación_getResponseCufdTask');
             $this->lastSiatCufdError = 'No se pudo obtener el token de autenticación SIAT.';
             return;
         }
         //http://66.94.100.10:5014/obtencion.codigos/cufd?codigoPuntoVenta=0&cuis=FD520714&nit=388615026&sucursal=0
-        $pos_setting = PosSetting::latest()->first();
         $bearer = 'Bearer ' . $token_siat;
-        $host = $pos_setting->url_operaciones;
+        $host = $pos_setting->url_operaciones ?? '';
         $path = '/obtencion.codigos/cufd';
         $punto_venta = '?codigoPuntoVenta=' . $p_venta;
         $codigo_cuis = '&cuis=' . $cuis;
-        $nit_emisor = '&nit=' . $pos_setting->nit_emisor;
+        $nit_emisor = '&nit=' . ($pos_setting->nit_emisor ?? '');
         $sucursal = '&sucursal=' . $sucursal_id;
         $query = $punto_venta . $codigo_cuis . $nit_emisor . $sucursal;
         $url = $host . $path . $query;
@@ -456,9 +502,14 @@ trait CufdTrait
     }
 
     // obtener token para Tarea Programada
-    public function getTokenTask()
+    public function getTokenTask($pos_setting = null)
     {
-        $pos_setting = PosSetting::latest()->first();
+        if (!$pos_setting) {
+            $pos_setting = $this->getPosSetting();
+        }
+        if (!$pos_setting) {
+            return null;
+        }
         $user_siat = $pos_setting->user_siat;
         $pass_siat = $pos_setting->pass_siat;
         $url_siat = $pos_setting->url_siat;
@@ -552,18 +603,25 @@ trait CufdTrait
 
     public function desactivarRegistroCUFD($p_venta)
     {
-        $activos_antes = SiatCufd::where('sucursal', $p_venta->sucursal)
+        $companyId = $p_venta->company_id ?? (auth()->check() ? auth()->user()->company_id : null);
+        $activosQuery = SiatCufd::withoutGlobalScope('company')
+            ->where('sucursal', $p_venta->sucursal)
             ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
-            ->where('estado', true)
-            ->count();
+            ->where('estado', true);
+        if ($companyId) {
+            $activosQuery->where('company_id', $companyId);
+        }
+
+        $activos_antes = (clone $activosQuery)->count();
 
         // obtener sólo los estado = true, y por each a false
-        $registro = SiatCufd::where('sucursal', $p_venta->sucursal)->where('codigo_punto_venta', $p_venta->codigo_punto_venta)->where('estado', true)->get()->each->updateEstado();
+        $registro = $activosQuery->get()->each->updateEstado();
 
         $this->writeCufdDebug('CUFD desactivarRegistroCUFD: estados desactivados', [
             'sucursal' => $p_venta->sucursal,
             'codigo_punto_venta' => $p_venta->codigo_punto_venta,
             'activos_antes' => $activos_antes,
+            'company_id' => $companyId,
         ]);
 
         // se procede a renovar el punto de venta
@@ -579,8 +637,11 @@ trait CufdTrait
             return array('status' => false, 'mensaje' => 'No se encontró el punto de venta.');
         }
 
+        $companyId = $p_venta->company_id ?? (auth()->check() ? auth()->user()->company_id : null);
+        $pos_setting = $this->getPosSetting($companyId, $p_venta);
+
         if (empty($p_venta->codigo_cuis)) {
-            $resCuis = $this->obtenerCuis($p_venta->codigo_punto_venta, $p_venta->sucursal);
+            $resCuis = $this->obtenerCuis($p_venta->codigo_punto_venta, $p_venta->sucursal, $pos_setting);
             if (!empty($resCuis['status']) && !empty($resCuis['data']['codigo'])) {
                 $p_venta->codigo_cuis = $resCuis['data']['codigo'];
                 $p_venta->save();
@@ -591,13 +652,15 @@ trait CufdTrait
             'sucursal' => $p_venta->sucursal,
             'codigo_punto_venta' => $p_venta->codigo_punto_venta,
             'codigo_cuis' => $p_venta->codigo_cuis,
+            'company_id' => $companyId,
         ]);
 
-        $response = $this->getResponseCufdTask($p_venta->sucursal, $p_venta->codigo_punto_venta, $p_venta->codigo_cuis);
+        $response = $this->getResponseCufdTask($p_venta->sucursal, $p_venta->codigo_punto_venta, $p_venta->codigo_cuis, $pos_setting);
         if ($response == null) {
             $this->writeCufdDebug('CUFD renovarVigenciaxPuntoVenta: respuesta nula', [
                 'sucursal' => $p_venta->sucursal,
                 'codigo_punto_venta' => $p_venta->codigo_punto_venta,
+                'company_id' => $companyId,
                 'error' => $this->lastSiatCufdError,
             ]);
             return array('status' => false, 'mensaje' => $this->lastSiatCufdError ?: 'No se pudo renovar el CUFD: sin respuesta de SIAT.');
@@ -610,11 +673,14 @@ trait CufdTrait
         $fecha_vigencia = new Carbon($item['fechaVigencia']);
 
         // Ver comentario equivalente en taskRenovarCUFD(): evitar múltiples CUFD activos a la vez.
-        SiatCufd::withoutGlobalScope('company')
+        $deactQuery = SiatCufd::withoutGlobalScope('company')
             ->where('sucursal', $p_venta->sucursal)
             ->where('codigo_punto_venta', $p_venta->codigo_punto_venta)
-            ->where('estado', true)
-            ->update(['estado' => false]);
+            ->where('estado', true);
+        if ($companyId) {
+            $deactQuery->where('company_id', $companyId);
+        }
+        $deactQuery->update(['estado' => false]);
 
         // proceso de guardar registro de cufd por punto de venta.
         $obj = new SiatCufd();
@@ -628,6 +694,7 @@ trait CufdTrait
         $obj->sucursal = $p_venta->sucursal;
         $obj->codigo_punto_venta = $p_venta->codigo_punto_venta;
         $obj->estado = true;
+        $obj->company_id = $companyId;
         $obj->save();
 
         $this->writeCufdDebug('CUFD renovarVigenciaxPuntoVenta: renovacion exitosa', [
@@ -635,18 +702,21 @@ trait CufdTrait
             'codigo_punto_venta' => $p_venta->codigo_punto_venta,
             'siat_cufd_id' => $obj->id,
             'fecha_vigencia' => $obj->fecha_vigencia,
+            'company_id' => $companyId,
         ]);
 
         log::info('operación renovarVigenciaxPuntoVenta, renovación CUFD exitosa para el Punto de Venta => ' . $p_venta->codigo_punto_venta . ' de la Sucursal => ' . $p_venta->sucursal);
         return array('status' => true, 'mensaje' => 'CUFD renovado correctamente para el punto de venta: ' . $p_venta->codigo_punto_venta);
     }
 
-    public function obtenerCuis(int $puntoVenta, int $sucursalId = null)
+    public function obtenerCuis(int $puntoVenta, int $sucursalId = null, $pos_setting = null)
     {
-        $pos_setting = PosSetting::latest()->first();
+        if (!$pos_setting) {
+            $pos_setting = $this->getPosSetting();
+        }
         $token = Session::get('token_siat');
         $bearer = 'Bearer ' . $token;
-        $host = $pos_setting->url_operaciones;
+        $host = $pos_setting->url_operaciones ?? '';
         $path = '/obtencion.codigos/cuis';
 
         Log::info('[obtenerCuis] Inicio', [
@@ -659,8 +729,7 @@ trait CufdTrait
 
         if (!$token) {
             Log::warning('[obtenerCuis] No hay token SIAT en sesión — se intentará re-autenticar.');
-            $this->getTokenTask();
-            $token = Session::get('token_siat');
+            $token = $this->getTokenTask($pos_setting);
             $bearer = 'Bearer ' . $token;
             if (!$token) {
                 Log::error('[obtenerCuis] Re-autenticación fallida, no se puede obtener CUIS.');
@@ -742,12 +811,12 @@ trait CufdTrait
 
     public function registrarPuntoVenta($puntoVenta)
     {
-        $pos_setting = PosSetting::latest()->first();
+        $pos_setting = $this->getPosSetting();
         $bearer = 'Bearer ' . Session::get('token_siat');
-        $host = $pos_setting->url_operaciones;
+        $host = $pos_setting->url_operaciones ?? '';
         $path = '/operaciones/registro.punto.venta';
 
-        $data_cuis = $this->obtenerCuis(0, $puntoVenta['sucursal']);
+        $data_cuis = $this->obtenerCuis(0, $puntoVenta['sucursal'], $pos_setting);
         if ($data_cuis['status']) {
             //Body
             $body = [
@@ -809,12 +878,12 @@ trait CufdTrait
 
     public function registrarPuntoVentaComisionista($puntoVenta)
     {
-        $pos_setting = PosSetting::latest()->first();
+        $pos_setting = $this->getPosSetting();
         $bearer = 'Bearer ' . Session::get('token_siat');
-        $host = $pos_setting->url_operaciones;
+        $host = $pos_setting->url_operaciones ?? '';
         $path = '/operaciones/registro.punto.venta.comisionista';
 
-        $data_cuis = $this->obtenerCuis(0, $puntoVenta['sucursal']);
+        $data_cuis = $this->obtenerCuis(0, $puntoVenta['sucursal'], $pos_setting);
         if ($data_cuis['status']) {
             $body = [
                 'nombrePuntoVenta' => $puntoVenta['nombre_punto_venta'],
@@ -881,12 +950,12 @@ trait CufdTrait
 
     public function bajaPuntoVenta($puntoVenta)
     {
-        $pos_setting = PosSetting::latest()->first();
+        $pos_setting = $this->getPosSetting();
         $bearer = 'Bearer ' . Session::get('token_siat');
-        $host = $pos_setting->url_operaciones;
+        $host = $pos_setting->url_operaciones ?? '';
         $path = '/operaciones/cierre.operaciones.sistema';
 
-        $data_cuis = $this->obtenerCuis($puntoVenta['codigo_punto_venta'], $puntoVenta['sucursal']);
+        $data_cuis = $this->obtenerCuis($puntoVenta['codigo_punto_venta'], $puntoVenta['sucursal'], $pos_setting);
         if ($data_cuis['status']) {
             $codigoPuntoVenta = '?codigoPuntoVenta=' . $puntoVenta['codigo_punto_venta'];
             $cuis = '&cuis=' . $data_cuis['data']['CUIS'];
@@ -976,7 +1045,7 @@ trait CufdTrait
             return null;
         }
 
-        $pos_setting = PosSetting::latest()->first();
+        $pos_setting = $this->getPosSetting();
         if (!$pos_setting || !$pos_setting->nit_emisor || !$pos_setting->url_operaciones) {
             Log::warning("getPuntosVentaDesdeSiatApi: POS settings incomplete.");
             return null;
@@ -988,7 +1057,7 @@ trait CufdTrait
             $bearer = 'Bearer ' . Session::get('token_siat');
         }
 
-        $data_cuis = $this->obtenerCuis(0, $sucursalCode);
+        $data_cuis = $this->obtenerCuis(0, $sucursalCode, $pos_setting);
         if (!$data_cuis || $data_cuis['status'] != true) {
             Log::warning("getPuntosVentaDesdeSiatApi: Falló al obtener CUIS para la sucursal {$sucursalCode}.");
             return null;

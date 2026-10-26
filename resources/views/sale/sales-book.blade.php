@@ -773,8 +773,9 @@
             $('#anioFiltroR').append($('<option />').val(i).html(i));
         }
         var all_permission = <?php echo json_encode($all_permission); ?>;
+        var is_admin = <?php echo json_encode($is_admin ?? false); ?>;
         var role_id = <?php echo json_encode(\Auth::user()->role_id); ?>;
-        if (role_id > 2) {
+        if (!is_admin && role_id > 2) {
             $('#sucursal').addClass('noselect');
             $('#codigo_punto_venta').addClass('noselect');
             $('select[name="sucursal"]').val($("input[name='sucursal_biller_id_hidden']").val());
@@ -782,7 +783,7 @@
             $('.selectpicker').selectpicker('refresh');
         }
 
-        if (role_id > 2) {
+        if (!is_admin && role_id > 2) {
             $('#usuario_filtro').addClass('noselect');
             $('#sucursal_filtro').addClass('noselect');
             $('#sucursalFiltroR').addClass('noselect');
@@ -808,11 +809,21 @@
             $('#sucursalarqcat_filtro').removeClass('noselect');
             $('#sucursalrev_filtro').removeClass('noselect');
             $('#operadorrev_filtro').removeClass('noselect');
+            $('#sucursal').removeClass('noselect');
+            $('#codigo_punto_venta').removeClass('noselect');
             if (!$('select[name="sucursal"]').val() && $("input[name='sucursal_biller_id_hidden']").val()) {
                 $('select[name="sucursal"]').val($("input[name='sucursal_biller_id_hidden']").val());
-                $('select[name="codigo_punto_venta"]').val($("input[name='punto_venta_biller_id_hidden']").val());
-                $('.selectpicker').selectpicker('refresh');
             }
+            if (!$('select[name="codigo_punto_venta"]').val() && $("input[name='punto_venta_biller_id_hidden']").val()) {
+                $('select[name="codigo_punto_venta"]').val($("input[name='punto_venta_biller_id_hidden']").val());
+            }
+            if (!$('select[name="codigo_punto_venta"]').val()) {
+                var firstPv = $('select[name="codigo_punto_venta"] option:first').val();
+                if (firstPv !== undefined && firstPv !== '') {
+                    $('select[name="codigo_punto_venta"]').val(firstPv);
+                }
+            }
+            $('.selectpicker').selectpicker('refresh');
         }
 
         $.ajaxSetup({
@@ -1808,5 +1819,17 @@
                 },
             });
         }
+    
+        $(document).ready(function() {
+            var autoLoadPv = $("select[name='codigo_punto_venta']").val();
+            if (autoLoadPv !== null && autoLoadPv !== undefined && autoLoadPv !== '') {
+                filtrarFacturas();
+            } else {
+                setTimeout(function() {
+                    filtrarFacturas();
+                }, 400);
+            }
+        });
+
     </script>
 @endsection('content')

@@ -204,7 +204,11 @@ class SaleController extends Controller
         );
 
         $user = Auth::user();
-        $has_all_permission = ($user && $user->role_id <= 2) || (is_array(session('permissions')) && in_array('sales-index-all', session('permissions')));
+        $role = ($user && $user->role_id) ? Role::find($user->role_id) : null;
+        $is_admin = $user && ($user->role_id <= 2 || ($role && in_array(strtolower($role->name ?? ''), ['admin', 'superadmin', 'administrador', 'propietario', 'owner'])));
+        $has_all_permission = $is_admin
+            || (is_array(session('permissions')) && in_array('sales-index-all', session('permissions')))
+            || ($role && method_exists($role, 'hasPermissionTo') && $role->hasPermissionTo('sales-index-all'));
 
         $baseQuery = Sale::query();
         if (!$has_all_permission && Auth::check()) {
@@ -582,8 +586,10 @@ class SaleController extends Controller
     {
 
         $user = Auth::user();
+        $role = ($user && $user->role_id) ? Role::find($user->role_id) : null;
         $permissions = is_array(session('permissions')) ? session('permissions') : [];
-        $canAdd = ($user && $user->role_id <= 2) || in_array('sales-add', $permissions);
+        $is_admin = $user && ($user->role_id <= 2 || ($role && in_array(strtolower($role->name ?? ''), ['admin', 'superadmin', 'administrador', 'propietario', 'owner'])));
+        $canAdd = $is_admin || in_array('sales-add', $permissions) || ($role && method_exists($role, 'hasPermissionTo') && $role->hasPermissionTo('sales-add'));
 
         if ($canAdd) {
             $all_permission = !empty($permissions) ? $permissions : ['sales-index', 'sales-add', 'sales-edit', 'sales-delete'];
@@ -6023,12 +6029,20 @@ class SaleController extends Controller
     public function libroVentas()
     {
         $user = Auth::user();
+        $role = ($user && $user->role_id) ? Role::find($user->role_id) : null;
         $permissions = is_array(session('permissions')) ? session('permissions') : [];
-        $hasPermission = ($user && $user->role_id <= 2) || in_array('sales-list-booksale', $permissions);
+        $is_admin = $user && ($user->role_id <= 2 || ($role && in_array(strtolower($role->name ?? ''), ['admin', 'superadmin', 'administrador', 'propietario', 'owner'])));
+        $hasPermission = $is_admin || in_array('sales-list-booksale', $permissions) || ($role && method_exists($role, 'hasPermissionTo') && $role->hasPermissionTo('sales-list-booksale'));
 
         if ($hasPermission) {
             $fecha_actual = date('Y-m-d');
-            $data_biller = ($user && $user->biller_id) ? Biller::find($user->biller_id) : Biller::first();
+            $data_biller = null;
+            if ($user && $user->biller_id) {
+                $data_biller = Biller::find($user->biller_id);
+            }
+            if (!$data_biller) {
+                $data_biller = Biller::where('is_active', true)->first() ?: Biller::first();
+            }
             if ($data_biller == null) {
                 $data_biller = (object)['sucursal' => 0, 'punto_venta_siat' => 0];
             }
@@ -6052,11 +6066,19 @@ class SaleController extends Controller
                 }
             }
 
+            // Asegurar que punto_venta_siat corresponda a uno existente en la lista
+            $availablePvs = $data_p_venta->pluck('codigo_punto_venta')->map(function ($val) {
+                return (string)$val;
+            })->toArray();
+            if (!in_array((string)($data_biller->punto_venta_siat ?? ''), $availablePvs)) {
+                $data_biller->punto_venta_siat = $data_p_venta->first()->codigo_punto_venta ?? 0;
+            }
+
             $usuarios = User::select('id', 'name')->where('is_active', true)->get();
             $sucursales = SiatSucursal::select('sucursal', 'nombre')->where('estado', true)->get();
             $all_permission = !empty($permissions) ? $permissions : ['sales-list-booksale'];
 
-            return view('sale.sales-book', compact('all_permission', 'fecha_actual', 'sucursales', 'data_biller', 'data_p_venta', 'usuarios'));
+            return view('sale.sales-book', compact('all_permission', 'fecha_actual', 'sucursales', 'data_biller', 'data_p_venta', 'usuarios', 'is_admin'));
         } else {
             return redirect()->back()->with('not_permitted', 'Lo siento! Usted no tiene acceso a este modulo');
         }
@@ -6068,7 +6090,8 @@ class SaleController extends Controller
             $user = Auth::user();
             $role = ($user && $user->role_id) ? Role::find($user->role_id) : null;
             $permissions = is_array(session('permissions')) ? session('permissions') : [];
-            $canDelete = ($user && $user->role_id <= 2)
+            $is_admin = $user && ($user->role_id <= 2 || ($role && in_array(strtolower($role->name ?? ''), ['admin', 'superadmin', 'administrador', 'propietario', 'owner'])));
+            $canDelete = $is_admin
                 || in_array('sales-delete', $permissions)
                 || ($role && method_exists($role, 'hasPermissionTo') && $role->hasPermissionTo('sales-delete'));
 

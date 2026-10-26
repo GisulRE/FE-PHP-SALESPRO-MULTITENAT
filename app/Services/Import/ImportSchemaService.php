@@ -333,7 +333,19 @@ class ImportSchemaService
             }
         }
 
+        $noNaturalKeyTables = [
+            'customer_sales',
+            'product_sales',
+            'payments',
+            'record',
+            'siat_cufd',
+        ];
+
         foreach ($this->tableMetadata as $table => $meta) {
+            if (in_array($table, $noNaturalKeyTables, true)) {
+                $this->tableMetadata[$table]['natural_keys'] = [];
+                continue;
+            }
             $naturalKeys = [];
             foreach ($this->naturalKeyPriority as $candidate) {
                 if (isset($meta['columns'][$candidate])) {

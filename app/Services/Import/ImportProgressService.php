@@ -87,7 +87,10 @@ class ImportProgressService
 
         $detail->deferred_rows = $deferredRows;
         $detail->save();
-        $this->refreshJob($detail->importJob);
+
+        if ($failedRows > 0 || (($detail->processed_rows + $detail->failed_rows) % 50 === 0)) {
+            $this->refreshJob($detail->importJob);
+        }
     }
 
     public function completeTable(ImportJobDetail $detail, $status, array $meta = [], $errorMessage = null)
@@ -161,13 +164,18 @@ class ImportProgressService
                 break;
         }
 
-        return ImportJobLog::create([
-            'import_job_id' => $job->id,
-            'import_job_detail_id' => $detail ? $detail->id : null,
-            'level' => $level,
-            'message' => $message,
-            'context' => $context,
-        ]);
+        try {
+            return ImportJobLog::create([
+                'import_job_id' => $job->id,
+                'import_job_detail_id' => $detail ? $detail->id : null,
+                'level' => $level,
+                'message' => $message,
+                'context' => $context,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("No se pudo registrar ImportJobLog en DB: " . $e->getMessage());
+            return null;
+        }
     }
 
     public function refreshJob(ImportJob $job)

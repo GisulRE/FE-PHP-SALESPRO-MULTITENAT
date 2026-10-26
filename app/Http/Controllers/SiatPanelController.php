@@ -88,24 +88,75 @@ class SiatPanelController extends Controller
         return view('siat-panel.documento_sector', ['billers' => $billers, 'documentos' => $documentos]);
     }
 
-    public function parametros()
+    public function parametros(Request $request)
     {
         //obteniendo Billers
         $billers = Biller::where('is_active', true)->get();
+        $selected_biller_id = $request->get('biller_id', optional($billers->first())->id);
+        $selected_tipo = $request->get('tipo', '');
 
-        $parametricas = SiatParametricaVario::orderBy('id')->get();
+        $query = SiatParametricaVario::query();
+        if (!empty($selected_tipo)) {
+            $query->where('tipo_clasificador', $selected_tipo);
+        }
 
-        return view('siat-panel.parametrica', ['billers' => $billers, 'parametricas' => $parametricas]);
+        $parametricas = $query->selectRaw('DISTINCT ON (tipo_clasificador, codigo_clasificador) *')
+            ->orderBy('tipo_clasificador')
+            ->orderBy('codigo_clasificador')
+            ->orderByDesc('id')
+            ->get();
+
+        $tipos = SiatParametricaVario::distinct('tipo_clasificador')
+            ->orderBy('tipo_clasificador')
+            ->pluck('tipo_clasificador');
+
+        return view('siat-panel.parametrica', [
+            'billers' => $billers,
+            'parametricas' => $parametricas,
+            'selected_biller_id' => $selected_biller_id,
+            'selected_tipo' => $selected_tipo,
+            'tipos' => $tipos,
+        ]);
     }
 
-    public function getParametroById(Biller $id)
+    public function getParametroById(Biller $id, Request $request)
     {
         //obteniendo Billers
         $billers = Biller::where('is_active', true)->get();
         $punto_venta = $id->punto_venta_siat;
-        $sucursal = $id->almacen->sucursal->sucursal;
-        $parametricas = SiatParametricaVario::where('codigo_punto_venta', $punto_venta)
-            ->where('sucursal', $sucursal)->get();
+        $sucursal = optional(optional($id->almacen)->sucursal)->sucursal ?? 0;
+        $selected_tipo = $request->get('tipo', '');
+
+        $query = SiatParametricaVario::query();
+        if ($punto_venta !== null && $sucursal !== null) {
+            $query->where('codigo_punto_venta', $punto_venta)
+                ->where('sucursal', $sucursal);
+        }
+        if (!empty($selected_tipo)) {
+            $query->where('tipo_clasificador', $selected_tipo);
+        }
+
+        $parametricas = $query->selectRaw('DISTINCT ON (tipo_clasificador, codigo_clasificador) *')
+            ->orderBy('tipo_clasificador')
+            ->orderBy('codigo_clasificador')
+            ->orderByDesc('id')
+            ->get();
+
+        if ($parametricas->isEmpty() && ($punto_venta != 0 || $sucursal != 0)) {
+            $queryFallback = SiatParametricaVario::query();
+            if (!empty($selected_tipo)) {
+                $queryFallback->where('tipo_clasificador', $selected_tipo);
+            }
+            $parametricas = $queryFallback->selectRaw('DISTINCT ON (tipo_clasificador, codigo_clasificador) *')
+                ->orderBy('tipo_clasificador')
+                ->orderBy('codigo_clasificador')
+                ->orderByDesc('id')
+                ->get();
+        }
+
+        $tipos = SiatParametricaVario::distinct('tipo_clasificador')
+            ->orderBy('tipo_clasificador')
+            ->pluck('tipo_clasificador');
 
         Log::info("SIAT PANEL BUSQUEDA", [
             'funcion' => 'getParametroById',
@@ -113,11 +164,18 @@ class SiatPanelController extends Controller
                 'biller_id' => $id->id,
                 'punto_venta' => $punto_venta,
                 'sucursal' => $sucursal,
+                'tipo' => $selected_tipo,
             ],
             'total_resultados' => $parametricas->count(),
         ]);
 
-        return view('siat-panel.parametrica', ['billers' => $billers, 'parametricas' => $parametricas]);
+        return view('siat-panel.parametrica', [
+            'billers' => $billers,
+            'parametricas' => $parametricas,
+            'selected_biller_id' => $id->id,
+            'selected_tipo' => $selected_tipo,
+            'tipos' => $tipos,
+        ]);
     }
 
 
@@ -254,7 +312,18 @@ class SiatPanelController extends Controller
     public function getPuntoVenta($id)
     {
         $unit = SiatPuntoVenta::where("sucursal", $id)->orderBy('codigo_punto_venta', 'asc')->first();
-        return $unit;
+        if (!$unit) {
+            $unit = SiatPuntoVenta::where(function($q) {
+                $q->where('codigo_punto_venta', 0)->orWhere('codigo_punto_venta', '0');
+            })->first();
+        }
+        if (!$unit) {
+            $unit = (object)[
+                'codigo_punto_venta' => 0,
+                'nombre_punto_venta' => 'Punto de Venta Principal (0)'
+            ];
+        }
+        return response()->json($unit);
     }
     public function getCuis($sucursal, $codigo_punto_venta)
     {
@@ -339,43 +408,230 @@ class SiatPanelController extends Controller
     public function listarSincronizados()
     {
         $sucursales = SiatSucursal::where('estado', true)->get();
-        $nitCollection = PosSetting::latest()->first()->pluck('nit_emisor');
+        $posSetting = PosSetting::first();
+        $nitValue = $posSetting ? $posSetting->nit_emisor : '';
         $operaciones = $this->listaOperaciones();
+
+        $sucursal_actual = $sucursales->first()->sucursal ?? 0;
+        $puntos_venta = SiatPuntoVenta::where('sucursal', $sucursal_actual)->orderBy('codigo_punto_venta', 'asc')->get();
+        if ($puntos_venta->isEmpty()) {
+            $puntos_venta = collect([(object)[
+                'codigo_punto_venta' => 0,
+                'nombre_punto_venta' => 'Punto de Venta Principal (0)'
+            ]]);
+        }
 
         return view('siat-panel.datos_sincronizados', [
             'sucursales' => $sucursales,
+            'puntos_venta' => $puntos_venta,
             'operaciones' => $operaciones,
-            'nit' => $nitCollection,
+            'nit' => [$nitValue],
         ]);
     }
 
     public function getListarNitData(Request $request)
     {
-        $nitCollection = PosSetting::latest()->first()->pluck('nit_emisor');
-        $nitValue = $nitCollection->first();
+        $posSetting = PosSetting::first();
+        $nitValue = $posSetting ? $posSetting->nit_emisor : '';
+        $companyName = $posSetting ? $posSetting->razon_social_emisor : '';
+
+        $parametro = (string) $request->input('parametro', '');
+        $sucursal = $request->has('sucursal') && $request->input('sucursal') !== '' ? (int)$request->input('sucursal') : null;
+        $codigoPuntoVenta = $request->has('codigo_punto_venta') && $request->input('codigo_punto_venta') !== '' ? (int)$request->input('codigo_punto_venta') : null;
+
         $entidades = [];
 
-        if (Session::get('token_siat') != null) {
-            $body = [
-                'nit' => $nitValue,
-                'parametro' => $request->input('parametro', ''),
-                'sucursal' => (int)$request->input('sucursal', 0),
-                'codigoPuntoVenta' => (int)$request->input('codigo_punto_venta', 0),
-            ];
+        // 1. Intentar consultar desde el microservicio remoto
+        try {
+            $token = Session::get('token_siat');
+            if (!$token) {
+                $this->getToken();
+                $token = Session::get('token_siat');
+            }
 
-            try {
+            if ($token && !empty($posSetting->url_optimo)) {
+                $body = [
+                    'nit' => $nitValue,
+                    'parametro' => $parametro,
+                    'sucursal' => $sucursal ?? 0,
+                    'codigoPuntoVenta' => $codigoPuntoVenta ?? 0,
+                ];
+
                 $response = $this->postListarNit($body);
-                if ($response && isset($response['ENTITIES'])) {
+                if ($response && isset($response['ENTITIES']) && is_array($response['ENTITIES']) && count($response['ENTITIES']) > 0) {
                     $entidades = $response['ENTITIES'];
                 }
-            } catch (\Exception $e) {
-                Log::error("SIAT GET LISTAR NIT DATA ERROR", [
-                    'error' => $e->getMessage(),
-                ]);
             }
+        } catch (\Exception $e) {
+            Log::warning("SIAT GET LISTAR NIT DATA API ERROR: " . $e->getMessage());
+        }
+
+        // 2. Fallback resiliente: consultar tablas locales sincronizadas en la base de datos
+        if (empty($entidades)) {
+            $entidades = $this->obtenerEntidadesLocales($parametro, $sucursal, $codigoPuntoVenta, $nitValue, $companyName);
         }
 
         return response()->json(['entidades' => $entidades]);
+    }
+
+    protected function obtenerEntidadesLocales($parametro, $sucursal, $codigoPuntoVenta, $nitValue, $companyName)
+    {
+        $entidades = [];
+
+        switch ($parametro) {
+            case 'actividades':
+                $items = SiatActividadEconomica::query()
+                    ->when($sucursal !== null, function ($q) use ($sucursal) {
+                        $q->where('sucursal', $sucursal);
+                    })
+                    ->when($codigoPuntoVenta !== null, function ($q) use ($codigoPuntoVenta) {
+                        $q->where('codigo_punto_venta', $codigoPuntoVenta);
+                    })
+                    ->orderBy('id', 'asc')
+                    ->get();
+
+                if ($items->isEmpty() && ($sucursal !== null || $codigoPuntoVenta !== null)) {
+                    $items = SiatActividadEconomica::orderBy('id', 'asc')->get();
+                }
+
+                foreach ($items as $item) {
+                    $entidades[] = [
+                        'id' => $item->id,
+                        'descripcion' => $item->descripcion,
+                        'clave' => $item->codigo_caeb,
+                        'valor' => $item->tipo_actividad,
+                        'empresa' => ['nombre' => $companyName, 'nit' => $nitValue],
+                        'estado' => 'A',
+                        'fecha_sincronizacion' => $item->updated_at ? $item->updated_at->format('Y-m-d H:i:s') : '',
+                        'fecha_alta' => $item->created_at ? $item->created_at->format('Y-m-d H:i:s') : '',
+                    ];
+                }
+                break;
+
+            case 'actividadesDocumentoSector':
+                $items = SiatDocumentoSector::query()
+                    ->when($sucursal !== null, function ($q) use ($sucursal) {
+                        $q->where('sucursal', $sucursal);
+                    })
+                    ->when($codigoPuntoVenta !== null, function ($q) use ($codigoPuntoVenta) {
+                        $q->where('codigo_punto_venta', $codigoPuntoVenta);
+                    })
+                    ->orderBy('id', 'asc')
+                    ->get();
+
+                if ($items->isEmpty() && ($sucursal !== null || $codigoPuntoVenta !== null)) {
+                    $items = SiatDocumentoSector::orderBy('id', 'asc')->get();
+                }
+
+                foreach ($items as $item) {
+                    $entidades[] = [
+                        'id' => $item->id,
+                        'descripcion' => $item->tipo_documento_sector,
+                        'clave' => $item->codigo_actividad,
+                        'valor' => $item->codigo_documento_sector,
+                        'empresa' => ['nombre' => $companyName, 'nit' => $nitValue],
+                        'estado' => 'A',
+                        'fecha_sincronizacion' => $item->updated_at ? $item->updated_at->format('Y-m-d H:i:s') : '',
+                        'fecha_alta' => $item->created_at ? $item->created_at->format('Y-m-d H:i:s') : '',
+                    ];
+                }
+                break;
+
+            case 'productosServicios':
+                $items = SiatProductoServicio::query()
+                    ->when($sucursal !== null, function ($q) use ($sucursal) {
+                        $q->where('sucursal', $sucursal);
+                    })
+                    ->when($codigoPuntoVenta !== null, function ($q) use ($codigoPuntoVenta) {
+                        $q->where('codigo_punto_venta', $codigoPuntoVenta);
+                    })
+                    ->orderBy('descripcion_producto', 'asc')
+                    ->get();
+
+                if ($items->isEmpty() && ($sucursal !== null || $codigoPuntoVenta !== null)) {
+                    $items = SiatProductoServicio::orderBy('descripcion_producto', 'asc')->get();
+                }
+
+                foreach ($items as $item) {
+                    $entidades[] = [
+                        'id' => $item->id,
+                        'descripcion' => $item->descripcion_producto,
+                        'clave' => $item->codigo_actividad,
+                        'valor' => $item->codigo_producto,
+                        'empresa' => ['nombre' => $companyName, 'nit' => $nitValue],
+                        'estado' => 'A',
+                        'fecha_sincronizacion' => $item->updated_at ? $item->updated_at->format('Y-m-d H:i:s') : '',
+                        'fecha_alta' => $item->created_at ? $item->created_at->format('Y-m-d H:i:s') : '',
+                    ];
+                }
+                break;
+
+            case 'leyendasFactura':
+                $items = SiatLeyendaFactura::query()
+                    ->when($sucursal !== null, function ($q) use ($sucursal) {
+                        $q->where('sucursal', $sucursal);
+                    })
+                    ->when($codigoPuntoVenta !== null, function ($q) use ($codigoPuntoVenta) {
+                        $q->where('codigo_punto_venta', $codigoPuntoVenta);
+                    })
+                    ->orderBy('id', 'asc')
+                    ->get();
+
+                if ($items->isEmpty() && ($sucursal !== null || $codigoPuntoVenta !== null)) {
+                    $items = SiatLeyendaFactura::orderBy('id', 'asc')->get();
+                }
+
+                foreach ($items as $item) {
+                    $entidades[] = [
+                        'id' => $item->id,
+                        'descripcion' => $item->descripcion_leyenda,
+                        'clave' => $item->codigo_actividad,
+                        'valor' => $item->codigo_actividad,
+                        'empresa' => ['nombre' => $companyName, 'nit' => $nitValue],
+                        'estado' => 'A',
+                        'fecha_sincronizacion' => $item->updated_at ? $item->updated_at->format('Y-m-d H:i:s') : '',
+                        'fecha_alta' => $item->created_at ? $item->created_at->format('Y-m-d H:i:s') : '',
+                    ];
+                }
+                break;
+
+            default:
+                if (!empty($parametro)) {
+                    $items = SiatParametricaVario::where('tipo_clasificador', $parametro)
+                        ->when($sucursal !== null, function ($q) use ($sucursal) {
+                            $q->where('sucursal', $sucursal);
+                        })
+                        ->when($codigoPuntoVenta !== null, function ($q) use ($codigoPuntoVenta) {
+                            $q->where('codigo_punto_venta', $codigoPuntoVenta);
+                        })
+                        ->orderBy('id', 'asc')
+                        ->get();
+
+                    if ($items->isEmpty() && ($sucursal !== null || $codigoPuntoVenta !== null)) {
+                        $items = SiatParametricaVario::where('tipo_clasificador', $parametro)
+                            ->orderBy('id', 'asc')
+                            ->get();
+                    }
+
+                    $items = $items->unique('codigo_clasificador');
+
+                    foreach ($items as $item) {
+                        $entidades[] = [
+                            'id' => $item->id,
+                            'descripcion' => $item->descripcion,
+                            'clave' => $item->tipo_clasificador,
+                            'valor' => $item->codigo_clasificador,
+                            'empresa' => ['nombre' => $companyName, 'nit' => $nitValue],
+                            'estado' => $item->estado ? 'A' : 'I',
+                            'fecha_sincronizacion' => $item->updated_at ? $item->updated_at->format('Y-m-d H:i:s') : '',
+                            'fecha_alta' => $item->created_at ? $item->created_at->format('Y-m-d H:i:s') : '',
+                        ];
+                    }
+                }
+                break;
+        }
+
+        return $entidades;
     }
 
     public function getRegistrosSiat($sucursal, $punto_venta)

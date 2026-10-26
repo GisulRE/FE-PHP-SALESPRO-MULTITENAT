@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class CompanySqlImportService
 {
+    use \Illuminate\Database\DetectsLostConnections;
+
     protected $schemaService;
     protected $parserService;
     protected $mapService;
@@ -98,6 +100,14 @@ class CompanySqlImportService
 
             $parsedTables = $this->filterParsedTables($parsedTables);
             $tableNames = array_keys($parsedTables);
+
+            // Reconectar a la base de datos luego del tiempo prolongado de split y parseo de archivos locales
+            try {
+                DB::reconnect();
+                $this->mapService->warmUp($job->company_id);
+            } catch (\Throwable $ignored) {
+            }
+
             $metadata = $this->schemaService->getTableMetadata($tableNames);
             $knownTables = array_keys($metadata);
             $unknownTables = array_values(array_diff($tableNames, $knownTables));
@@ -163,6 +173,10 @@ class CompanySqlImportService
                     continue;
                 }
 
+                if ($details[$tableName]->status === 'completed' && (int) $details[$tableName]->failed_rows === 0) {
+                    continue;
+                }
+
                 $pendingTables = array_slice($order, $index + 1);
 
                 $shouldContinue = $this->processTable(
@@ -201,7 +215,16 @@ class CompanySqlImportService
 
     protected function isCancellationRequested(ImportJob $job)
     {
-        $job->refresh();
+        try {
+            $job->refresh();
+        } catch (\Throwable $e) {
+            try {
+                DB::reconnect();
+                $job->refresh();
+            } catch (\Throwable $ex) {
+                return false;
+            }
+        }
         $options = is_array($job->options) ? $job->options : [];
 
         return !empty($options['cancel_requested'])
@@ -296,6 +319,9 @@ class CompanySqlImportService
                 ], $detail);
             }
 
+            $bufferedProcessed = 0;
+            $bufferedFailed = 0;
+
             foreach ($pendingRows as $row) {
                 if ($this->abortIfCancelled($job, $detail, $tableName)) {
                     return false;
@@ -305,7 +331,11 @@ class CompanySqlImportService
 
                 if ($result['status'] === 'processed') {
                     $processedThisRound++;
-                    $this->progressService->incrementTable($detail, 1, 0, count($nextPending));
+                    $bufferedProcessed++;
+                    if ($bufferedProcessed >= 50) {
+                        $this->progressService->incrementTable($detail, $bufferedProcessed, 0, count($nextPending));
+                        $bufferedProcessed = 0;
+                    }
                     continue;
                 }
 
@@ -333,7 +363,11 @@ class CompanySqlImportService
                 }
 
                 $hardFailures++;
-                $this->progressService->incrementTable($detail, 0, 1, count($nextPending));
+                $bufferedFailed++;
+                if ($bufferedFailed >= 50) {
+                    $this->progressService->incrementTable($detail, 0, $bufferedFailed, count($nextPending));
+                    $bufferedFailed = 0;
+                }
                 $oldId = isset($row['id']) ? $row['id'] : 'unknown';
 
                 // Loggear en laravel.log con severidad error
@@ -348,6 +382,14 @@ class CompanySqlImportService
                     'row' => $row,
                 ], $detail);
             }
+
+            if ($bufferedProcessed > 0 || $bufferedFailed > 0) {
+                $this->progressService->incrementTable($detail, $bufferedProcessed, $bufferedFailed, count($nextPending));
+                $bufferedProcessed = 0;
+                $bufferedFailed = 0;
+            }
+
+            $this->mapService->flushBuffer();
 
             $pendingRows = $nextPending;
             $detail->deferred_rows = count($pendingRows);
@@ -445,6 +487,17 @@ class CompanySqlImportService
 
             return ['status' => 'processed', 'new_id' => $newId, 'action' => 'inserted'];
         } catch (QueryException $exception) {
+            if ($this->causedByLostConnection($exception)
+                || strpos($exception->getMessage(), '10060') !== false
+                || strpos($exception->getMessage(), 'timed out') !== false
+                || strpos($exception->getMessage(), 'connection unexpectedly') !== false) {
+                try {
+                    DB::purge('pgsql');
+                    DB::reconnect();
+                } catch (\Throwable $ignored) {}
+                return ['status' => 'deferred', 'reason' => 'Conexión interrumpida, se reintentará: ' . $exception->getMessage()];
+            }
+
             if ($this->isForeignKeyError($exception)) {
                 return ['status' => 'deferred', 'reason' => $exception->getMessage()];
             }
@@ -674,6 +727,8 @@ class CompanySqlImportService
         return $row;
     }
 
+    protected $referenceCache = [];
+
     protected function resolveExistingRecord(ImportJob $job, $tableName, array $row, $tableMeta, $oldId)
     {
         if (!$tableMeta) {
@@ -687,34 +742,48 @@ class CompanySqlImportService
             }
         }
 
-        $primaryKey = $tableMeta['primary_key'];
-        if ($primaryKey && !in_array($primaryKey, $tableMeta['auto_increment_columns'], true) && array_key_exists($primaryKey, $row)) {
-            $query = DB::table($tableName)->where($primaryKey, $row[$primaryKey]);
-            if ($tableMeta['has_company_id'] && array_key_exists('company_id', $row)) {
-                $query->where('company_id', $row['company_id']);
-            }
-            $existing = $query->first();
-            if ($existing) {
-                return isset($existing->{$primaryKey}) ? $existing->{$primaryKey} : $row[$primaryKey];
-            }
-        }
-
-        foreach ($tableMeta['natural_keys'] as $naturalKey) {
-            if (!array_key_exists($naturalKey, $row) || $row[$naturalKey] === null || $row[$naturalKey] === '') {
-                continue;
-            }
-
-            $query = DB::table($tableName)->where($naturalKey, $row[$naturalKey]);
-            if ($tableMeta['has_company_id'] && array_key_exists('company_id', $row)) {
-                $query->where('company_id', $row['company_id']);
-            }
-
-            $existing = $query->first();
-            if ($existing) {
-                $identifier = $primaryKey && isset($existing->{$primaryKey}) ? $existing->{$primaryKey} : null;
-                if ($identifier !== null) {
-                    return $identifier;
+        $attempts = 0;
+        while ($attempts < 3) {
+            try {
+                $primaryKey = $tableMeta['primary_key'];
+                if ($primaryKey && !in_array($primaryKey, $tableMeta['auto_increment_columns'], true) && array_key_exists($primaryKey, $row)) {
+                    $query = DB::table($tableName)->where($primaryKey, $row[$primaryKey]);
+                    if ($tableMeta['has_company_id'] && array_key_exists('company_id', $row)) {
+                        $query->where('company_id', $row['company_id']);
+                    }
+                    $existing = $query->first();
+                    if ($existing) {
+                        return isset($existing->{$primaryKey}) ? $existing->{$primaryKey} : $row[$primaryKey];
+                    }
                 }
+
+                foreach ($tableMeta['natural_keys'] as $naturalKey) {
+                    if (!array_key_exists($naturalKey, $row) || $row[$naturalKey] === null || $row[$naturalKey] === '') {
+                        continue;
+                    }
+
+                    $query = DB::table($tableName)->where($naturalKey, $row[$naturalKey]);
+                    if ($tableMeta['has_company_id'] && array_key_exists('company_id', $row)) {
+                        $query->where('company_id', $row['company_id']);
+                    }
+
+                    $existing = $query->first();
+                    if ($existing) {
+                        $identifier = $primaryKey && isset($existing->{$primaryKey}) ? $existing->{$primaryKey} : null;
+                        if ($identifier !== null) {
+                            return $identifier;
+                        }
+                    }
+                }
+
+                return null;
+            } catch (\Throwable $e) {
+                $attempts++;
+                if ($attempts >= 3) {
+                    throw $e;
+                }
+                DB::reconnect();
+                usleep(200000);
             }
         }
 
@@ -736,18 +805,36 @@ class CompanySqlImportService
             }
         }
 
-        if ($usesAutoIncrement) {
-            // En PostgreSQL, insertGetId necesita el nombre de la PK para leer el valor de la sequence.
-            // En MySQL el segundo argumento es ignorado pero no causa errores.
-            return DB::table($tableName)->insertGetId($row, $primaryKey);
-        }
+        $attempts = 0;
+        while ($attempts < 3) {
+            try {
+                if ($usesAutoIncrement) {
+                    return DB::table($tableName)->insertGetId($row, $primaryKey);
+                }
 
-        DB::table($tableName)->insert($row);
-        return $primaryKey && array_key_exists($primaryKey, $row) ? $row[$primaryKey] : null;
+                DB::table($tableName)->insert($row);
+                return $primaryKey && array_key_exists($primaryKey, $row) ? $row[$primaryKey] : null;
+            } catch (\Throwable $e) {
+                if ($this->isForeignKeyError($e) || $this->isDuplicateKeyError($e)) {
+                    throw $e;
+                }
+                $attempts++;
+                if ($attempts >= 3) {
+                    throw $e;
+                }
+                DB::reconnect();
+                usleep(200000);
+            }
+        }
     }
 
     protected function referenceExists($tableName, $id, $companyId)
     {
+        $cacheKey = "{$tableName}_{$id}_{$companyId}";
+        if (isset($this->referenceCache[$cacheKey])) {
+            return $this->referenceCache[$cacheKey];
+        }
+
         $metadata = $this->schemaService->getTableMetadata([$tableName]);
         if (!isset($metadata[$tableName])) {
             return false;
@@ -755,13 +842,28 @@ class CompanySqlImportService
 
         $tableMeta = $metadata[$tableName];
         $primaryKey = $tableMeta['primary_key'] ?: 'id';
-        $query = DB::table($tableName)->where($primaryKey, $id);
 
-        if ($tableMeta['has_company_id']) {
-            $query->where('company_id', $companyId);
+        $attempts = 0;
+        while ($attempts < 3) {
+            try {
+                $query = DB::table($tableName)->where($primaryKey, $id);
+                if ($tableMeta['has_company_id']) {
+                    $query->where('company_id', $companyId);
+                }
+                $exists = $query->exists();
+                $this->referenceCache[$cacheKey] = $exists;
+                return $exists;
+            } catch (\Throwable $e) {
+                $attempts++;
+                if ($attempts >= 3) {
+                    throw $e;
+                }
+                DB::reconnect();
+                usleep(200000);
+            }
         }
 
-        return $query->exists();
+        return false;
     }
 
     protected function isForeignKeyError(QueryException $exception)

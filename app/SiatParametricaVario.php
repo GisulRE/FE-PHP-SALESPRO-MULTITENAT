@@ -25,12 +25,22 @@ class SiatParametricaVario extends Model
         "codigo_punto_venta"
     ];
 
+    protected static $sucursalesCache = null;
+    protected static $puntosVentaCache = null;
+
     public function getPuntoVenta()
     {
-        return $punto = SiatPuntoVenta::where('codigo_punto_venta', $this->codigo_punto_venta)->pluck('nombre_punto_venta')->first();
+        if (self::$puntosVentaCache === null) {
+            self::$puntosVentaCache = SiatPuntoVenta::pluck('nombre_punto_venta', 'codigo_punto_venta')->toArray();
+        }
+        return self::$puntosVentaCache[$this->codigo_punto_venta] ?? ($this->codigo_punto_venta == 0 ? 'Central' : 'Punto ' . $this->codigo_punto_venta);
     }
+
     public function getSucursal()
     {
-        return $punto = SiatSucursal::where('sucursal', $this->sucursal)->pluck('nombre')->first();
+        if (self::$sucursalesCache === null) {
+            self::$sucursalesCache = SiatSucursal::pluck('nombre', 'sucursal')->toArray();
+        }
+        return self::$sucursalesCache[$this->sucursal] ?? ($this->sucursal == 0 ? 'Casa Matriz' : 'Sucursal ' . $this->sucursal);
     }
 }

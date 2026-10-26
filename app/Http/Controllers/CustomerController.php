@@ -644,12 +644,27 @@ class CustomerController extends Controller
 
     private function findCustomerByPhone($phone)
     {
-        if (!$phone)
+        if (!$phone) {
             return null;
+        }
         $clean = preg_replace('/\D/', '', $phone);
+        if (empty($clean)) {
+            return null;
+        }
+
+        $candidates = [$clean];
+        if (strlen($clean) > 8 && substr($clean, 0, 3) === '591') {
+            $candidates[] = substr($clean, 3);
+        } elseif (strlen($clean) === 8) {
+            $candidates[] = '591' . $clean;
+        }
 
         return Customer::where('is_active', true)
-            ->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone_number,'+',''),' ',''),'-',''),'(',''),')','') = ?", [$clean])
+            ->where(function ($query) use ($candidates) {
+                foreach ($candidates as $cand) {
+                    $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone_number,'+',''),' ',''),'-',''),'(',''),')','') = ?", [$cand]);
+                }
+            })
             ->first();
     }
 
@@ -666,8 +681,14 @@ class CustomerController extends Controller
         }
 
         $clean = preg_replace('/\D/', '', $phone);
-        $cacheKey = 'otp:' . $clean;
-        $cached = Cache::get($cacheKey);
+        $cached = Cache::get('otp:' . $clean);
+        if (!$cached) {
+            if (strlen($clean) > 8 && substr($clean, 0, 3) === '591') {
+                $cached = Cache::get('otp:' . substr($clean, 3));
+            } elseif (strlen($clean) === 8) {
+                $cached = Cache::get('otp:591' . $clean);
+            }
+        }
 
         if (!$cached) {
             return response()->json(['message' => 'OTP expired or not found'], 404);
@@ -677,7 +698,13 @@ class CustomerController extends Controller
             return response()->json(['message' => 'Invalid OTP'], 400);
         }
 
-        Cache::forget($cacheKey);
+        Cache::forget('otp:' . $clean);
+        if (strlen($clean) > 8 && substr($clean, 0, 3) === '591') {
+            Cache::forget('otp:' . substr($clean, 3));
+        } elseif (strlen($clean) === 8) {
+            Cache::forget('otp:591' . $clean);
+        }
+
         $customer = $this->findCustomerByPhone($phone);
         if (!$customer) {
             return response()->json(['message' => 'Customer not found'], 404);
@@ -756,12 +783,17 @@ class CustomerController extends Controller
 
             $text = "Tu código OTP es: {$code}. No lo compartas con nadie. Válido 5 minutos.";
 
-            $wa = new WhatsAppService();
-            $sent = $wa->sendMessage($phone, $text);
+            $wa = app(WhatsAppService::class);
+            $sent = $wa->sendOtp($phone, (string) $code, $text);
 
             if ($sent) {
                 $cleanCache = preg_replace('/\D/', '', $phone);
                 Cache::put('otp:' . $cleanCache, $code, 300);
+                if (strlen($cleanCache) > 8 && substr($cleanCache, 0, 3) === '591') {
+                    Cache::put('otp:' . substr($cleanCache, 3), $code, 300);
+                } elseif (strlen($cleanCache) === 8) {
+                    Cache::put('otp:591' . $cleanCache, $code, 300);
+                }
                 return response()->json(['message' => 'OTP sent'], 200);
             }
 
@@ -783,15 +815,26 @@ class CustomerController extends Controller
         }
 
         $clean = preg_replace('/\D/', '', $phone);
-        $cacheKey = 'otp:' . $clean;
-        $cached = Cache::get($cacheKey);
+        $cached = Cache::get('otp:' . $clean);
+        if (!$cached) {
+            if (strlen($clean) > 8 && substr($clean, 0, 3) === '591') {
+                $cached = Cache::get('otp:' . substr($clean, 3));
+            } elseif (strlen($clean) === 8) {
+                $cached = Cache::get('otp:591' . $clean);
+            }
+        }
 
         if (!$cached) {
             return response()->json(['message' => 'OTP expired or not found'], 404);
         }
 
         if ((string) $cached === (string) $code) {
-            Cache::forget($cacheKey);
+            Cache::forget('otp:' . $clean);
+            if (strlen($clean) > 8 && substr($clean, 0, 3) === '591') {
+                Cache::forget('otp:' . substr($clean, 3));
+            } elseif (strlen($clean) === 8) {
+                Cache::forget('otp:591' . $clean);
+            }
             return response()->json(['message' => 'OTP valid'], 200);
         }
 

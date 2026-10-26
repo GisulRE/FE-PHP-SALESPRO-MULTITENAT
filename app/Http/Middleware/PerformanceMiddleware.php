@@ -57,6 +57,10 @@ class PerformanceMiddleware
         // Compatible con respuestas Laravel (Response, JsonResponse) y Symfony (BinaryFileResponse, StreamedResponse)
         if ($response && isset($response->headers) && method_exists($response->headers, 'set')) {
             $response->headers->set('X-Response-Time', $durationMs . 'ms');
+            if ($request->ajax()) {
+                $response->headers->set('Vary', 'X-Requested-With');
+                $response->headers->set('Cache-Control', 'no-cache, no-store, must-revalidate');
+            }
         }
 
         // 3. Verificación de umbral de lentitud (configurable via config/env)
