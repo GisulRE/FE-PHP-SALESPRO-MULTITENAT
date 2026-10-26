@@ -5,6 +5,7 @@ namespace App;
 use App\SiatSucursal;
 use App\SiatPuntoVenta;
 use App\SiatActividadEconomica;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class SiatParametricaVario extends Model
@@ -12,11 +13,14 @@ class SiatParametricaVario extends Model
     protected $table = 'siat_parametricas_varios';
 
     protected $fillable =[
-
+        "company_id",
+        "id_empresa",
+        "estado",
         "tipo_clasificador",
 
         "codigo_clasificador", 
         "descripcion", 
+        "datos",
 
         "usuario_alta",
         "usuario_modificacion",
@@ -27,6 +31,27 @@ class SiatParametricaVario extends Model
 
     protected static $sucursalesCache = null;
     protected static $puntosVentaCache = null;
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        $table = (new static)->getTable();
+        static::addGlobalScope('company', function (Builder $builder) use ($table) {
+            if (auth()->check() && auth()->user()->company_id) {
+                $builder->where(function ($q) use ($table) {
+                    $q->where($table . '.company_id', auth()->user()->company_id)
+                      ->orWhereNull($table . '.company_id');
+                });
+            }
+        });
+
+        static::creating(function ($model) {
+            if (auth()->check() && empty($model->company_id)) {
+                $model->company_id = auth()->user()->company_id;
+            }
+        });
+    }
 
     public function getPuntoVenta()
     {

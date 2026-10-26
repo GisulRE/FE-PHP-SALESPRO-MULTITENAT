@@ -17,6 +17,7 @@ use App\Http\Traits\SiatTrait;
 use App\SiatActividadEconomica;
 use App\SiatRegistrosSincronizacion;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Http;
 use Log;
 use Auth;
 
@@ -716,6 +717,10 @@ class SiatPanelController extends Controller
     //Desde la funcion UPDATE, se llamará al model SiatTrait para operaciones genéricas
     public function update(Request $request, $id)
     {
+        if (!Session::get('token_siat')) {
+            $this->getToken();
+        }
+
         if (Session::get('token_siat') != null) {
             $registro = $request->registro_id;
             $descripcion = $request->descripcion;
@@ -725,9 +730,17 @@ class SiatPanelController extends Controller
             $p_venta = $request->codigo_punto_venta;
             $idEmpresa = $request->id_empresa;
             $nit = $request->nit;
-            $is_auth = false;
-            if (isset($request->auth))
-                $is_auth = true;
+            $is_auth = isset($request->auth);
+
+            $company_id = Auth::check() ? Auth::user()->company_id : (Session::get('company_id') ?? 1);
+            $pos_setting = PosSetting::where('company_id', $company_id)->first() ?? PosSetting::first();
+
+            if (empty($idEmpresa)) {
+                $idEmpresa = Session::get('siat_id_empresa') ?? ($pos_setting->id_empresa_siat ?? 0);
+            }
+            if (empty($nit)) {
+                $nit = $pos_setting->nit_emisor ?? '';
+            }
 
             $body = [
                 'id' => (int)$registro,
@@ -761,7 +774,102 @@ class SiatPanelController extends Controller
                 return redirect()->back()->with('warning', 'Credenciales SIAT no válidas');
             }
 
-            $msj = $descripcion . '\n Sincronización Siat completada con éxito.';
+            // Descargar y sincronizar datos reales del SIAT a las tablas locales por Empresa
+            $sincronizadoExitoso = false;
+            $pv = SiatPuntoVenta::where('sucursal', $sucursal)
+                ->where('codigo_punto_venta', $p_venta)
+                ->when($company_id, function ($q) use ($company_id) {
+                    $q->where('company_id', $company_id);
+                })
+                ->first();
+            $cuis = ($pv && $pv->codigo_cuis && $pv->codigo_cuis !== 'CUIS-PENDIENTE') ? $pv->codigo_cuis : null;
+            if (!$cuis) {
+                $pvFallback = SiatPuntoVenta::where('sucursal', $sucursal)
+                    ->where('codigo_punto_venta', $p_venta)
+                    ->whereNotNull('codigo_cuis')
+                    ->where('codigo_cuis', '!=', 'CUIS-PENDIENTE')
+                    ->first();
+                $cuis = $pvFallback ? $pvFallback->codigo_cuis : null;
+            }
+
+            if ($cuis && !empty($pos_setting->url_operaciones)) {
+                $queryParams = [
+                    'nit' => (int)$nit,
+                    'codigoSucursal' => (int)$sucursal,
+                    'codigoPuntoVenta' => (int)$p_venta,
+                    'operacion' => $operacion,
+                    'cuis' => $cuis
+                ];
+                $urlSinc = rtrim($pos_setting->url_operaciones, '/') . '/sincronizacion/sincronizacion?' . http_build_query($queryParams);
+                try {
+                    $respSiat = Http::timeout(35)->withHeaders([
+                        'Authorization' => 'Bearer ' . Session::get('token_siat'),
+                    ])->post($urlSinc);
+
+                    if ($respSiat->successful()) {
+                        $siatData = $respSiat->json();
+                        if (isset($siatData['ESTADO']) && $siatData['ESTADO'] === 'OK') {
+                            $this->llenarTablaxOperacion($operacion, $siatData, $sucursal, $p_venta);
+                            $sincronizadoExitoso = true;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("SIAT PANEL ERROR DESCARGA 7014: " . $e->getMessage());
+                }
+            }
+
+            // Fallback si 7014 no respondió o no hubo CUIS: consultar datos sincronizados desde backend Optimo
+            if (!$sincronizadoExitoso && !empty($pos_setting->url_optimo)) {
+                $parametroMap = [
+                    'tipoMetodoPago' => 'tipo_metodo_pago',
+                    'tipoDocumentoIdentidad' => 'tipo_documento_identidad',
+                    'tipoMoneda' => 'tipo_moneda',
+                    'unidadMedida' => 'unidades_medida',
+                    'tipoDocumentoSector' => 'tipo_documento_sector',
+                    'motivoAnulacion' => 'motivo_anulacion',
+                    'mensajesServicios' => 'mensajes_servicios',
+                    'eventosSignificativos' => 'evento_significativos',
+                    'paisOrigen' => 'pais_origen',
+                    'tipoEmision' => 'tipo_emision',
+                    'tipoHabitacion' => 'tipo_habitacion',
+                    'puntoVenta' => 'tipo_punto_venta',
+                    'tipoFactura' => 'tipo_factura',
+                    'actividades' => 'actividades',
+                    'leyendasFactura' => 'leyendas',
+                    'productosServicios' => 'productos',
+                    'actividadesDocumentoSector' => 'actividad_documento_sector',
+                ];
+                $paramSnake = $parametroMap[$operacion] ?? $operacion;
+                try {
+                    $respListar = $this->postListarNit([
+                        'nit' => $nit,
+                        'parametro' => $paramSnake,
+                        'sucursal' => (int)$sucursal,
+                        'codigoPuntoVenta' => (int)$p_venta,
+                    ]);
+                    if ($respListar && !empty($respListar['ENTITIES'])) {
+                        $this->llenarTablaxOperacion($operacion, ['ENTITIES' => $respListar['ENTITIES']], $sucursal, $p_venta);
+                        $sincronizadoExitoso = true;
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("SIAT PANEL ERROR LISTAR-NIT 7012: " . $e->getMessage());
+                }
+            }
+
+            // Actualizar tupla en registros_sincronizacion_siat local
+            SiatRegistrosSincronizacion::where('sucursal', $sucursal)
+                ->where('codigo_punto_venta', $p_venta)
+                ->where('operacion', $operacion)
+                ->when($company_id, function ($q) use ($company_id) {
+                    $q->where('company_id', $company_id);
+                })
+                ->update([
+                    'estado' => 'S',
+                    'usuario_modificacion' => Auth::check() ? Auth::user()->id : null,
+                    'updated_at' => now(),
+                ]);
+
+            $msj = $descripcion . "\n Sincronización Siat completada con éxito.";
 
             Log::info("SIAT PANEL SINCRONIZACION COMPLETADA", [
                 'funcion' => 'update',
@@ -769,6 +877,7 @@ class SiatPanelController extends Controller
                 'sucursal' => $sucursal,
                 'punto_venta' => $p_venta,
                 'estado' => 'completada',
+                'sincronizado_local' => $sincronizadoExitoso,
             ]);
 
             if ($is_auth) {

@@ -415,29 +415,49 @@ trait SiatTrait
     //insertar todo lo relacionado a Actividad Económica
     public function setActividadEconomica($textOpe, $response, $sucursal, $p_venta)
     {
-
         try {
             //Obtener solo los datos de la operacion "ACTIVIDADES"
-            $items = $response[$textOpe];
-            //Variables 
-            $user = Auth::user()->id;
-
-            //Consultar si hay tuplas con Sucursal-PuntoVenta, y proceder a eliminarlas
-            $arreglos = SiatActividadEconomica::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta)->get()->each->delete();
-
-            //Insertar los datos en función de Sucursal - PuntoVenta
-            foreach ($items as $item) {
-                $obj = new SiatActividadEconomica();
-                $obj->codigo_caeb = $item['codigoCaeb'];
-                $obj->descripcion = $item['descripcion'];
-                $obj->tipo_actividad = $item['tipoActividad'];
-                $obj->usuario_alta = $user;
-                $obj->sucursal = $sucursal;
-                $obj->codigo_punto_venta = $p_venta;
-                $obj->save();
+            $items = $response[$textOpe] ?? [];
+            if (empty($items)) {
+                return;
             }
-        } catch (Exception $e) {
-            Log::error($e->getMessage());
+            $user = Auth::check() ? Auth::user()->id : null;
+            $company_id = Auth::check() ? Auth::user()->company_id : (Session::get('company_id') ?? null);
+            $id_empresa = Session::get('siat_id_empresa') ?? (PosSetting::where('company_id', $company_id)->first()->id_empresa_siat ?? null);
+
+            //Consultar si hay tuplas de la empresa con Sucursal-PuntoVenta, y eliminarlas antes de insertar
+            $query = SiatActividadEconomica::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta);
+            if ($company_id) {
+                $query->where('company_id', $company_id);
+            }
+            $query->delete();
+
+            //Insertar los datos en lote
+            $now = now();
+            $batch = [];
+            foreach ($items as $item) {
+                $batch[] = [
+                    'company_id' => $company_id,
+                    'id_empresa' => $id_empresa,
+                    'codigo_caeb' => $item['codigoCaeb'] ?? ($item['clave'] ?? ''),
+                    'descripcion' => $item['descripcion'] ?? '',
+                    'tipo_actividad' => $item['tipoActividad'] ?? ($item['valor'] ?? ''),
+                    'usuario_alta' => $user,
+                    'sucursal' => $sucursal,
+                    'codigo_punto_venta' => $p_venta,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                if (count($batch) >= 100) {
+                    \Illuminate\Support\Facades\DB::table('siat_actividades_economicas')->insert($batch);
+                    $batch = [];
+                }
+            }
+            if (!empty($batch)) {
+                \Illuminate\Support\Facades\DB::table('siat_actividades_economicas')->insert($batch);
+            }
+        } catch (\Throwable $e) {
+            Log::error("SIAT setActividadEconomica ERROR: " . $e->getMessage());
         }
     }
 
@@ -446,80 +466,144 @@ trait SiatTrait
     {
         try {
             //Obtener solo los datos de la operacion "ACTIVIDADES_DOCUMENTO_SECTOR"
-            $items = $response[$textOpe];
-            //Variables 
-            $user = Auth::user()->id;
-
-            //Consultar si hay tuplas con Sucursal-PuntoVenta, y proceder a eliminarlas
-            $arreglos = SiatDocumentoSector::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta)->get()->each->delete();
-
-            //Insertar los datos en función de Sucursal - PuntoVenta
-            foreach ($items as $item) {
-                $obj = new SiatDocumentoSector();
-
-                $obj->codigo_actividad = $item['codigoActividad'];
-                $obj->codigo_documento_sector = $item['codigoDocumentoSector'];
-                $obj->tipo_documento_sector = $item['tipoDocumentoSector'];
-                $obj->usuario_alta = $user;
-                $obj->sucursal = $sucursal;
-                $obj->codigo_punto_venta = $p_venta;
-                $obj->save();
+            $items = $response[$textOpe] ?? [];
+            if (empty($items)) {
+                return;
             }
-        } catch (Exception $e) {
-            Log::error($e->getMessage());
+            $user = Auth::check() ? Auth::user()->id : null;
+            $company_id = Auth::check() ? Auth::user()->company_id : (Session::get('company_id') ?? null);
+            $id_empresa = Session::get('siat_id_empresa') ?? (PosSetting::where('company_id', $company_id)->first()->id_empresa_siat ?? null);
+
+            //Consultar si hay tuplas de la empresa con Sucursal-PuntoVenta, y eliminarlas antes de insertar
+            $query = SiatDocumentoSector::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta);
+            if ($company_id) {
+                $query->where('company_id', $company_id);
+            }
+            $query->delete();
+
+            //Insertar los datos en lote
+            $now = now();
+            $batch = [];
+            foreach ($items as $item) {
+                $batch[] = [
+                    'company_id' => $company_id,
+                    'id_empresa' => $id_empresa,
+                    'codigo_actividad' => $item['codigoActividad'] ?? ($item['clave'] ?? ''),
+                    'codigo_documento_sector' => $item['codigoDocumentoSector'] ?? ($item['valor'] ?? ''),
+                    'tipo_documento_sector' => $item['tipoDocumentoSector'] ?? ($item['descripcion'] ?? ''),
+                    'usuario_alta' => $user,
+                    'sucursal' => $sucursal,
+                    'codigo_punto_venta' => $p_venta,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                if (count($batch) >= 100) {
+                    \Illuminate\Support\Facades\DB::table('siat_documento_sector')->insert($batch);
+                    $batch = [];
+                }
+            }
+            if (!empty($batch)) {
+                \Illuminate\Support\Facades\DB::table('siat_documento_sector')->insert($batch);
+            }
+        } catch (\Throwable $e) {
+            Log::error("SIAT setDocumentoSector ERROR: " . $e->getMessage());
         }
     }
+
     //insertar todo lo relacionado a Productos/Servicios
     public function setProductosServicios($textOpe, $response, $sucursal, $p_venta)
     {
         try {
             //Obtener solo los datos de la operacion "PRODUCTOS"
-            $items = $response[$textOpe];
-            //Variables 
-            $user = Auth::user()->id;
-
-            //Consultar si hay tuplas con Sucursal-PuntoVenta, y proceder a eliminarlas
-            $arreglos = SiatProductoServicio::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta)->get()->each->delete();
-            //Insertar los datos en función de Sucursal - PuntoVenta
-            foreach ($items as $item) {
-                $obj = new SiatProductoServicio();
-
-                $obj->codigo_actividad = $item['codigoActividad'];
-                $obj->codigo_producto = $item['codigoProducto'];
-                $obj->descripcion_producto = $item['descripcionProducto'];
-                $obj->usuario_alta = $user;
-                $obj->sucursal = $sucursal;
-                $obj->codigo_punto_venta = $p_venta;
-                $obj->save();
+            $items = $response[$textOpe] ?? [];
+            if (empty($items)) {
+                return;
             }
-        } catch (Exception $e) {
-            Log::error($e->getMessage());
+            $user = Auth::check() ? Auth::user()->id : null;
+            $company_id = Auth::check() ? Auth::user()->company_id : (Session::get('company_id') ?? null);
+            $id_empresa = Session::get('siat_id_empresa') ?? (PosSetting::where('company_id', $company_id)->first()->id_empresa_siat ?? null);
+
+            //Consultar si hay tuplas de la empresa con Sucursal-PuntoVenta, y eliminarlas antes de insertar
+            $query = SiatProductoServicio::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta);
+            if ($company_id) {
+                $query->where('company_id', $company_id);
+            }
+            $query->delete();
+
+            //Insertar los datos en lote
+            $now = now();
+            $batch = [];
+            foreach ($items as $item) {
+                $batch[] = [
+                    'company_id' => $company_id,
+                    'id_empresa' => $id_empresa,
+                    'codigo_actividad' => $item['codigoActividad'] ?? ($item['clave'] ?? ''),
+                    'codigo_producto' => $item['codigoProducto'] ?? ($item['valor'] ?? ''),
+                    'descripcion_producto' => $item['descripcionProducto'] ?? ($item['descripcion'] ?? ''),
+                    'usuario_alta' => $user,
+                    'sucursal' => $sucursal,
+                    'codigo_punto_venta' => $p_venta,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                if (count($batch) >= 100) {
+                    \Illuminate\Support\Facades\DB::table('siat_producto_servicios')->insert($batch);
+                    $batch = [];
+                }
+            }
+            if (!empty($batch)) {
+                \Illuminate\Support\Facades\DB::table('siat_producto_servicios')->insert($batch);
+            }
+        } catch (\Throwable $e) {
+            Log::error("SIAT setProductosServicios ERROR: " . $e->getMessage());
         }
     }
+
     //insertar todo lo relacionado a Leyendas de Factura
     public function setLeyendasFactura($textOpe, $response, $sucursal, $p_venta)
     {
         try {
             //Obtener solo los datos de la operacion "LEYENDAS_FACTURA"
-            $items = $response[$textOpe];
-            //Variables 
-            $user = Auth::user()->id;
-
-            //Consultar si hay tuplas con Sucursal-PuntoVenta, y proceder a eliminarlas
-            $arreglos = SiatLeyendaFactura::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta)->get()->each->delete();
-            //Insertar los datos en función de Sucursal - PuntoVenta
-            foreach ($items as $item) {
-                $obj = new SiatLeyendaFactura();
-
-                $obj->codigo_actividad = $item['codigoActividad'];
-                $obj->descripcion_leyenda = $item['descripcionLeyenda'];
-                $obj->usuario_alta = $user;
-                $obj->sucursal = $sucursal;
-                $obj->codigo_punto_venta = $p_venta;
-                $obj->save();
+            $items = $response[$textOpe] ?? [];
+            if (empty($items)) {
+                return;
             }
-        } catch (Exception $e) {
-            Log::error($e->getMessage());
+            $user = Auth::check() ? Auth::user()->id : null;
+            $company_id = Auth::check() ? Auth::user()->company_id : (Session::get('company_id') ?? null);
+            $id_empresa = Session::get('siat_id_empresa') ?? (PosSetting::where('company_id', $company_id)->first()->id_empresa_siat ?? null);
+
+            //Consultar si hay tuplas de la empresa con Sucursal-PuntoVenta, y eliminarlas antes de insertar
+            $query = SiatLeyendaFactura::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta);
+            if ($company_id) {
+                $query->where('company_id', $company_id);
+            }
+            $query->delete();
+
+            //Insertar los datos en lote
+            $now = now();
+            $batch = [];
+            foreach ($items as $item) {
+                $batch[] = [
+                    'company_id' => $company_id,
+                    'id_empresa' => $id_empresa,
+                    'codigo_actividad' => $item['codigoActividad'] ?? ($item['clave'] ?? ''),
+                    'descripcion_leyenda' => $item['descripcionLeyenda'] ?? ($item['descripcion'] ?? ''),
+                    'usuario_alta' => $user,
+                    'sucursal' => $sucursal,
+                    'codigo_punto_venta' => $p_venta,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                if (count($batch) >= 100) {
+                    \Illuminate\Support\Facades\DB::table('siat_leyendas_facturas')->insert($batch);
+                    $batch = [];
+                }
+            }
+            if (!empty($batch)) {
+                \Illuminate\Support\Facades\DB::table('siat_leyendas_facturas')->insert($batch);
+            }
+        } catch (\Throwable $e) {
+            Log::error("SIAT setLeyendasFactura ERROR: " . $e->getMessage());
         }
     }
 
@@ -529,27 +613,57 @@ trait SiatTrait
         try {
             //Obtener solo los datos de la operacion. 
             $textOpe = $this->textOperacion($operacion);
-            $items = $response[$textOpe];
-            //Variables 
-            $user = Auth::user()->id;
-
-            //Consultar si hay tuplas con Sucursal-PuntoVenta, y proceder a eliminarlas
-            $arreglos = SiatParametricaVario::where('sucursal', $sucursal)->where('codigo_punto_venta', $p_venta)->where('tipo_clasificador', $operacion)->get()->each->delete();
-            //Insertar los datos en función de Sucursal - PuntoVenta
-            foreach ($items as $item) {
-                $obj = new SiatParametricaVario();
-
-                $obj->codigo_clasificador = $item['codigoClasificador'];
-                $obj->descripcion = $item['descripcion'];
-                $obj->tipo_clasificador = $operacion;
-                $obj->usuario_alta = $user;
-                $obj->usuario_modificacion = $user;
-                $obj->sucursal = $sucursal;
-                $obj->codigo_punto_venta = $p_venta;
-                $obj->save();
+            $items = $response[$textOpe] ?? ($response['ENTITIES'] ?? []);
+            if (empty($items) || !is_array($items)) {
+                Log::warning("SIAT setParametricaVarios: no items for operation $operacion (key $textOpe)");
+                return;
             }
-        } catch (Exception $e) {
-            Log::error($e->getMessage());
+
+            $user = Auth::check() ? Auth::user()->id : null;
+            $company_id = Auth::check() ? Auth::user()->company_id : (Session::get('company_id') ?? null);
+            $id_empresa = Session::get('siat_id_empresa') ?? (PosSetting::where('company_id', $company_id)->first()->id_empresa_siat ?? null);
+
+            //Consultar si hay tuplas de la empresa con Sucursal-PuntoVenta-Operacion, y eliminarlas antes de insertar
+            $query = SiatParametricaVario::where('sucursal', $sucursal)
+                ->where('codigo_punto_venta', $p_venta)
+                ->where('tipo_clasificador', $operacion);
+            if ($company_id) {
+                $query->where('company_id', $company_id);
+            }
+            $query->delete();
+
+            //Insertar los datos en lote (batch) para máxima velocidad
+            $now = now();
+            $batch = [];
+            foreach ($items as $item) {
+                $codigoClasificador = $item['codigoClasificador'] ?? ($item['valor'] ?? null);
+                if ($codigoClasificador === null) {
+                    continue;
+                }
+                $batch[] = [
+                    'company_id' => $company_id,
+                    'id_empresa' => $id_empresa,
+                    'codigo_clasificador' => (string)$codigoClasificador,
+                    'descripcion' => $item['descripcion'] ?? '',
+                    'tipo_clasificador' => $operacion,
+                    'usuario_alta' => $user,
+                    'usuario_modificacion' => $user,
+                    'sucursal' => (string)$sucursal,
+                    'codigo_punto_venta' => (string)$p_venta,
+                    'estado' => 1,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                if (count($batch) >= 100) {
+                    \Illuminate\Support\Facades\DB::table('siat_parametricas_varios')->insert($batch);
+                    $batch = [];
+                }
+            }
+            if (!empty($batch)) {
+                \Illuminate\Support\Facades\DB::table('siat_parametricas_varios')->insert($batch);
+            }
+        } catch (\Throwable $e) {
+            Log::error("SIAT setParametricaVarios ERROR: " . $e->getMessage());
         }
     }
 
