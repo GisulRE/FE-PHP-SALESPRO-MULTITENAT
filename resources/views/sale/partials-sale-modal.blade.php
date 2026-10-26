@@ -441,12 +441,17 @@
 
 
     // Función para buscar el nit-valor documento 
-    function consultar_ValorDocumento() {
-        $('.valid-feedback').hide();
-        $('.invalid-feedback').hide();
-        $('#sales_complemento').hide();
-        $('#sales_verificarNIT').hide(300);
-        var query = $("input[name='sales_valor_documento']").val();
+    function consultar_ValorDocumento(isLiveTyping) {
+        if (typeof isLiveTyping === 'undefined') {
+            isLiveTyping = false;
+        }
+
+        var query = $("input[name='sales_valor_documento']").val().trim();
+        if (query === '') {
+            $('.valid-feedback').hide();
+            $('.invalid-feedback').hide();
+            return;
+        }
 
         $.ajax({
             url: "{{ route('searchNit') }}",
@@ -455,93 +460,132 @@
                 query: query
             },
             dataType: 'json',
-            async: false,
             success: function(data) {
+                $('.valid-feedback').hide();
+                $('.invalid-feedback').hide();
+
                 // Caso no existe coincidencia
-                if (data.total_data == 0) {
-                    $('.invalid-feedback').text('No hay coincidencias');
-                    $('.invalid-feedback').show();
+                if (!data.table_data || data.total_data == 0) {
+                    if (isLiveTyping) {
+                        $('.invalid-feedback').text('Documento nuevo / no registrado').show();
+                    } else {
+                        $('.invalid-feedback').text('No hay coincidencias para este documento').show();
+                    }
                     if ($('select[name=sales_tipo_documento]').val() == 1) {
-                        ('input[name=sales_complemento_documento]').val("");
                         $('#sales_complemento').show();
-                    } else {
-                        ('input[name=sales_complemento_documento]').val("");
                     }
-                    $("input[name='sales_razon_social']").val("");
-                    $("input[name='sales_email']").val("");
+                    return;
                 }
-                // Caso existe una coincidencia
-                if (data.total_data == 1) {
-                    $('.valid-feedback').text('Existe una coincidencia exacta');
-                    $('.valid-feedback').show();
-                    $("input[name='sales_razon_social']").val(data.table_data[0]['razon_social']);
-                    $("input[name='sales_email']").val(data.table_data[0]['email']);
-                    $('select[name=sales_tipo_documento]').val(data.table_data[0]['tipo_documento']);
-                    $('input[name=sales_valor_documento]').val(data.table_data[0]['valor_documento']);
-                    $('input[name=sales_complemento_documento]').val(data.table_data[0][
-                        'complemento_documento'
-                    ]);
-                    if (data.table_data[0]['tipo_documento'] == 1) {
+
+                // Caso coincidencia exacta encontrada
+                if (data.total_data == 1 || data.is_exact) {
+                    var item = data.table_data[0];
+                    $('.valid-feedback').text('Datos recuperados de la última factura').show();
+                    if (item.razon_social) {
+                        $("input[name='sales_razon_social']").val(item.razon_social);
+                    }
+                    if (item.email) {
+                        $("input[name='sales_email']").val(item.email);
+                    }
+                    if (item.tipo_documento) {
+                        $('select[name=sales_tipo_documento]').val(item.tipo_documento);
+                    }
+                    if (item.complemento_documento) {
+                        $('input[name=sales_complemento_documento]').val(item.complemento_documento);
+                    }
+
+                    if (item.tipo_documento == 1) {
                         $('#sales_complemento').show();
                     } else {
-                        ('input[name=sales_complemento_documento]').val("");
+                        $('#sales_complemento').hide();
+                        $('input[name=sales_complemento_documento]').val("");
                     }
+
                     if ($('select[name=sales_tipo_documento]').val() == 5) {
                         sales_consultarNIT();
                     }
                 }
-                // Caso más de una coincidencia
-                if (data.total_data > 1) {
-                    $('.invalid-feedback').text('Existen ' + data.total_data + ' coincidencias');
-                    $('.invalid-feedback').show();
-                    $("#tabla_busqueda_modal").find("tr:gt(0)").remove();
+                // Caso múltiples coincidencias parciales
+                else if (data.total_data > 1) {
+                    if (isLiveTyping) {
+                        // Mientras escribe no abrimos modal invasivo, solo informamos
+                        $('.valid-feedback').text('Existen ' + data.total_data + ' coincidencias. Presione Enter para ver lista.').show();
+                    } else {
+                        // Enter o clic en buscar: abrir modal para seleccionar
+                        $('.invalid-feedback').text('Existen ' + data.total_data + ' coincidencias').show();
+                        $("#tabla_busqueda_modal").find("tr:gt(0)").remove();
 
-                    $.each(data.table_data, function(key, value) {
-                        btnHtmlValorDocumento = '<td>' +
-                            '<button class="item-selected-btn btn btn-link" type="button" ' +
-                            'data-id = "' + key + '"' +
-                            'data-razon_social = "' + value['razon_social'] + '"' +
-                            'data-email = "' + value['email'] + '"' +
-                            'data-tipo_documento = "' + value['tipo_documento'] + '"' +
-                            'data-valor_documento = "' + value['valor_documento'] + '"' +
-                            'data-complemento_documento = "' + value['complemento_documento'] +
-                            '"' +
-                            'data-toggle="modal" data-target="#busquedaModal"' +
-                            '>' +
-                            '<i class="dripicons-document-edit"></i> ' +
-                            value['valor_documento'] +
-                            '</button> ' +
+                        $.each(data.table_data, function(key, value) {
+                            var btnHtmlValorDocumento = '<td>' +
+                                '<button class="item-selected-btn btn btn-link" type="button" ' +
+                                'data-id = "' + key + '"' +
+                                'data-razon_social = "' + (value['razon_social'] || '') + '"' +
+                                'data-email = "' + (value['email'] || '') + '"' +
+                                'data-tipo_documento = "' + (value['tipo_documento'] || 1) + '"' +
+                                'data-valor_documento = "' + (value['valor_documento'] || '') + '"' +
+                                'data-complemento_documento = "' + (value['complemento_documento'] || '') + '"' +
+                                'data-toggle="modal" data-target="#busquedaModal"' +
+                                '>' +
+                                '<i class="dripicons-document-edit"></i> ' +
+                                (value['valor_documento'] || '') +
+                                '</button>' +
+                                '</td>';
 
-                            '</td>';
+                            var text_complemento_documento = value['complemento_documento'] ? value['complemento_documento'] : '';
 
-                        text_complemento_documento = '';
-                        if (value['complemento_documento'] != null) {
-                            text_complemento_documento = value['complemento_documento'];
-                        }
+                            var htmlTags = '<tr>' +
+                                '<td>' + (value['razon_social'] || '') + '</td>' +
+                                '<td>' + (value['email'] || '') + '</td>' +
+                                btnHtmlValorDocumento +
+                                '<td>' + text_complemento_documento + '</td>' +
+                                '<td>' + (value['tipo_documento'] || '') + '</td>' +
+                                '</tr>';
 
-                        var htmlTags = '<tr>' +
-                            '<td>' + value['razon_social'] + '</td>' +
-                            '<td>' + value['email'] + '</td>' +
-                            btnHtmlValorDocumento +
-                            '<td>' + text_complemento_documento + '</td>' +
-                            '<td>' + value['tipo_documento'] + '</td>' +
-                            '</tr>';
+                            $('#tabla_busqueda_modal tbody').append(htmlTags);
+                        });
 
-                        $('#tabla_busqueda_modal tbody').append(htmlTags);
-                    });
-
-
-
-                    $('#modalBusquedaNit').modal('show');
+                        $('#modalBusquedaNit').modal('show');
+                    }
                 }
 
-                console.log('La cantidad de coincidencia es => ' + data.total_data)
                 setValoresTipoDocumentoCasoEspecial();
                 $('.selectpicker').selectpicker('refresh');
-
             }
         });
     }
+
+    // Escucha en tiempo real al digitar el Valor Documento con debounce
+    var nitTypingDebounceTimer = null;
+    $(document).on('input', 'input[name="sales_valor_documento"]', function() {
+        clearTimeout(nitTypingDebounceTimer);
+        var q = $(this).val().trim();
+        if (q.length >= 3) {
+            nitTypingDebounceTimer = setTimeout(function() {
+                consultar_ValorDocumento(true);
+            }, 350);
+        } else {
+            $('.valid-feedback').hide();
+            $('.invalid-feedback').hide();
+        }
+    });
+
+    $(document).on('keypress', 'input[name="sales_valor_documento"]', function(event) {
+        var keycode = (event.keyCode ? event.keyCode : event.which);
+        if (keycode == 13) {
+            event.preventDefault();
+            event.stopPropagation();
+            clearTimeout(nitTypingDebounceTimer);
+            consultar_ValorDocumento(false);
+        }
+    });
+
+    $(document).on('blur', 'input[name="sales_valor_documento"]', function() {
+        clearTimeout(nitTypingDebounceTimer);
+        var q = $(this).val().trim();
+        if (q.length >= 3 && $("input[name='sales_razon_social']").val().trim() === '') {
+            consultar_ValorDocumento(true);
+        }
+    });
 
     // Rellenar datos del valor_documento seleccionado, desde "tabla modal con lista de coincidencias"
     $(document).on("click", ".item-selected-btn", function() {

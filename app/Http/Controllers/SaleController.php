@@ -1574,36 +1574,22 @@ class SaleController extends Controller
                 }
 
                 // Tabla CustomerNIT
-                if ($sales_caso_esp == 1) { // Válido solo cuando no exista casos especial
-                    $nit_data = CustomerNit::where('tipo_documento', $sales_tipo_doc)
-                        ->where('valor_documento', $sales_val_doc)->first();
-
-                    $fecha_hora_actual = new Carbon();
-                    if ($nit_data != null) {
-                        // Existe alguna coincidencia en la base de datos
-                        \DB::table('customer_nit')
-                            ->where('tipo_documento', $sales_tipo_doc)
-                            ->where('valor_documento', $sales_val_doc)
-                            ->update([
-                                'razon_social' => $sales_razon,
-                                'email' => $sales_mail,
-                                'complemento_documento' => $text_complemento_documento,
-                                'updated_at' => $fecha_hora_actual,
-                            ]);
-                    } else {
-
-                        \DB::table('customer_nit')->insert(
-                            [
-                                'tipo_documento' => $sales_tipo_doc,
-                                'valor_documento' => $sales_val_doc,
-                                'complemento_documento' => $text_complemento_documento,
-                                'razon_social' => $sales_razon,
-                                'email' => $sales_mail,
-                                'created_at' => $fecha_hora_actual,
-                                'updated_at' => $fecha_hora_actual,
-                            ]
-                        );
-                    }
+                if ($sales_caso_esp == 1 && !empty($sales_val_doc) && $sales_val_doc != '0') {
+                    $companyId = Auth::check() ? Auth::user()->company_id : ($data['company_id'] ?? null);
+                    CustomerNit::withoutGlobalScope('company')->updateOrCreate(
+                        [
+                            'company_id'      => $companyId,
+                            'valor_documento' => $sales_val_doc,
+                        ],
+                        [
+                            'tipo_documento'        => $sales_tipo_doc,
+                            'complemento_documento' => $text_complemento_documento,
+                            'razon_social'          => $sales_razon ?: 'S/N',
+                            'email'                 => $sales_mail,
+                            'tipo_caso_especial'    => $sales_caso_esp,
+                            'updated_at'            => Carbon::now(),
+                        ]
+                    );
                 }
                 // Fin tabla CustomerNit
 
@@ -2016,31 +2002,22 @@ class SaleController extends Controller
                 : null;
 
             // ─── CustomerNit (upsert) ─────────────────────────────────────────
-            if ($caso_especial_val == 1) {
-                $fecha_hora_actual = new Carbon();
-                $nit_data = CustomerNit::where('tipo_documento', $tipo_documento_val)
-                    ->where('valor_documento', $data['sales_valor_documento'] ?? '')->first();
-                if ($nit_data) {
-                    \DB::table('customer_nit')
-                        ->where('tipo_documento', $tipo_documento_val)
-                        ->where('valor_documento', $data['sales_valor_documento'])
-                        ->update([
-                            'razon_social'          => $data['sales_razon_social'] ?? '',
-                            'email'                 => $data['sales_email'] ?? null,
-                            'complemento_documento' => $text_complemento_documento,
-                            'updated_at'            => $fecha_hora_actual,
-                        ]);
-                } else {
-                    \DB::table('customer_nit')->insert([
+            if ($caso_especial_val == 1 && !empty($data['sales_valor_documento']) && $data['sales_valor_documento'] != '0') {
+                $companyId = Auth::check() ? Auth::user()->company_id : ($data['company_id'] ?? null);
+                CustomerNit::withoutGlobalScope('company')->updateOrCreate(
+                    [
+                        'company_id'      => $companyId,
+                        'valor_documento' => $data['sales_valor_documento'],
+                    ],
+                    [
                         'tipo_documento'        => $tipo_documento_val,
-                        'valor_documento'       => $data['sales_valor_documento'] ?? '',
                         'complemento_documento' => $text_complemento_documento,
-                        'razon_social'          => $data['sales_razon_social'] ?? '',
+                        'razon_social'          => $data['sales_razon_social'] ?? 'S/N',
                         'email'                 => $data['sales_email'] ?? null,
-                        'created_at'            => $fecha_hora_actual,
-                        'updated_at'            => $fecha_hora_actual,
-                    ]);
-                }
+                        'tipo_caso_especial'    => $caso_especial_val,
+                        'updated_at'            => Carbon::now(),
+                    ]
+                );
             }
 
             // ─── CustomerSale ─────────────────────────────────────────────────
@@ -5796,38 +5773,100 @@ class SaleController extends Controller
     public function searchNit(Request $request)
     {
         if ($request->ajax()) {
-            $output = '';
-            $query = $request->get('query');
-            if ($query != '') {
-                $data = \DB::table('customer_nit')
-                    ->where('valor_documento', 'like', '%' . $query . '%')
-                    ->orWhere('complemento_documento', 'like', '%' . $query . '%')
-                    ->orderBy('valor_documento', 'desc')
-                    ->get();
-            } else {
-                $data = \DB::table('customer_nit')
-                    ->orderBy('valor_documento', 'desc')
-                    ->get();
+            $query = trim($request->get('query', ''));
+            if ($query === '') {
+                return response()->json([
+                    'table_data' => [],
+                    'total_data' => 0,
+                    'is_exact'   => false,
+                ]);
             }
-            $total_row = $data->count();
-            if ($total_row > 0) {
-                foreach ($data as $row) {
-                    // <option value="{{ $sucursal->sucursal }}">{{ $sucursal->sucursal}}.- {{ $sucursal->nombre}} | {{ $sucursal->direccion }}</option>
-                    // '<option value="'+ data[i].codigo_punto_venta +'">'+ data[i].codigo_punto_venta +' - '+data[i].nombre_punto_venta +'</option>'
-                    $output .= '
-                    <option value="' . $row->valor_documento . '">' . $row->valor_documento . ' - ' . $row->razon_social . '</option>
-                    ';
+
+            $companyId = Auth::check() ? Auth::user()->company_id : (session('company_id') ?? null);
+
+            // 1. Buscar coincidencia exacta en la última factura emitida (customer_sales)
+            $exactSale = \DB::table('customer_sales')
+                ->when($companyId, function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->where('valor_documento', $query)
+                ->whereNotNull('valor_documento')
+                ->where('valor_documento', '!=', '')
+                ->where('valor_documento', '!=', '0')
+                ->orderBy('id', 'desc')
+                ->first(['tipo_documento', 'valor_documento', 'complemento_documento', 'razon_social', 'email']);
+
+            // 2. Buscar coincidencia exacta en customer_nit
+            $exactNit = \DB::table('customer_nit')
+                ->when($companyId, function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->where('valor_documento', $query)
+                ->orderBy('id', 'desc')
+                ->first(['tipo_documento', 'valor_documento', 'complemento_documento', 'razon_social', 'email']);
+
+            if ($exactSale || $exactNit) {
+                // Preferir los datos de la última factura si existen; si no, customer_nit
+                $selected = $exactSale ? (object)(array)$exactSale : (object)(array)$exactNit;
+
+                // Si en customer_sales no había email pero sí en customer_nit, completar
+                if (empty($selected->email) && $exactNit && !empty($exactNit->email)) {
+                    $selected->email = $exactNit->email;
                 }
-            } else {
-                $output = '
-                <option value="">Información no encontrada!</option>
-                ';
+                if (empty($selected->razon_social) && $exactNit && !empty($exactNit->razon_social)) {
+                    $selected->razon_social = $exactNit->razon_social;
+                }
+
+                return response()->json([
+                    'table_data' => [$selected],
+                    'total_data' => 1,
+                    'is_exact'   => true,
+                ]);
             }
-            $data_salida = array(
-                'table_data' => $data,
-                'total_data' => $total_row,
-            );
-            echo json_encode($data_salida);
+
+            // 3. Si no hay coincidencia exacta, buscar sugerencias por coincidencia parcial (LIKE)
+            $salesMatches = \DB::table('customer_sales')
+                ->when($companyId, function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->where('valor_documento', 'like', '%' . $query . '%')
+                ->whereNotNull('valor_documento')
+                ->where('valor_documento', '!=', '')
+                ->where('valor_documento', '!=', '0')
+                ->orderBy('id', 'desc')
+                ->limit(25)
+                ->get(['tipo_documento', 'valor_documento', 'complemento_documento', 'razon_social', 'email']);
+
+            $nitMatches = \DB::table('customer_nit')
+                ->when($companyId, function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                })
+                ->where('valor_documento', 'like', '%' . $query . '%')
+                ->orderBy('id', 'desc')
+                ->limit(25)
+                ->get(['tipo_documento', 'valor_documento', 'complemento_documento', 'razon_social', 'email']);
+
+            // Combinar y deduplicar por valor_documento priorizando la última factura emitida
+            $combined = collect();
+            foreach ($salesMatches as $item) {
+                if (!$combined->has($item->valor_documento)) {
+                    $combined->put($item->valor_documento, (object)(array)$item);
+                }
+            }
+            foreach ($nitMatches as $item) {
+                if (!$combined->has($item->valor_documento)) {
+                    $combined->put($item->valor_documento, (object)(array)$item);
+                }
+            }
+
+            $tableData = $combined->values()->take(15)->all();
+            $totalRow = count($tableData);
+
+            return response()->json([
+                'table_data' => $tableData,
+                'total_data' => $totalRow,
+                'is_exact'   => false,
+            ]);
         }
     }
 

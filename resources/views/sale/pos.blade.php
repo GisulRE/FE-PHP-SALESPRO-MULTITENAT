@@ -6684,14 +6684,15 @@
         });
 
         // permite pulsar tecla enter y buscar coincidencias
-        $('#sales_valor_documento').keypress(function(event) {
+        $(document).on('keypress', 'input[name="sales_valor_documento"]', function(event) {
             var keycode = (event.keyCode ? event.keyCode : event.which);
-            if (keycode == '13') {
-                consultar_ValorDocumento();
-                console.log(
-                    'El valor documento ha sido presionado para buscar coincidencias en la Base de Datos -----');
+            if (keycode == 13) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (typeof consultar_ValorDocumento === 'function') {
+                    consultar_ValorDocumento(false);
+                }
             }
-            event.stopPropagation();
         });
 
         // funcion en desuso
