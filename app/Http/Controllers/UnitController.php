@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Auth;
 use App\Unit;
 use App\PosSetting;
+use App\SiatParametricaVario;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Http;
@@ -20,7 +21,8 @@ class UnitController extends Controller
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('unit')) {
             $lims_unit_all = Unit::where('is_active', true)->get();
-            return view('unit.create', compact('lims_unit_all'));
+            $siat_unidades = $this->obtenerUnidadesMedidaSiat();
+            return view('unit.create', compact('lims_unit_all', 'siat_unidades'));
         }
         else
             return redirect()->back()->with('not_permitted', '¡Lo siento! No tienes permiso para acceder a este módulo.');
@@ -30,61 +32,48 @@ class UnitController extends Controller
     {
         Log::info("UNIT GET UNIDADES MEDIDA: Iniciando petición");
 
-        $nitCollection = PosSetting::latest()->first()->pluck('nit_emisor');
-        $nitValue = $nitCollection->first();
-        $unidades = [];
+        $unidades = $this->obtenerUnidadesMedidaSiat();
 
-        if (Session::get('token_siat') != null) {
+        // Fallback remoto a Optimo si la base de datos local estuviera vacía y hay token
+        if (empty($unidades) && Session::get('token_siat') != null) {
             $pos_setting = PosSetting::latest()->first();
-            $bearer = 'Bearer ' . Session::get('token_siat');
-            $host = $pos_setting->url_optimo;
-            $url = $host . '/datosincronizado/v1/listar-nit';
+            if ($pos_setting) {
+                $nitValue = $pos_setting->nit_emisor;
+                $bearer = 'Bearer ' . Session::get('token_siat');
+                $host = $pos_setting->url_optimo;
+                $url = $host . '/datosincronizado/v1/listar-nit';
 
-            Log::info("UNIT GET UNIDADES MEDIDA: Enviando petición", [
-                'url' => $url,
-                'nit' => $nitValue,
-                'parametro' => 'unidades_medida',
-            ]);
+                Log::info("UNIT GET UNIDADES MEDIDA: Enviando petición fallback", [
+                    'url' => $url,
+                    'nit' => $nitValue,
+                    'parametro' => 'unidades_medida',
+                ]);
 
-            $body = [
-                'nit' => $nitValue,
-                'parametro' => 'unidades_medida',
-                'sucursal' => 0,
-                'codigoPuntoVenta' => 0,
-            ];
+                $body = [
+                    'nit' => $nitValue,
+                    'parametro' => 'unidades_medida',
+                    'sucursal' => 0,
+                    'codigoPuntoVenta' => 0,
+                ];
 
-            try {
-                $response = Http::withHeaders([
-                    'Authorization' => $bearer,
-                    'Content-Type' => 'application/json',
-                ])->post($url, $body);
+                try {
+                    $response = Http::withHeaders([
+                        'Authorization' => $bearer,
+                        'Content-Type' => 'application/json',
+                    ])->post($url, $body);
 
-                if ($response->successful()) {
-                    $data = $response->json();
-                    if ($data && isset($data['ENTITIES'])) {
-                        $unidades = $data['ENTITIES'];
-                        if (!empty($unidades)) {
-                            Log::info("UNIT GET UNIDADES MEDIDA: Primer item estructura", [
-                                'item' => json_encode($unidades[0])
-                            ]);
+                    if ($response->successful()) {
+                        $data = $response->json();
+                        if ($data && isset($data['ENTITIES'])) {
+                            $unidades = $data['ENTITIES'];
                         }
                     }
-                    Log::info("UNIT GET UNIDADES MEDIDA: Respuesta exitosa", [
-                        'total_unidades' => count($unidades),
-                    ]);
-                } else {
-                    Log::warning("UNIT GET UNIDADES MEDIDA: Error HTTP", [
-                        'status' => $response->status(),
-                        'body' => $response->body(),
+                } catch (\Exception $e) {
+                    Log::error("UNIT GET UNIDADES MEDIDA: Excepción remota", [
+                        'error' => $e->getMessage(),
                     ]);
                 }
-            } catch (\Exception $e) {
-                Log::error("UNIT GET UNIDADES MEDIDA: Excepción", [
-                    'error' => $e->getMessage(),
-                ]);
             }
-        } else {
-            Log::warning("UNIT GET UNIDADES MEDIDA: token_siat es null, no se hace petición API");
         }
 
         Log::info("UNIT GET UNIDADES MEDIDA: Finalizado", [
@@ -92,6 +81,40 @@ class UnitController extends Controller
         ]);
 
         return response()->json(['unidades' => $unidades]);
+    }
+
+    private function obtenerUnidadesMedidaSiat()
+    {
+        $items = SiatParametricaVario::where('tipo_clasificador', 'unidadMedida')
+            ->whereNotNull('codigo_clasificador')
+            ->where('codigo_clasificador', '!=', '')
+            ->get();
+
+        if ($items->isEmpty()) {
+            $items = SiatParametricaVario::withoutGlobalScope('company')
+                ->where('tipo_clasificador', 'unidadMedida')
+                ->whereNotNull('codigo_clasificador')
+                ->where('codigo_clasificador', '!=', '')
+                ->get();
+        }
+
+        if ($items->isNotEmpty()) {
+            return $items->unique('codigo_clasificador')
+                ->sortBy(function ($item) {
+                    return (int) $item->codigo_clasificador;
+                })
+                ->values()
+                ->map(function ($item) {
+                    return [
+                        'valor' => (string) $item->codigo_clasificador,
+                        'descripcion' => $item->codigo_clasificador . ' - ' . $item->descripcion,
+                        'clave' => 'unidadMedida',
+                    ];
+                })
+                ->all();
+        }
+
+        return [];
     }
 
     public function store(Request $request)
@@ -129,7 +152,8 @@ class UnitController extends Controller
         $lims_unit_name = $_GET['lims_unitNameSearch'];
         $lims_unit_all = Unit::where('unit_name', $lims_unit_name)->paginate(5);
         $lims_unit_list = Unit::all();
-        return view('unit.create', compact('lims_unit_all','lims_unit_list'));
+        $siat_unidades = $this->obtenerUnidadesMedidaSiat();
+        return view('unit.create', compact('lims_unit_all','lims_unit_list', 'siat_unidades'));
     }
 
     public function edit($id)
