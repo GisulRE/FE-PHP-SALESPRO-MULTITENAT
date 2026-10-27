@@ -272,13 +272,15 @@ class RoleController extends Controller
 
         $uniquePermissions = array_values(array_unique($permissions));
 
-        // 4) Asegurar que todos los permisos existan en la tabla permissions con guard 'web' (Bulk select + insert)
-        $existingPermissions = Permission::whereIn('name', $uniquePermissions)
+        // 4) Obtener todos los permisos existentes para los nombres gestionados por el formulario agrupados por nombre
+        $allPermissions = \DB::table('permissions')
+            ->whereIn('name', $uniquePermissions)
             ->where('guard_name', $guard)
-            ->pluck('id', 'name')
-            ->toArray();
+            ->select('id', 'name')
+            ->get();
 
-        $missingPermissions = array_diff($uniquePermissions, array_keys($existingPermissions));
+        $existingNames = $allPermissions->pluck('name')->unique()->toArray();
+        $missingPermissions = array_diff($uniquePermissions, $existingNames);
         if (!empty($missingPermissions)) {
             $now = now();
             $bulkInsert = [];
@@ -292,47 +294,65 @@ class RoleController extends Controller
             }
             \DB::table('permissions')->insert($bulkInsert);
 
-            $existingPermissions = Permission::whereIn('name', $uniquePermissions)
+            $allPermissions = \DB::table('permissions')
+                ->whereIn('name', $uniquePermissions)
                 ->where('guard_name', $guard)
-                ->pluck('id', 'name')
-                ->toArray();
+                ->select('id', 'name')
+                ->get();
         }
 
-        // 5) Determinar IDs a otorgar y revocar según el request
-        $grantedIds = [];
-        $revokedIds = [];
+        // Agrupar IDs por nombre de permiso para contemplar duplicados históricos en la tabla permissions
+        $permIdsByName = [];
+        foreach ($allPermissions as $p) {
+            $permIdsByName[$p->name][] = $p->id;
+        }
+
+        // 5) Determinar qué nombres se otorgaron y cuáles se revocaron
+        $allRevokedIds = [];
+        $canonicalGrantedIds = [];
 
         foreach ($uniquePermissions as $permName) {
-            $permId = $existingPermissions[$permName] ?? null;
-            if (!$permId) {
+            $ids = $permIdsByName[$permName] ?? [];
+            if (empty($ids)) {
                 continue;
             }
+
             if ($request->has($permName)) {
-                $grantedIds[] = $permId;
+                // Primer ID como canónico
+                $canonicalGrantedIds[] = $ids[0];
+                // Si la BD tiene duplicados para este nombre, revocar los IDs adicionales para limpiar
+                if (count($ids) > 1) {
+                    for ($i = 1; $i < count($ids); $i++) {
+                        $allRevokedIds[] = $ids[$i];
+                    }
+                }
             } else {
-                $revokedIds[] = $permId;
+                // Si fue desmarcado, revocar TODOS los IDs (incluidos duplicados en la BD)
+                foreach ($ids as $id) {
+                    $allRevokedIds[] = $id;
+                }
             }
         }
 
         // 6) Actualizar role_has_permissions en masa para este rol en una transacción rápida
-        \DB::transaction(function () use ($role, $grantedIds, $revokedIds) {
-            // Revocar los desmarcados de la vista
-            if (!empty($revokedIds)) {
+        \DB::transaction(function () use ($role, $canonicalGrantedIds, $allRevokedIds) {
+            // Revocar todos los IDs de permisos desmarcados y duplicados excedentes
+            if (!empty($allRevokedIds)) {
                 \DB::table('role_has_permissions')
                     ->where('role_id', $role->id)
-                    ->whereIn('permission_id', $revokedIds)
+                    ->whereIn('permission_id', $allRevokedIds)
                     ->delete();
             }
 
-            // Otorgar los marcados que no estén ya asignados
-            if (!empty($grantedIds)) {
+            // Otorgar los marcados (insertando solo el canónico si no está asignado)
+            if (!empty($canonicalGrantedIds)) {
                 $alreadyAssigned = \DB::table('role_has_permissions')
                     ->where('role_id', $role->id)
-                    ->whereIn('permission_id', $grantedIds)
+                    ->whereIn('permission_id', $canonicalGrantedIds)
                     ->pluck('permission_id')
                     ->toArray();
 
-                $toInsert = array_diff($grantedIds, $alreadyAssigned);
+                $toInsert = array_diff($canonicalGrantedIds, $alreadyAssigned);
                 if (!empty($toInsert)) {
                     $insertData = [];
                     foreach ($toInsert as $pid) {
