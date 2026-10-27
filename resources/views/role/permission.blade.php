@@ -3071,7 +3071,7 @@
                                 </script>
                             </div>
                             <div class="form-group">
-                                <input type="submit" value="{{ trans('file.submit') }}" class="btn btn-primary">
+                                <input type="submit" value="{{ trans('file.submit') }}" class="btn btn-primary" id="btn-submit-permissions" onclick="this.value='Guardando...';">
                             </div>
                         </div>
                         {!! Form::close() !!}

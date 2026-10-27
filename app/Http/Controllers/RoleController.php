@@ -160,16 +160,17 @@ class RoleController extends Controller
             return redirect()->back()->with('not_permitted', 'Sorry! You are not allowed to access this module');
         }
 
-        // 1) Reset de cache de permisos (clave para evitar PermissionDoesNotExist por cache viejo)
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        // Ampliar tiempo de ejecución para evitar caídas por timeout de PHP
+        ini_set('max_execution_time', 120);
+        set_time_limit(120);
 
-        // 2) Guard fijo y consistente (según tu tabla roles, es 'web')
+        // 1) Guard fijo y consistente
         $guard = 'web';
 
-        // 3) No crees roles con firstOrCreate por id. Debe existir.
+        // 2) Validar rol existente
         $role = Role::findOrFail($request->role_id);
 
-        // 4) Lista de permisos (agrega/quita según tu sistema)
+        // 3) Lista completa de permisos gestionados en la vista (158 permisos)
         $permissions = [
             // Products
             'products-index','products-add','products-edit','products-delete',
@@ -200,6 +201,9 @@ class RoleController extends Controller
 
             // Qty Adjustment
             'qty_adjustment-index','qty_adjustment-add','qty_adjustment-edit','qty_adjustment-delete',
+
+            // Adjustment Account
+            'adjustment-account-index','adjustment-account-add','adjustment-account-edit','adjustment-account-delete',
 
             // Account / Money
             'account-index','money-transfer','balance-sheet','balance-sheet-account','close-balance-account','account-statement',
@@ -258,51 +262,100 @@ class RoleController extends Controller
             'lv_arqueogralpdf','lv_arqueogral_categ','lv_reportespdf_excel',
             'lv_facturas_cobradas','lv_facturas_revertidas',
 
-            // Transfer acceptance (tenías este con guard_name, lo incluimos igual)
+            // Transfer acceptance
             'accept-transfers',
 
-            // Otros (si los tienes)
-            'module_qr',
+            // Otros
             'salebiller-report','salecustomer-report','only-commision-report','service-commission-report',
             'sale-renueve-report','attendance-employee-report','holiday-employee-report',
         ];
 
-        // 5) Sincronizador: crea permiso con guard web y asigna / revoca según request
-        foreach (array_unique($permissions) as $permName) {
-            // Crea el permiso SIEMPRE con guard_name para evitar inconsistencias
-            Permission::firstOrCreate([
-                'name' => $permName,
-                'guard_name' => $guard,
-            ]);
+        $uniquePermissions = array_values(array_unique($permissions));
 
+        // 4) Asegurar que todos los permisos existan en la tabla permissions con guard 'web' (Bulk select + insert)
+        $existingPermissions = Permission::whereIn('name', $uniquePermissions)
+            ->where('guard_name', $guard)
+            ->pluck('id', 'name')
+            ->toArray();
+
+        $missingPermissions = array_diff($uniquePermissions, array_keys($existingPermissions));
+        if (!empty($missingPermissions)) {
+            $now = now();
+            $bulkInsert = [];
+            foreach ($missingPermissions as $missingName) {
+                $bulkInsert[] = [
+                    'name'       => $missingName,
+                    'guard_name' => $guard,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            \DB::table('permissions')->insert($bulkInsert);
+
+            $existingPermissions = Permission::whereIn('name', $uniquePermissions)
+                ->where('guard_name', $guard)
+                ->pluck('id', 'name')
+                ->toArray();
+        }
+
+        // 5) Determinar IDs a otorgar y revocar según el request
+        $grantedIds = [];
+        $revokedIds = [];
+
+        foreach ($uniquePermissions as $permName) {
+            $permId = $existingPermissions[$permName] ?? null;
+            if (!$permId) {
+                continue;
+            }
             if ($request->has($permName)) {
-                $role->givePermissionTo($permName);
+                $grantedIds[] = $permId;
             } else {
-                // revokePermissionTo también busca por guard; ya existe porque lo creamos arriba
-                $role->revokePermissionTo($permName);
+                $revokedIds[] = $permId;
             }
         }
 
-        // 6) Guardar módulos bloqueados (tu lógica original)
+        // 6) Actualizar role_has_permissions en masa para este rol en una transacción rápida
+        \DB::transaction(function () use ($role, $grantedIds, $revokedIds) {
+            // Revocar los desmarcados de la vista
+            if (!empty($revokedIds)) {
+                \DB::table('role_has_permissions')
+                    ->where('role_id', $role->id)
+                    ->whereIn('permission_id', $revokedIds)
+                    ->delete();
+            }
+
+            // Otorgar los marcados que no estén ya asignados
+            if (!empty($grantedIds)) {
+                $alreadyAssigned = \DB::table('role_has_permissions')
+                    ->where('role_id', $role->id)
+                    ->whereIn('permission_id', $grantedIds)
+                    ->pluck('permission_id')
+                    ->toArray();
+
+                $toInsert = array_diff($grantedIds, $alreadyAssigned);
+                if (!empty($toInsert)) {
+                    $insertData = [];
+                    foreach ($toInsert as $pid) {
+                        $insertData[] = [
+                            'permission_id' => $pid,
+                            'role_id'       => $role->id,
+                        ];
+                    }
+                    \DB::table('role_has_permissions')->insert($insertData);
+                }
+            }
+        });
+
+        // 7) Guardar módulos bloqueados
         $blocked_modules = $request->input('blocked_modules', []);
         $lims_role_data = Roles::find($request->role_id);
-
-        Log::info('=== GUARDANDO MÓDULOS BLOQUEADOS ===');
-        Log::info('Role ID: ' . $request->role_id);
-        Log::info('Blocked Modules Array: ' . print_r($blocked_modules, true));
-        Log::info('JSON: ' . json_encode($blocked_modules));
 
         if ($lims_role_data) {
             $lims_role_data->blocked_modules = json_encode($blocked_modules);
             $lims_role_data->save();
-
-            $lims_role_data->refresh();
-            Log::info('Guardado en BD: ' . $lims_role_data->blocked_modules);
-        } else {
-            Log::warning('No se encontró Roles::find(role_id) para guardar blocked_modules. role_id=' . $request->role_id);
         }
 
-        // 7) Limpia cache al final también (opcional, pero ayuda)
+        // 8) Limpiar cache de permisos de Spatie una sola vez al final
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         return redirect('role')->with('message', 'Permisos actualizados con éxito');
