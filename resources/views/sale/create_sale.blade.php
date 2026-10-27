@@ -681,7 +681,14 @@
                       ['role_id', $role->id]
                   ])->first();
               ?>
-              @if($role->id <= 2)
+              @php
+                  $can_role = Auth::user() && (
+                      Auth::user()->role_id <= 2 ||
+                      (($user_role = \App\Roles::find(Auth::user()->role_id)) &&
+                       in_array(strtolower($user_role->name ?? ''), ['admin', 'superadmin', 'administrador', 'owner', 'propietario', 'tienda']))
+                  );
+              @endphp
+              @if ($can_role)
               <li id="role-menu"><a href="{{route('role.index')}}">{{trans('file.Role Permission')}}</a></li>
               @endif
               @if($warehouse_permission_active)

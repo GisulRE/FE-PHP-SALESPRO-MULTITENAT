@@ -751,7 +751,14 @@
                             $pos_setting_permission_active = $hasPerm('pos_setting');
                             $hrm_setting_permission_active = $hasPerm('hrm_setting');
                             ?>
-                            @if (Auth::user() && Auth::user()->role_id <= 2)
+                            @php
+                                $can_role = Auth::user() && (
+                                    Auth::user()->role_id <= 2 ||
+                                    (($user_role = \App\Roles::find(Auth::user()->role_id)) &&
+                                     in_array(strtolower($user_role->name ?? ''), ['admin', 'superadmin', 'administrador', 'owner', 'propietario', 'tienda']))
+                                );
+                            @endphp
+                            @if ($can_role)
                                 <li id="role-menu"><a
                                         href="{{ route('role.index') }}">{{ trans('file.Role Permission') }}</a></li>
                             @endif

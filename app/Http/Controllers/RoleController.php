@@ -24,7 +24,7 @@ class RoleController extends Controller
         }
         $role = Role::find($user->role_id);
         return $role && in_array(strtolower($role->name ?? ''), [
-            'admin', 'superadmin', 'administrador', 'owner', 'propietario'
+            'admin', 'superadmin', 'administrador', 'owner', 'propietario', 'tienda'
         ]);
     }
 

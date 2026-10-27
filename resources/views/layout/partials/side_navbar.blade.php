@@ -6,7 +6,7 @@
 
     if ($user) {
         $role = \App\Roles::find($user->role_id);
-        if ($user->role_id <= 2 || ($role && in_array(strtolower($role->name), ['admin', 'superadmin', 'administrador', 'owner']))) {
+        if ($user->role_id <= 2 || ($role && in_array(strtolower($role->name), ['admin', 'superadmin', 'administrador', 'owner', 'propietario', 'tienda']))) {
             $is_admin = true;
         }
     }
@@ -721,7 +721,12 @@
                                 class="dripicons-gear"></i><span>{{ trans('file.settings') }}</span></a>
                         <ul id="setting" class="collapse list-unstyled ">
 
-                            @if ($role->id <= 2)
+                            @php
+                                $can_role = $is_admin
+                                    || ($role && ($role->id <= 2 || in_array(strtolower($role->name), ['admin', 'superadmin', 'administrador', 'owner', 'propietario', 'tienda'])))
+                                    || in_array('role', $permissions);
+                            @endphp
+                            @if ($can_role)
                                 <li id="role-menu"><a href="{{ route('role.index') }}">{{ trans('file.Role Permission') }}</a>
                                 </li>
                             @endif

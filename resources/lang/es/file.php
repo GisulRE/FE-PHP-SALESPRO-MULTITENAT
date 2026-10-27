@@ -464,7 +464,7 @@ return [
     "Payable Amount" => "Monto a pagar",
     "Change" => "Cambio",
     "Back" => "Espalda",
-    "Role Permission" => "Permiso de rol",
+    "Role Permission" => "Roles",
     "Exclusive: Poduct price = Actual product price + Tax. Inclusive: Actual product price = Product price - Tax" => "Exclusivo: precio del producto = precio real del producto + impuestos. Incluido: Precio real del producto = Precio del producto - Impuestos.",
     "Accounting" => "Contabilidad",
     "Account" => "Cuenta",
