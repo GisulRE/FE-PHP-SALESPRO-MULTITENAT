@@ -22,15 +22,34 @@ use Illuminate\Support\Facades\Mail;
 class UserController extends Controller
 {
 
+    private function isTenantAdmin($user)
+    {
+        if (!$user) {
+            return false;
+        }
+        if ($user->role_id <= 2) {
+            return true;
+        }
+        $role = Roles::find($user->role_id);
+        return $role && in_array(strtolower($role->name ?? ''), [
+            'admin', 'superadmin', 'administrador', 'owner', 'propietario', 'tienda'
+        ]);
+    }
+
     public function index()
     {
         $user = Auth::user();
         $permissions = is_array(session('permissions')) ? session('permissions') : [];
-        $hasPermission = ($user && $user->role_id <= 2) || in_array('users-index', $permissions);
+        $hasPermission = $this->isTenantAdmin($user) || in_array('users-index', $permissions);
 
         if ($hasPermission) {
             $all_permission = !empty($permissions) ? $permissions : ['users-index', 'users-add', 'users-edit', 'users-delete'];
-            $lims_user_list = User::where('is_deleted', false)->get();
+            $company_id = $user ? $user->company_id : null;
+            $lims_user_list = User::where('is_deleted', false)
+                ->when($company_id, function ($query) use ($company_id) {
+                    return $query->where('company_id', $company_id);
+                })
+                ->get();
             $categories = Category::select('id', 'name')->where('is_active', true)->get();
             return view('user.index', compact('lims_user_list', 'all_permission', 'categories'));
         } else {
@@ -42,10 +61,15 @@ class UserController extends Controller
     {
         $user = Auth::user();
         $permissions = is_array(session('permissions')) ? session('permissions') : [];
-        $hasPermission = ($user && $user->role_id <= 2) || in_array('users-add', $permissions);
+        $hasPermission = $this->isTenantAdmin($user) || in_array('users-add', $permissions);
 
         if ($hasPermission) {
-            $lims_role_list = Roles::where('is_active', true)->get();
+            $company_id = $user ? $user->company_id : null;
+            $lims_role_list = Roles::where('is_active', true)
+                ->when($company_id, function ($query) use ($company_id) {
+                    return $query->where('company_id', $company_id);
+                })
+                ->get();
             $lims_biller_list = Biller::select('id', 'name', 'company_name')->where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::select('id', 'name')->where('is_active', true)->get();
             $lims_company_list = Company::all();
@@ -124,14 +148,23 @@ class UserController extends Controller
     {
         $user = Auth::user();
         $permissions = is_array(session('permissions')) ? session('permissions') : [];
-        $hasPermission = ($user && $user->role_id <= 2) || in_array('users-edit', $permissions);
+        $hasPermission = $this->isTenantAdmin($user) || in_array('users-edit', $permissions);
 
         if ($hasPermission) {
-            $lims_user_data = User::find($id);
+            $company_id = $user ? $user->company_id : null;
+            $lims_user_data = User::where('id', $id)
+                ->when($company_id, function ($query) use ($company_id) {
+                    return $query->where('company_id', $company_id);
+                })
+                ->first();
             if (!$lims_user_data) {
                 return redirect('user')->with('not_permitted', 'Usuario no encontrado');
             }
-            $lims_role_list = Roles::where('is_active', true)->get();
+            $lims_role_list = Roles::where('is_active', true)
+                ->when($company_id, function ($query) use ($company_id) {
+                    return $query->where('company_id', $company_id);
+                })
+                ->get();
             $lims_biller_list = Biller::select('id', 'name', 'company_name')->where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::select('id', 'name')->where('is_active', true)->get();
             $lims_company_list = Company::all();
@@ -143,8 +176,19 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
-        $currentUser = User::find($id);
-        $companyId = $request->input('company_id') ?: ($currentUser ? $currentUser->company_id : (Auth::user() ? Auth::user()->company_id : null));
+        $user = Auth::user();
+        $authCompanyId = $user ? $user->company_id : null;
+        $currentUser = User::where('id', $id)
+            ->when($authCompanyId, function ($query) use ($authCompanyId) {
+                return $query->where('company_id', $authCompanyId);
+            })
+            ->first();
+
+        if (!$currentUser) {
+            return redirect('user')->with('not_permitted', 'Usuario no encontrado');
+        }
+
+        $companyId = $authCompanyId ?: ($request->input('company_id') ?: $currentUser->company_id);
 
         $this->validate($request, [
             'name' => [
@@ -180,13 +224,11 @@ class UserController extends Controller
                 $input['password'] = bcrypt($request['password']);
 
             if (isset($input['biller_id']) && $input['biller_id'] === '') $input['biller_id'] = null;
-            if (isset($input['company_id']) && $input['company_id'] === '') $input['company_id'] = null;
+            if (isset($input['company_id']) && $input['company_id'] === '') $input['company_id'] = $companyId;
+            if (empty($input['company_id']) && $companyId) $input['company_id'] = $companyId;
             if (isset($input['warehouse_id']) && $input['warehouse_id'] === '') $input['warehouse_id'] = null;
 
-            $lims_user_data = User::find($id);
-            if (!$lims_user_data) {
-                return redirect('user')->with('not_permitted', 'Usuario no encontrado');
-            }
+            $lims_user_data = $currentUser;
 
             $lims_user_data->update($input);
 
@@ -237,19 +279,36 @@ class UserController extends Controller
 
     public function deleteBySelection(Request $request)
     {
+        $user = Auth::user();
+        $company_id = $user ? $user->company_id : null;
         $user_id = $request['userIdArray'];
         foreach ($user_id as $id) {
-            $lims_user_data = User::find($id);
-            $lims_user_data->is_deleted = true;
-            $lims_user_data->is_active = false;
-            $lims_user_data->save();
+            $lims_user_data = User::where('id', $id)
+                ->when($company_id, function ($query) use ($company_id) {
+                    return $query->where('company_id', $company_id);
+                })
+                ->first();
+            if ($lims_user_data) {
+                $lims_user_data->is_deleted = true;
+                $lims_user_data->is_active = false;
+                $lims_user_data->save();
+            }
         }
         return 'User deleted successfully!';
     }
 
     public function destroy($id)
     {
-        $lims_user_data = User::find($id);
+        $user = Auth::user();
+        $company_id = $user ? $user->company_id : null;
+        $lims_user_data = User::where('id', $id)
+            ->when($company_id, function ($query) use ($company_id) {
+                return $query->where('company_id', $company_id);
+            })
+            ->first();
+        if (!$lims_user_data) {
+            return redirect('user')->with('not_permitted', 'Usuario no encontrado');
+        }
         $lims_user_data->is_deleted = true;
         $lims_user_data->is_active = false;
         $lims_user_data->save();
