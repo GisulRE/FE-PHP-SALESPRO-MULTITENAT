@@ -6290,7 +6290,7 @@ class SaleController extends Controller
                     case 'R=RECHAZADA NO VALIDA':
                     case 'RECHAZADA':
                     case 'RECHAZADA NO VALIDA':
-                        $list_facturas[$i]['estado'] = '<div class="badge badge-danger" style="background-color: #dc3545; color: white;">R=RECHAZADA NO VALIDA</div>';
+                        $list_facturas[$i]['estado'] = '<div class="badge badge-danger" style="background-color: #dc3545; color: white;">RECHAZADA NO VALIDA</div>';
                         break;
                 }
                 $list_invoices[] = $list_facturas[$i];
