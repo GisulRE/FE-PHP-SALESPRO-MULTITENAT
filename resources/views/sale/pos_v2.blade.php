@@ -1693,6 +1693,12 @@
                                                 @endforeach
                                             </select>
                                         </div>
+
+                                        <!-- Nota de Venta / Paciente -->
+                                        <div class="form-group mb-2">
+                                            <label class="small font-weight-bold text-muted mb-1">{{ trans('file.Sale Note') }}:</label>
+                                            <textarea rows="2" class="form-control form-control-sm bg-dark text-white border-secondary" name="sale_note" id="sale_note_v2" placeholder="Nota de venta / Nombre del paciente"></textarea>
+                                        </div>
                                     </div>
 
                                     <!-- COLUMNA DERECHA: PAGO & VUELTO GIGANTE -->

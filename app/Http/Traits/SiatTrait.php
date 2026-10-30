@@ -942,8 +942,11 @@ trait SiatTrait
             $complemento = $data_cliente->complemento_documento;
         }
         $listAdicionales = null;
-        if ($data_venta->sale_note != null || $data_venta->sale_note != '') {
-            $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
+        if (!empty($data_venta->sale_note)) {
+            $listAdicionales[] = [
+                "etiqueta" => "paciente",
+                "valor"    => $data_venta->sale_note
+            ];
         }
 
         $periodoFacturado = trim((string) ($data_cliente->glosa_periodo_facturado ?? ''));
@@ -1017,6 +1020,7 @@ trait SiatTrait
             'url' => $host . $path,
             'payload' => $data_body,
         ]);
+        Log::info("Body => " . json_encode($data_body));
         
         try {
             $response = Http::withHeaders([
@@ -1221,9 +1225,12 @@ trait SiatTrait
             $complemento = $data_cliente->complemento_documento;
         }
 
-        $listAdicionales = [];
-        if ($data_venta->sale_note != null && $data_venta->sale_note != '') {
-            $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
+        $listAdicionales = null;
+        if (!empty($data_venta->sale_note)) {
+            $listAdicionales[] = [
+                "etiqueta" => "paciente",
+                "valor"    => $data_venta->sale_note
+            ];
         }
 
         $online = ($pos_setting->codigo_emision ?? 1) == 1;
@@ -1284,6 +1291,7 @@ trait SiatTrait
             'url' => $url_completa,
             'payload' => $data_body,
         ]);
+        Log::info("Body => " . json_encode($data_body));
 
         try {
             $response = Http::timeout(90)->withHeaders([
@@ -1540,8 +1548,11 @@ trait SiatTrait
             $fecha_emision = "";
         }
         $listAdicionales = null;
-        if ($data_venta->sale_note != null || $data_venta->sale_note != '') {
-            $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
+        if (!empty($data_venta->sale_note)) {
+            $listAdicionales[] = [
+                "etiqueta" => "paciente",
+                "valor"    => $data_venta->sale_note
+            ];
         }
 
         // Construir data_body según la especificación del nuevo endpoint gestionado
@@ -1574,7 +1585,7 @@ trait SiatTrait
                 'codigoExcepcion' => (int) ($data_cliente->codigo_excepcion ?? 0),
                 'detalle' => $data_product_sales,
             ],
-            'adicionales' => $listAdicionales ?? [],
+            'adicionales' => $listAdicionales,
         ];
 
         $response = Http::withHeaders([
@@ -1754,8 +1765,11 @@ trait SiatTrait
             $fecha_emision = "";
         }
         $listAdicionales = null;
-        if ($data_venta->sale_note != null || $data_venta->sale_note != '') {
-            $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
+        if (!empty($data_venta->sale_note)) {
+            $listAdicionales[] = [
+                "etiqueta" => "paciente",
+                "valor"    => $data_venta->sale_note
+            ];
         }
 
         // Construir data_body según la especificación del nuevo endpoint gestionado
@@ -1811,7 +1825,7 @@ trait SiatTrait
                 'detalleOtrosPagosNoSujetoIva' => $data_cliente->detalle_otros_pagos_no_sujeto_iva,
                 'detalle' => $data_product_sales,
             ],
-            'adicionales' => $listAdicionales ?? [],
+            'adicionales' => $listAdicionales,
         ];
         
         $response = Http::withHeaders([
@@ -2007,8 +2021,11 @@ trait SiatTrait
             $fecha_emision = "";
         }
         $listAdicionales = null;
-        if ($data_venta->sale_note != null || $data_venta->sale_note != '') {
-            $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
+        if (!empty($data_venta->sale_note)) {
+            $listAdicionales[] = [
+                "etiqueta" => "paciente",
+                "valor"    => $data_venta->sale_note
+            ];
         }
         // Construir data_body según la especificación del nuevo endpoint gestionado
         $data_body = [
@@ -2041,7 +2058,7 @@ trait SiatTrait
                 'codigoExcepcion' => (int) ($data_cliente->codigo_excepcion ?? 0),
                 'detalle' => $data_product_sales,
             ],
-            'adicionales' => $listAdicionales ?? [],
+            'adicionales' => $listAdicionales,
         ];
 
         $response = Http::withHeaders([
@@ -3389,8 +3406,11 @@ Descripción: " . $data_response['descripcion'];
             $complemento = $data_cliente->complemento_documento;
         }
         $listAdicionales = null;
-        if ($data_venta->sale_note != null || $data_venta->sale_note != '') {
-            $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
+        if (!empty($data_venta->sale_note)) {
+            $listAdicionales[] = [
+                "etiqueta" => "paciente",
+                "valor"    => $data_venta->sale_note
+            ];
         }
         // Construir data_body base - Alquiler
         $data_body = [
@@ -3598,8 +3618,11 @@ Descripción: " . $data_response['descripcion'];
             $data_cliente->beneficiario_ley_1886 = 0;
         }
         $listAdicionales = null;
-        if ($data_venta->sale_note != null || $data_venta->sale_note != '') {
-            $listAdicionales[] = array("etiqueta" => "paciente", "valor" => $data_venta->sale_note);
+        if (!empty($data_venta->sale_note)) {
+            $listAdicionales[] = [
+                "etiqueta" => "paciente",
+                "valor"    => $data_venta->sale_note
+            ];
         }
 
         $periodoFacturado = trim((string) ($data_cliente->glosa_periodo_facturado ?? ''));

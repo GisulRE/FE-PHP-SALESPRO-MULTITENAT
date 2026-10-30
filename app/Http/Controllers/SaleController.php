@@ -1976,6 +1976,10 @@ class SaleController extends Controller
             }
 
             $data = $request->all();
+            if (isset($data['sale_note']) && $data['sale_note'] !== '') {
+                $lims_sale_data->sale_note = $data['sale_note'];
+                $lims_sale_data->save();
+            }
 
             // ─── Normalizar campos cuyo hidden nunca es seteado por JS ──────────
             $tipo_documento_val = max(1, (int) ($data['sales_tipo_documento'] ?? $data['sales_tipo_documento_hidden'] ?? 1));
