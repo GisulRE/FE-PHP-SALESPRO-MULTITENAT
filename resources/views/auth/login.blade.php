@@ -371,7 +371,7 @@ $general_setting = $general_setting ?? DB::table('general_settings')->find(1) ??
                 <p class="mb-1" style="font-size: 0.82rem; color: #94a3b8;">
                     {{ trans('file.Developed By') }} <a href="http://www.gisul.com.bo/" class="external font-weight-bold" style="color: #0284c7; text-decoration: none;">Gisul S.R.L.</a>
                 </p>
-                <span class="badge badge-secondary px-2 py-1 mt-1" style="font-size: 0.75rem; background-color: #334155; color: #cbd5e1;">v2.5.0-20260822</span>
+                <span class="badge badge-secondary px-2 py-1 mt-1" style="font-size: 0.75rem; background-color: #334155; color: #cbd5e1;">v2.5.1-20261030</span>
             </div>
         </div>
     </div>
