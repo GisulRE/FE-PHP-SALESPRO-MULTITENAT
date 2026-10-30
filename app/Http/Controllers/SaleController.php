@@ -6247,17 +6247,20 @@ class SaleController extends Controller
         
         for ($i = 0; $i < count($list_facturas); $i++) {
             if (isset($list_facturas[$i])) {
+                $rawEstado = trim((string)($list_facturas[$i]['estado'] ?? ''));
+                $esNoOperable = in_array(strtoupper($rawEstado), ['B', 'R', 'RECHAZADA', 'RECHAZADA NO VALIDA']);
+
                 $op['options'] = '<div class="btn-group">';
                 $op['options'] .= '<button type="button" class="imprimir-factura-modal btn btn-info" data-id = "' . $list_facturas[$i]['cuf'] . '" data-toggle="modal" data-target="#imprimir-factura-modal" title="Imprimir"><i class="fa fa-print"></i></button>';
-                if ($list_facturas[$i]['pago'] == null && $list_facturas[$i]['estado'] != 'B') {
+                if ($list_facturas[$i]['pago'] == null && !$esNoOperable) {
                     $op['options'] .= '<button type="button" class="pagar-factura-modal btn btn-warning" data-id = "' . $list_facturas[$i]['cuf'] . '" title="Pagar"><i class="fa fa-money"></i></button>';
-                } else if ($list_facturas[$i]['pago'] != null && $list_facturas[$i]['estado'] != 'B') {
+                } else if ($list_facturas[$i]['pago'] != null && !$esNoOperable) {
                     $op['options'] .= '<button type="button" class="revertir-factura-modal btn btn-secondary" style="background-color: darkorange;" data-id = "' . $list_facturas[$i]['cuf'] . '" title="Revertir Pago"><i class="fa fa-exchange"></i></button>';
                 }
-                if ($canDelete && ($list_facturas[$i]['pago'] == null && $list_facturas[$i]['estado'] != 'B')) {
+                if ($canDelete && ($list_facturas[$i]['pago'] == null && !$esNoOperable)) {
                     $op['options'] .= '<button type="button" class="anular-factura-modal btn btn-danger" data-id = "' . $list_facturas[$i]['cuf'] . '" data-ptoventa = "' . $list_facturas[$i]['codigoPuntoVenta'] . '" data-sucursal = "' . $list_facturas[$i]['codigoSucursal'] . '" data-toggle="modal" data-target="#anular-factura-modal" title="Anular Factura"><i class="fa fa-trash"></i></button>';
                 }
-                if ($list_facturas[$i]['estado'] != 'B' && ($list_facturas[$i]['codigoDocumentoSector'] ?? 1) != 24) {
+                if (!$esNoOperable && ($list_facturas[$i]['codigoDocumentoSector'] ?? 1) != 24) {
                     $op['options'] .= '<button type="button" class="emitir-nota-credito-debito-btn btn btn-dark" style="background-color: #6f42c1; border-color: #6f42c1; color: white;" data-id = "' . $list_facturas[$i]['cuf'] . '" title="Emitir Nota de Crédito/Débito SIAT"><i class="fa fa-undo"></i></button>';
                 }
                 $op['options'] .= '<button type="button" class="reenviar-factura-modal btn btn-success" data-id = "' . $list_facturas[$i]['cuf'] . '" data-toggle="modal" data-target="#reenviar-factura-modal" title="Reenviar Factura"><i class="fa fa-whatsapp"></i></button>';
@@ -6276,12 +6279,18 @@ class SaleController extends Controller
                     $list_facturas[$i]['documentoSector'] = 'Nota de Credito/Debito';
                 }
 
-                switch ($list_facturas[$i]['estado']) {
+                switch (strtoupper($rawEstado)) {
                     case 'A':
                         $list_facturas[$i]['estado'] = '<div class="badge badge-success">Activo</div>';
                         break;
                     case 'B':
                         $list_facturas[$i]['estado'] = '<div class="badge badge-danger">Anulado</div>';
+                        break;
+                    case 'R':
+                    case 'R=RECHAZADA NO VALIDA':
+                    case 'RECHAZADA':
+                    case 'RECHAZADA NO VALIDA':
+                        $list_facturas[$i]['estado'] = '<div class="badge badge-danger" style="background-color: #dc3545; color: white;">R=RECHAZADA NO VALIDA</div>';
                         break;
                 }
                 $list_invoices[] = $list_facturas[$i];

@@ -79,6 +79,7 @@
                             <option selected value="T">Todas</option>
                             <option value="A">Válidas</option>
                             <option value="B">Anuladas</option>
+                            <option value="R">Rechazadas</option>
                         </select>
                     </div>
                     <div class="col-md-1">
