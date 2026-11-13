@@ -444,16 +444,16 @@ class SaleController extends Controller
                 if (!empty($venta_facturada)) {
 
                     if ($venta_facturada->estado_factura == 'ANULADO') {
-                        // Factura anulada: ofrecer re-facturar (CUF=null, el modal detecta y genera nueva)
+                        // Factura anulada: ofrecer re-facturar
                         $nestedData['options'] .=
                             '<li>
-                            <button type="button" class="imprimir-factura-modal btn btn-link" data-id = "' . $sale->id . '" data-toggle="modal" data-target="#imprimir-factura-modal"><i class="fa fa-refresh"></i> Re-Facturar</button>
+                            <button type="button" class="refacturar-modal btn btn-link" data-id = "' . $sale->id . '" data-customer-id = "' . $sale->customer_id . '"><i class="fa fa-refresh"></i> Re-Facturar</button>
                         </li>';
                     } else {
-                        // Vigente, Contingencia, Masivo: mostrar botón imprimir
+                        // Vigente, Contingencia, Masivo: mostrar botón imprimir (solo ver/imprimir existente)
                         $nestedData['options'] .=
                             '<li>
-                            <button type="button" class="imprimir-factura-modal btn btn-link" data-id = "' . $sale->id . '" data-toggle="modal" data-target="#imprimir-factura-modal"><i class="fa fa-print"></i> ' . 'Imprimir Factura' . '</button>
+                            <button type="button" class="imprimir-factura-modal btn btn-link" data-id = "' . $sale->id . '"><i class="fa fa-print"></i> ' . 'Imprimir Factura' . '</button>
                         </li>';
                     }
 
@@ -478,6 +478,12 @@ class SaleController extends Controller
                             </ul>
                         </div>';
                 } else {
+                    // Venta sin factura (Nota de Venta): ofrecer opción para facturar
+                    $nestedData['options'] .=
+                        '<li>
+                        <button type="button" class="facturar-venta-modal btn btn-link" data-id = "' . $sale->id . '" data-customer-id = "' . $sale->customer_id . '"><i class="fa fa-file-text-o"></i> ' . 'Facturar Venta' . '</button>
+                    </li>';
+
                     if (in_array("sales-delete", $req_permissions)) {
                         $nestedData['options'] .= '<form action="' . route('sales.destroy', $sale->id) . '" method="POST" style="display:inline">' . csrf_field() . method_field('DELETE') . '
                                     <li>

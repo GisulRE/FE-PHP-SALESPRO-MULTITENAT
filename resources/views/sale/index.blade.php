@@ -668,7 +668,7 @@
 
                                 <div class="mt-3 text-right">
                                     <button type="button" class="btn btn-secondary mr-2" data-dismiss="modal">Cerrar</button>
-                                    <button type="button" id="imprimir-next-btn" class="btn btn-primary">Generar y Ver Factura</button>
+                                    <button type="button" id="imprimir-next-btn" class="btn btn-primary"><i class="fa fa-paper-plane"></i> Emitir Factura SIAT</button>
                                 </div>
                             </form>
                         </div>
@@ -1162,22 +1162,6 @@
                             $(row).hide();
                         }
                     }
-                    
-                    // Agregar botón "Imprimir Factura" dentro del menú de acciones si existe
-                    try {
-                        var saleId = data['sale'] ? data['sale'][13] : '';
-                        var $optionsCell = $('td', row).eq(11);
-                        var $menu = $optionsCell.find('.dropdown-menu');
-                        if ($menu.length) {
-                            // Añadir al inicio del menú
-                            $menu.prepend('<li><button type="button" class="btn btn-link imprimir-factura-modal" data-id="' + saleId + '"><i class="fa fa-print"></i> Imprimir Factura</button></li>');
-                        } else if (saleId) {
-                            // Si no hay menú, añadir botón simple
-                            $optionsCell.append('<button type="button" class="btn btn-link imprimir-factura-modal" data-id="' + saleId + '"><i class="fa fa-print"></i></button>');
-                        }
-                    } catch (e) {
-                        console.log('No se pudo añadir el botón imprimir-factura:', e);
-                    }
                 },
                 "columns": [{
                         "data": "key"
@@ -1634,342 +1618,227 @@
                 $('#anular-factura-modal').modal('show');
             });
         });
+        // Helper para cargar la vista/PDF de la factura SIAT y sección de WhatsApp
+        window.loadFacturaSiat = function(saleId, verificada, dataFactura) {
+            var url = '{{ url('sales/imprimir_factura') }}/' + saleId;
+            
+            $('#imprimir-pdf-container').html('<div class="text-center py-4"><i class="fa fa-spinner fa-spin fa-3x text-primary"></i><p class="mt-2">Cargando factura...</p></div>');
+            
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(html) {
+                    $('#imprimir-pdf-container').html(html);
+                    
+                    // Si se pasó información de la factura, mostrar badge/resumen
+                    if (verificada && dataFactura && (dataFactura.cuf || dataFactura.nro_factura)) {
+                        var infoVerificacion = '<div class="alert alert-success mt-2 mb-2 py-2">';
+                        infoVerificacion += '<div class="row align-items-center">';
+                        infoVerificacion += '<div class="col-md-7">';
+                        infoVerificacion += '<i class="fa fa-check-circle text-success mr-1"></i> <strong>Factura SIAT Registrada</strong><br>';
+                        if (dataFactura.nro_factura) infoVerificacion += '<small><strong>Nro. Factura:</strong> ' + dataFactura.nro_factura + '</small> ';
+                        if (dataFactura.cuf) infoVerificacion += '<small class="text-muted text-truncate d-inline-block" style="max-width:320px;" title="' + dataFactura.cuf + '"><strong>CUF:</strong> ' + dataFactura.cuf + '</small>';
+                        infoVerificacion += '</div>';
+                        infoVerificacion += '<div class="col-md-5 text-right">';
+                        if (dataFactura.xml) {
+                            infoVerificacion += '<button type="button" class="btn btn-sm btn-outline-info" id="ver-xml-factura"><i class="fa fa-code"></i> Ver XML</button>';
+                        }
+                        infoVerificacion += '</div>';
+                        infoVerificacion += '</div></div>';
+                        $('#imprimir-pdf-container').prepend(infoVerificacion);
+                    }
+                    
+                    // Sección de envío por WhatsApp
+                    var whatsappPhone = $('#imprimir-factura-modal').data('customer-phone') || '';
+                    var whatsappBtn = '<div class="alert alert-info mt-3" id="whatsapp-section">';
+                    whatsappBtn += '<h6><i class="fa fa-whatsapp"></i> Enviar Factura por WhatsApp</h6>';
+                    whatsappBtn += '<div class="form-group mb-2">';
+                    whatsappBtn += '<label for="whatsapp-phone" class="small mb-1">Teléfono del Cliente (con código de país, ej: +591):</label>';
+                    whatsappBtn += '<div class="input-group">';
+                    whatsappBtn += '<div class="input-group-prepend">';
+                    whatsappBtn += '<span class="input-group-text"><i class="fa fa-phone"></i></span>';
+                    whatsappBtn += '</div>';
+                    whatsappBtn += '<input type="text" class="form-control" id="whatsapp-phone" placeholder="Ej: +59171234567" value="' + whatsappPhone + '">';
+                    whatsappBtn += '</div>';
+                    whatsappBtn += '</div>';
+                    whatsappBtn += '<button type="button" class="btn btn-success btn-block" id="send-whatsapp-btn" data-sale-id="' + saleId + '">';
+                    whatsappBtn += '<i class="fa fa-whatsapp"></i> Enviar Factura por WhatsApp';
+                    whatsappBtn += '</button>';
+                    whatsappBtn += '<div id="whatsapp-result" class="mt-2"></div>';
+                    whatsappBtn += '</div>';
+                    $('#imprimir-pdf-container').append(whatsappBtn);
+                    
+                    $('#imprimir-step-1').hide();
+                    $('#imprimir-step-2').show();
+                },
+                error: function() {
+                    $('#imprimir-pdf-container').html(
+                        '<div class="alert alert-warning">' +
+                        'Error al cargar la factura en el visor. ' +
+                        '<a href="' + url + '" target="_blank" class="btn btn-primary btn-sm ml-2"><i class="fa fa-external-link"></i> Abrir en nueva ventana</a>' +
+                        '</div>'
+                    );
+                    $('#imprimir-step-1').hide();
+                    $('#imprimir-step-2').show();
+                }
+            });
+        };
+
+        // 1. RE-IMPRIMIR FACTURA (Para ventas YA facturadas: Vigente, Facturada, Contingencia)
+        // NUNCA muestra el formulario de emisión; carga y muestra directamente la factura existente.
         $(document).on("click", "table.sale-list tbody .imprimir-factura-modal", function(event) {
+            event.preventDefault();
             var id = $(this).data('id').toString();
             var $tr = $(this).closest('tr');
             var sale = $tr.data('sale');
             
-            console.log('═══════════════════════════════════════════════════════');
-            console.log('🔍 INICIO - Click en botón Imprimir Factura');
-            console.log('Sale ID:', id);
-            console.log('¿Existe array sale?', !!sale);
-            console.log('Datos completos de venta:', sale);
-            
-            if (sale) {
-                console.log('📊 Estructura del array sale:');
-                console.log('  - Índice 0 (fecha):', sale[0]);
-                console.log('  - Índice 1 (referencia):', sale[1]);
-                console.log('  - Índice 13 (id):', sale[13]);
-                console.log('  - Índice 31 (CUF):', sale[31]);
-                console.log('  - Índice 32 (nro_factura):', sale[32]);
-                console.log('  - Total elementos en array:', sale.length);
-            }
-            
-            // Extraer CUF y nro_factura del array sale (índices 31 y 32)
             var cuf = sale ? (sale[31] || '').trim() : '';
             var nroFactura = sale ? (sale[32] || '').trim() : '';
-            
-            console.log('📄 CUF extraído:', cuf);
-            console.log('📄 Nro Factura extraído:', nroFactura);
-            console.log('📄 Longitud CUF:', cuf.length);
-            console.log('═══════════════════════════════════════════════════════');
+            var ref = sale ? (sale[1] || '') : '';
+            var phone = sale ? (sale[10] || '') : '';
 
-            // Rellenar formulario y vistas con datos de la venta
+            $('#imprimir_sale_id').val(id);
+            $('#imprimir-pdf-frame').attr('src', '');
+            
+            // Forzar vista de visor (Paso 2) y ocultar edición/generación (Paso 1)
+            $('#imprimir-step-1').hide();
+            $('#imprimir-step-2').show();
+            $('#imprimir-back-btn').hide(); // Sin botón atrás para evitar volver a formulario de emisión
+
+            var titleHtml = '<i class="fa fa-print text-primary mr-1"></i> Imprimir Factura ' + 
+                            (nroFactura ? ('#' + nroFactura + ' ') : '') + 
+                            (ref ? ('<small class="text-muted">[' + ref + ']</small>') : '');
+            $('#exampleModalLabel').html(titleHtml);
+
+            // Formatear teléfono para WhatsApp
+            var cleanPhone = '';
+            if (phone) {
+                cleanPhone = phone.toString().replace(/[\s\-\(\)]/g, '');
+                if (!cleanPhone.startsWith('+')) {
+                    if (!cleanPhone.startsWith('591') && cleanPhone.length < 11) {
+                        cleanPhone = '591' + cleanPhone;
+                    }
+                    cleanPhone = '+' + cleanPhone;
+                }
+            }
+            $('#imprimir-factura-modal').data('customer-phone', cleanPhone);
+            $('#imprimir-factura-modal').data('cuf', cuf);
+            $('#imprimir-factura-modal').data('sale_id', id);
+
+            $('#imprimir-factura-modal').modal('show');
+            loadFacturaSiat(id, true, { cuf: cuf, nro_factura: nroFactura });
+        });
+
+        // Función común para abrir el modal en modo emisión (Paso 1)
+        function abrirFormularioEmisionFactura(saleId, customerId, esRefacturar, $tr) {
+            var sale = $tr ? $tr.data('sale') : null;
+            var ref = sale ? (sale[1] || '') : '';
+
+            $('#imprimir_sale_id').val(saleId);
+            $('#imprimir-pdf-frame').attr('src', '');
+            
+            // Mostrar formulario (Paso 1) y ocultar visor (Paso 2)
+            $('#imprimir-step-1').show();
+            $('#imprimir-step-2').hide();
+            $('#imprimir-back-btn').show();
+
+            // Configurar títulos y botones según acción
+            if (esRefacturar) {
+                $('#exampleModalLabel').html('<i class="fa fa-refresh text-warning mr-1"></i> Re-Facturar Venta ' + (ref ? ('<small class="text-muted">[' + ref + ' - Factura previa Anulada]</small>') : ''));
+                $('#imprimir-next-btn').html('<i class="fa fa-refresh"></i> Emitir Nueva Factura SIAT');
+            } else {
+                $('#exampleModalLabel').html('<i class="fa fa-file-text-o text-success mr-1"></i> Facturar Venta ' + (ref ? ('<small class="text-muted">[' + ref + ']</small>') : ''));
+                $('#imprimir-next-btn').html('<i class="fa fa-paper-plane"></i> Emitir Factura SIAT');
+            }
+
+            // Datos de resumen de venta
             if (sale) {
-                $('#imprimir_sale_id').val(sale[13] || id);
                 $('#imprimir_ref').text(sale[1] || '');
                 $('#imprimir_fecha').text(sale[0] || '');
                 $('#imprimir_grandtotal').text(sale[21] || '');
                 $('#imprimir_paid').text(sale[22] || '');
                 $('#imprimir_due').text(parseFloat((sale[21] || 0) - (sale[22] || 0)).toFixed(2));
-                
-                // Obtener customer_id del array de sale (suponiendo que está en el índice 4)
-                var customerId = sale[4] || sale[14];
-                
-                if (customerId) {
-                    // Obtener datos completos del cliente
-                    $.get('{{ url("sales/getcliente") }}/' + customerId, function(data) {
-                        $('#imprimir_sales_razon_social').val(data.name || '');
-                        $('#imprimir_sales_email').val(data.email || '');
-                        $('#imprimir_codigo_fijo').val(data.codigofijo || data.id || '');
-                        
-                        // Auto-poblar teléfono para WhatsApp
-                        var whatsappPhone = '';
-                        if (data.phone_number) {
-                            // Limpiar el teléfono (quitar espacios, guiones, etc)
-                            var cleanPhone = data.phone_number.toString().replace(/[\s\-\(\)]/g, '');
-                            // Si no empieza con +, agregar +591 (Bolivia)
-                            if (!cleanPhone.startsWith('+')) {
-                                if (!cleanPhone.startsWith('591') && cleanPhone.length < 11) {
-                                    cleanPhone = '591' + cleanPhone;
-                                }
-                                cleanPhone = '+' + cleanPhone;
+            }
+
+            // Cargar datos del cliente
+            if (customerId) {
+                $.get('{{ url("sales/getcliente") }}/' + customerId, function(data) {
+                    $('#imprimir_sales_razon_social').val(data.name || '');
+                    $('#imprimir_sales_email').val(data.email || '');
+                    $('#imprimir_codigo_fijo').val(data.codigofijo || data.id || '');
+                    
+                    var whatsappPhone = '';
+                    if (data.phone_number) {
+                        var cleanPhone = data.phone_number.toString().replace(/[\s\-\(\)]/g, '');
+                        if (!cleanPhone.startsWith('+')) {
+                            if (!cleanPhone.startsWith('591') && cleanPhone.length < 11) {
+                                cleanPhone = '591' + cleanPhone;
                             }
-                            whatsappPhone = cleanPhone;
-                            $('#imprimir_whatsapp_phone').val(cleanPhone);
-                        } else {
-                            $('#imprimir_whatsapp_phone').val('');
+                            cleanPhone = '+' + cleanPhone;
                         }
-                        
-                        // Guardar teléfono en data del modal para usar en paso 2
-                        $('#imprimir-factura-modal').data('customer-phone', whatsappPhone);
-                        
-                        if (data.tipo_documento) {
-                            $('#imprimir_sales_tipo_documento_id').val(data.tipo_documento);
-                            $('#imprimir_sales_tipo_documento_id').selectpicker('refresh');
-                            $('input[name="sales_tipo_documento_hidden"]').val(data.tipo_documento);
-                            
-                            // Mostrar/ocultar campos según el tipo
-                            if (data.tipo_documento == '5') { // NIT
-                                $('#imprimir_sales_valor_documento').show();
-                                $('#imprimir_sales_complemento').hide();
-                            } else if (data.tipo_documento == '1') { // CI
-                                $('#imprimir_sales_valor_documento').show();
-                                $('#imprimir_sales_complemento').show();
-                            } else if (data.tipo_documento == '99001' || data.tipo_documento == '99002' || data.tipo_documento == '99003') {
-                                $('#imprimir_sales_valor_documento').hide();
-                                $('#imprimir_sales_complemento').hide();
-                            } else {
-                                $('#imprimir_sales_valor_documento').show();
-                                $('#imprimir_sales_complemento').hide();
-                            }
-                        }
-                        
-                        if (data.valor_documento) {
-                            $('input[name="sales_valor_documento"]').val(data.valor_documento);
-                        }
-                        
-                        if (data.complemento_documento) {
-                            $('input[name="sales_complemento_documento"]').val(data.complemento_documento);
-                        }
-                        
-                        $('.selectpicker').selectpicker('refresh');
-                    }).fail(function() {
-                        // Si falla, usar datos básicos del sale
-                        $('#imprimir_sales_razon_social').val(sale[9] || sale[3] || '');
-                        $('#imprimir_sales_email').val(sale[12] || '');
+                        whatsappPhone = cleanPhone;
+                        $('#imprimir_whatsapp_phone').val(cleanPhone);
+                    } else {
                         $('#imprimir_whatsapp_phone').val('');
-                    });
-                } else {
-                    // Sin customer_id, usar datos del array sale
-                    $('#imprimir_sales_razon_social').val(sale[9] || sale[3] || '');
-                    $('#imprimir_sales_email').val(sale[12] || '');
-                    $('#imprimir_whatsapp_phone').val('');
-                }
-            } else {
-                $('#imprimir_sale_id').val(id);
-            }
-
-            // Clear any previous PDF
-            $('#imprimir-pdf-frame').attr('src', '');
-            $('#imprimir-step-1').show();
-            $('#imprimir-step-2').hide();
-            
-            // Limpiar badges y alertas previas antes de verificar
-            $('#exampleModalLabel').html('Imprimir Factura');
-            $('#imprimir-step-1-saleinfo .alert').remove();
-            
-            // Mostrar loader durante verificación
-            var loaderHtml = '<div id="factura-loader" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center;">';
-            loaderHtml += '<div style="background: white; padding: 30px; border-radius: 10px; text-align: center;">';
-            loaderHtml += '<i class="fa fa-spinner fa-spin fa-3x text-primary mb-3"></i>';
-            loaderHtml += '<h5>Verificando factura...</h5>';
-            loaderHtml += '<p class="text-muted">Por favor espere</p>';
-            loaderHtml += '</div></div>';
-            $('body').append(loaderHtml);
-
-            // Función helper para cargar factura SIAT
-            var facturaVerificada = false;
-            var facturaData = null;
-            
-            window.loadFacturaSiat = function(saleId, verificada, dataFactura) {
-                var url = '{{ url('sales/imprimir_factura') }}/' + saleId;
-                
-                // Limpiar container
-                $('#imprimir-pdf-container').html('<div class="text-center"><i class="fa fa-spinner fa-spin fa-3x"></i><p>Cargando factura...</p></div>');
-                
-                // Cargar vista parcial con AJAX
-                $.ajax({
-                    url: url,
-                    type: 'GET',
-                    success: function(html) {
-                        $('#imprimir-pdf-container').html(html);
-                        
-                        // Si la factura fue verificada, mostrar información adicional
-                        if (verificada && dataFactura) {
-                            var infoVerificacion = '<div class="alert alert-success mt-2">';
-                            infoVerificacion += '<h6><i class="fa fa-check-circle"></i> Factura Verificada en SIAT</h6>';
-                            infoVerificacion += '<div class="row">';
-                            infoVerificacion += '<div class="col-md-6">';
-                            infoVerificacion += '<small><strong>CUF:</strong> ' + (dataFactura.cuf || cuf || 'N/A') + '</small><br>';
-                            infoVerificacion += '<small><strong>Nro. Factura:</strong> ' + (dataFactura.nro_factura || nroFactura || 'N/A') + '</small><br>';
-                            infoVerificacion += '<small><strong>Fecha:</strong> ' + (dataFactura.fecha_factura || 'N/A') + '</small>';
-                            infoVerificacion += '</div>';
-                            infoVerificacion += '<div class="col-md-6">';
-                            infoVerificacion += '<small><strong>Código Recepción:</strong> ' + (dataFactura.codigo_recepcion || 'N/A') + '</small><br>';
-                            infoVerificacion += '<small><strong>CUFD:</strong> ' + (dataFactura.cufd ? dataFactura.cufd.substring(0, 30) + '...' : 'N/A') + '</small>';
-                            infoVerificacion += '</div>';
-                            infoVerificacion += '</div>';
-                            
-                            // Agregar botón para ver XML si existe
-                            if (dataFactura.xml) {
-                                infoVerificacion += '<hr>';
-                                infoVerificacion += '<button type="button" class="btn btn-sm btn-info" id="ver-xml-factura"><i class="fa fa-code"></i> Ver XML de Factura</button>';
-                            }
-                            infoVerificacion += '</div>';
-                            $('#imprimir-pdf-container').prepend(infoVerificacion);
-                        }
-                        
-                        // Agregar botón de WhatsApp
-                        var whatsappPhone = $('#imprimir-factura-modal').data('customer-phone') || '';
-                        var whatsappBtn = '<div class="alert alert-info mt-3" id="whatsapp-section">';
-                        whatsappBtn += '<h6><i class="fa fa-whatsapp"></i> Enviar por WhatsApp</h6>';
-                        whatsappBtn += '<div class="form-group">';
-                        whatsappBtn += '<label for="whatsapp-phone">Teléfono del Cliente (incluir código de país):</label>';
-                        whatsappBtn += '<div class="input-group">';
-                        whatsappBtn += '<div class="input-group-prepend">';
-                        whatsappBtn += '<span class="input-group-text"><i class="fa fa-phone"></i></span>';
-                        whatsappBtn += '</div>';
-                        whatsappBtn += '<input type="text" class="form-control" id="whatsapp-phone" placeholder="Ej: +59171234567" value="' + whatsappPhone + '">';
-                        whatsappBtn += '</div>';
-                        whatsappBtn += '<small class="form-text text-muted">Ingrese el número de teléfono con código de país (Ej: +591 para Bolivia)</small>';
-                        whatsappBtn += '</div>';
-                        whatsappBtn += '<button type="button" class="btn btn-success btn-block" id="send-whatsapp-btn" data-sale-id="' + saleId + '">';
-                        whatsappBtn += '<i class="fa fa-whatsapp"></i> Enviar Factura por WhatsApp';
-                        whatsappBtn += '</button>';
-                        whatsappBtn += '<div id="whatsapp-result" class="mt-2"></div>';
-                        whatsappBtn += '</div>';
-                        $('#imprimir-pdf-container').append(whatsappBtn);
-                        
-                        $('#imprimir-step-1').hide();
-                        $('#imprimir-step-2').show();
-                    },
-                    error: function() {
-                        $('#imprimir-pdf-container').html(
-                            '<div class="alert alert-warning">' +
-                            'Error al cargar la factura. ' +
-                            '<a href="' + url + '" target="_blank" class="btn btn-primary btn-sm">Abrir en nueva ventana</a>' +
-                            '</div>'
-                        );
-                        $('#imprimir-step-1').hide();
-                        $('#imprimir-step-2').show();
                     }
-                });
-            }
+                    $('#imprimir-factura-modal').data('customer-phone', whatsappPhone);
 
-            // Verificar factura con datosFactura DIRECTAMENTE usando el CUF (similar al flujo en POS)
-            if (cuf && cuf.length > 0) {
-                // Tenemos CUF, verificar con datosFactura DIRECTAMENTE (sin getBytesFactura)
-                var urlDatosFactura = '{{ url('factura.venta/datos-factura') }}?cuf=' + cuf;
-                
-                console.log('🔍 Verificando factura directamente con CUF:', cuf);
-                console.log('📡 URL de verificación:', urlDatosFactura);
-                console.log('📤 Parámetros enviados:', JSON.stringify({
-                    cuf: cuf,
-                    sale_id: sale ? sale[13] : id,
-                    nro_factura: nroFactura
-                }));
-                
-                $.ajax({
-                    url: urlDatosFactura,
-                    type: 'GET',
-                    dataType: 'json',
-                    success: function(facturaData) {
-                        console.log('✅ Verificación de factura exitosa');
-                        console.log('📥 Respuesta recibida:', JSON.stringify(facturaData, null, 2));
+                    if (data.tipo_documento) {
+                        $('#imprimir_sales_tipo_documento_id').val(data.tipo_documento);
+                        $('#imprimir_sales_tipo_documento_id').selectpicker('refresh');
+                        $('input[name="sales_tipo_documento_hidden"]').val(data.tipo_documento);
                         
-                        if (facturaData.ESTADO === 'OK') {
-                            // Factura verificada exitosamente
-                            console.log('🚀 Factura verificada - Cargando PDF directamente...');
-                            
-                            $('#imprimir-factura-modal').data('factura-verificada', true);
-                            $('#imprimir-factura-modal').data('factura-data', facturaData.ENTITY);
-                            $('#imprimir-factura-modal').data('cuf', cuf);
-                            $('#imprimir-factura-modal').data('sale_id', sale[13] || id);
-                            
-                            // Mostrar indicador de factura verificada en el título
-                            var badgeVerificado = '<span class="badge badge-success ml-2"><i class="fa fa-check-circle"></i> Factura Verificada en SIAT</span>';
-                            $('#exampleModalLabel').html('Imprimir Factura ' + badgeVerificado);
-                            
-                            // IMPORTANTE: Ocultar paso 1 y mostrar paso 2 ANTES de abrir el modal
-                            $('#imprimir-step-1').hide();
-                            $('#imprimir-step-2').show();
-                            
-                            // Remover loader y abrir modal (ahora ya está en paso 2)
-                            $('#factura-loader').remove();
-                            $('#imprimir-factura-modal').modal('show');
-                            
-                            // Cargar PDF DESPUÉS de abrir el modal
-                            loadFacturaSiat(sale[13] || id, true, facturaData.ENTITY);
+                        if (data.tipo_documento == '5') {
+                            $('#imprimir_sales_valor_documento').show();
+                            $('#imprimir_sales_complemento').hide();
+                        } else if (data.tipo_documento == '1') {
+                            $('#imprimir_sales_valor_documento').show();
+                            $('#imprimir_sales_complemento').show();
+                        } else if (data.tipo_documento == '99001' || data.tipo_documento == '99002' || data.tipo_documento == '99003') {
+                            $('#imprimir_sales_valor_documento').hide();
+                            $('#imprimir_sales_complemento').hide();
                         } else {
-                            // Factura no verificada - mostrar formulario
-                            console.warn('⚠️ Estado de factura no es OK:', facturaData.ESTADO);
-                            $('#imprimir-factura-modal').data('factura-verificada', false);
-                            
-                            var badgeNoVerificado = '<span class="badge badge-warning ml-2"><i class="fa fa-exclamation-triangle"></i> No Verificada</span>';
-                            $('#exampleModalLabel').html('Imprimir Factura ' + badgeNoVerificado);
-                            
-                            // Remover loader y abrir modal en paso 1 (formulario)
-                            $('#factura-loader').remove();
-                            $('#imprimir-factura-modal').modal('show');
+                            $('#imprimir_sales_valor_documento').show();
+                            $('#imprimir_sales_complemento').hide();
                         }
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('❌ ERROR al verificar factura con SIAT');
-                        console.error('📊 Status HTTP:', xhr.status);
-                        console.error('📊 Status Text:', xhr.statusText);
-                        console.error('📊 Ready State:', xhr.readyState);
-                        console.error('📊 Error Type:', status);
-                        console.error('📊 Error Message:', error);
-                        console.error('📥 Response completa:', JSON.stringify({
-                            status: xhr.status,
-                            statusText: xhr.statusText,
-                            responseText: xhr.responseText,
-                            responseJSON: xhr.responseJSON,
-                            readyState: xhr.readyState,
-                            headers: xhr.getAllResponseHeaders()
-                        }, null, 2));
-                        
-                        if (xhr.responseJSON) {
-                            console.error('📋 Detalle del error:', JSON.stringify(xhr.responseJSON, null, 2));
-                        }
-                        
-                        $('#imprimir-factura-modal').data('factura-verificada', false);
-                        $('#imprimir-factura-modal').data('cuf', cuf);
-                        $('#imprimir-factura-modal').data('sale_id', sale[13] || id);
-                        
-                        var badgeAdvertencia = '<span class="badge badge-warning ml-2"><i class="fa fa-exclamation-triangle"></i> Sin Verificar</span>';
-                        $('#exampleModalLabel').html('Imprimir Factura ' + badgeAdvertencia);
-                        
-                        var alertAdvertencia = '<div class="alert alert-warning mt-2">';
-                        alertAdvertencia += '<strong><i class="fa fa-exclamation-triangle"></i> Advertencia</strong><br>';
-                        alertAdvertencia += '<small>No se pudo verificar el estado de la factura con SIAT.</small><br>';
-                        
-                        // Agregar información de error si está disponible
-                        if (xhr.status === 404) {
-                            alertAdvertencia += '<small class="text-muted">Error 404: Endpoint no encontrado</small>';
-                        } else if (xhr.status === 500) {
-                            alertAdvertencia += '<small class="text-muted">Error 500: Error interno del servidor</small>';
-                        } else if (xhr.status === 0) {
-                            alertAdvertencia += '<small class="text-muted">Error de conexión: No se pudo contactar con el servidor</small>';
-                        } else if (xhr.responseJSON && xhr.responseJSON.message) {
-                            alertAdvertencia += '<small class="text-muted">' + xhr.responseJSON.message + '</small>';
-                        }
-                        
-                        alertAdvertencia += '</div>';
-                        $('#imprimir-step-1-saleinfo').append(alertAdvertencia);
-                        
-                        // Remover loader y abrir modal incluso con error
-                        $('#factura-loader').remove();
-                        $('#imprimir-factura-modal').modal('show');
                     }
+                    if (data.valor_documento) {
+                        $('input[name="sales_valor_documento"]').val(data.valor_documento);
+                    }
+                    if (data.complemento_documento) {
+                        $('input[name="sales_complemento_documento"]').val(data.complemento_documento);
+                    }
+                    $('.selectpicker').selectpicker('refresh');
                 });
-            } else {
-                // Sin CUF - factura no generada aún
-                console.log('⚠️ Sin CUF - factura no generada');
-                $('#imprimir-factura-modal').data('factura-verificada', false);
-                $('#imprimir-factura-modal').data('sale_id', sale[13] || id);
-                
-                var badgeSinFactura = '<span class="badge badge-secondary ml-2"><i class="fa fa-exclamation-circle"></i> Sin Factura</span>';
-                $('#exampleModalLabel').html('Imprimir Factura ' + badgeSinFactura);
-                
-                // Remover loader y abrir modal sin CUF
-                $('#factura-loader').remove();
-                $('#imprimir-factura-modal').modal('show');
+            } else if (sale) {
+                $('#imprimir_sales_razon_social').val(sale[9] || '');
+                $('#imprimir_sales_email').val(sale[26] || '');
+                $('#imprimir_whatsapp_phone').val(sale[10] || '');
             }
+
+            $('#imprimir-factura-modal').removeData('cuf');
+            $('#imprimir-factura-modal').modal('show');
+        }
+
+        // 2. FACTURAR VENTA (Para Notas de Venta sin factura)
+        $(document).on("click", "table.sale-list tbody .facturar-venta-modal", function(event) {
+            event.preventDefault();
+            var id = $(this).data('id').toString();
+            var customerId = $(this).data('customer-id');
+            var $tr = $(this).closest('tr');
+            abrirFormularioEmisionFactura(id, customerId, false, $tr);
         });
 
-        // Siguiente -> intentar obtener/generar factura SIAT y mostrar paso 2
+        // 3. RE-FACTURAR (Para ventas con factura ANULADA)
+        $(document).on("click", "table.sale-list tbody .refacturar-modal", function(event) {
+            event.preventDefault();
+            var id = $(this).data('id').toString();
+            var customerId = $(this).data('customer-id');
+            var $tr = $(this).closest('tr');
+            abrirFormularioEmisionFactura(id, customerId, true, $tr);
+        });
+
+        // Ejecución de Emisión de Factura SIAT desde Paso 1
         $(document).on('click', '#imprimir-next-btn', function() {
             var saleId = $('#imprimir_sale_id').val();
             if (!saleId) {
@@ -1977,75 +1846,76 @@
                 return;
             }
 
-            var urlGet = '{{ route('sales.obtener_bytes_factura', ':id') }}'.replace(':id', saleId);
-            var urlFactura = '{{ url('sales/imprimir_factura') }}/' + saleId;
             var urlFinalize = '{{ route('sales.finalize-ajax') }}';
-            
-            // Obtener datos de verificación si existen
-            var facturaVerificada = $('#imprimir-factura-modal').data('factura-verificada');
-            var facturaData = $('#imprimir-factura-modal').data('factura-data');
-            var tieneCuf = $('#imprimir-factura-modal').data('cuf');
+            var $btn = $(this);
+            var originalBtnHtml = $btn.html();
+            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Emitiendo Factura SIAT...');
 
-            // Verificar si la factura ya existe (usando CUF del array)
-            if (tieneCuf && tieneCuf.length > 0) {
-                // Factura existe, cargar directamente usando función global
-                console.log('✅ Factura existe (CUF presente), cargando...');
-                loadFacturaSiat(saleId, facturaVerificada, facturaData);
-            } else {
+            $('#imprimir-pdf-container').html(
+                '<div class="alert alert-info text-center py-4">' +
+                '<i class="fa fa-spinner fa-spin fa-3x mb-3 text-primary"></i>' +
+                '<h5>Emitiendo y validando factura en SIAT...</h5>' +
+                '<p class="text-muted">Por favor espere unos segundos mientras se procesa con impuestos nacionales.</p>' +
+                '</div>'
+            );
+            $('#imprimir-step-1').hide();
+            $('#imprimir-step-2').show();
+            $('#imprimir-back-btn').hide();
 
-                // No invoice yet -> call finalize-ajax to generate it
-                console.log('⚠️ Factura no encontrada, generando...');
-                $('#imprimir-pdf-container').html('<div class="alert alert-info"><i class="fa fa-spinner fa-spin"></i> Factura no encontrada. Generando factura SIAT...</div>');
-                $('#imprimir-step-1').hide();
-                $('#imprimir-step-2').show();
-                
-                // Recopilar todos los datos del formulario
-                var formData = {
-                    sale_id: saleId,
-                    sales_razon_social: $('input[name="sales_razon_social"]').val(),
-                    sales_email: $('input[name="sales_email"]').val(),
-                    sales_tipo_documento: $('select[name="sales_tipo_documento"]').val() || $('#imprimir_sales_tipo_documento_id').val(),
-                    sales_valor_documento: $('input[name="sales_valor_documento"]').val(),
-                    sales_complemento_documento: $('input[name="sales_complemento_documento"]').val(),
-                    codigo_fijo: $('input[name="codigo_fijo"]').val(),
-                    sales_caso_especial: $('select[name="sales_caso_especial"]').val() || '1',
-                    tipo_factura: $('select[name="tipo_factura"]').val() || '1',
-                    bandera_factura_hidden: '1',
-                    bandera_codigo_documento_sector_hidden: '1',
-                    nro_factura_manual: $('input[name="nro_factura_manual"]').val(),
-                    fecha_manual: $('input[name="fecha_manual"]').val()
-                };
-                
-                $.ajax({
-                    url: urlFinalize,
-                    type: 'POST',
-                    headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
-                    data: formData,
-                    dataType: 'json',
-                    success: function(fin) {
-                        if (fin && fin.status) {
-                            // After successful generation, load the SIAT invoice
-                            setTimeout(function() {
-                                loadFacturaSiat(saleId);
-                            }, 1000);
-                        } else {
-                            $('#imprimir-pdf-container').html(
-                                '<div class="alert alert-danger">Error generando factura: ' + 
-                                (fin.message || 'Desconocido') + '</div>' +
-                                '<button type="button" id="imprimir-back-btn" class="btn btn-secondary">Volver</button>'
-                            );
-                        }
-                    },
-                    error: function(xhr) {
-                        var msg = 'Error al generar la factura.';
-                        try { msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : msg; } catch (e) {}
+            var formData = {
+                sale_id: saleId,
+                sales_razon_social: $('input[name="sales_razon_social"]').val(),
+                sales_email: $('input[name="sales_email"]').val(),
+                sales_tipo_documento: $('select[name="sales_tipo_documento"]').val() || $('#imprimir_sales_tipo_documento_id').val(),
+                sales_valor_documento: $('input[name="sales_valor_documento"]').val(),
+                sales_complemento_documento: $('input[name="sales_complemento_documento"]').val(),
+                codigo_fijo: $('input[name="codigo_fijo"]').val(),
+                sales_caso_especial: $('select[name="sales_caso_especial"]').val() || '1',
+                tipo_factura: $('select[name="tipo_factura"]').val() || '1',
+                bandera_factura_hidden: '1',
+                bandera_codigo_documento_sector_hidden: '1',
+                nro_factura_manual: $('input[name="nro_factura_manual"]').val(),
+                fecha_manual: $('input[name="fecha_manual"]').val()
+            };
+
+            $.ajax({
+                url: urlFinalize,
+                type: 'POST',
+                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                data: formData,
+                dataType: 'json',
+                success: function(fin) {
+                    $btn.prop('disabled', false).html(originalBtnHtml);
+                    if (fin && fin.status) {
+                        setTimeout(function() {
+                            loadFacturaSiat(saleId);
+                            if ($.fn.DataTable.isDataTable('#sale-table')) {
+                                $('#sale-table').DataTable().ajax.reload(null, false);
+                            }
+                        }, 800);
+                    } else {
                         $('#imprimir-pdf-container').html(
-                            '<div class="alert alert-danger">' + msg + '</div>' +
-                            '<button type="button" id="imprimir-back-btn" class="btn btn-secondary">Volver</button>'
+                            '<div class="alert alert-danger py-3">' +
+                            '<h6><i class="fa fa-exclamation-triangle"></i> Error al emitir la factura:</h6>' +
+                            '<p>' + (fin.message || 'Error desconocido del servicio de facturación') + '</p>' +
+                            '<button type="button" id="imprimir-back-btn" class="btn btn-secondary btn-sm mt-2"><i class="fa fa-arrow-left"></i> Volver a revisar datos</button>' +
+                            '</div>'
                         );
                     }
-                });
-            }
+                },
+                error: function(xhr) {
+                    $btn.prop('disabled', false).html(originalBtnHtml);
+                    var msg = 'Error al contactar con el servicio de facturación.';
+                    try { msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : msg; } catch (e) {}
+                    $('#imprimir-pdf-container').html(
+                        '<div class="alert alert-danger py-3">' +
+                        '<h6><i class="fa fa-exclamation-triangle"></i> Error en la petición:</h6>' +
+                        '<p>' + msg + '</p>' +
+                        '<button type="button" id="imprimir-back-btn" class="btn btn-secondary btn-sm mt-2"><i class="fa fa-arrow-left"></i> Volver a revisar datos</button>' +
+                        '</div>'
+                    );
+                }
+            });
         });
 
         // Atrás -> volver a paso 1
