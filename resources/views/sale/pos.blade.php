@@ -940,7 +940,7 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div id="div_fecha_venta" class="col-md-4" @if($lims_pos_setting_data && $lims_pos_setting_data->date_sell == 1) style="display:none;" @endif>
+                                        <div id="div_fecha_venta" class="col-md-4">
                                             <div class="form-group">
                                                 <label>Fecha venta</label>
                                                 <input type="datetime-local" id="date_sell_input" class="form-control">
@@ -2911,22 +2911,16 @@
         $("ul#sale").addClass("show");
         $("ul#sale #sale-pos-menu").addClass("active");
         var dateSellInput = $('#date_sell_input');
-        var nowLocal = toDateTimeLocalValue(date);
+        var nowLocal = toDateTimeLocalValue(new Date());
         // Clave única por biller para evitar conflictos entre distintos cajeros/sucursales
         var dateSellStorageKey = 'datesell_biller_' + biller_id;
 
-        if (changedate == 1) {
-            // "Mantener Fecha de Venta" ACTIVADO: ocultar campo, siempre usar fecha actual
-            $('#div_fecha_venta').hide();
-            dateSellInput.val(nowLocal);
-            $('input[name="date_sell"]').val(toSqlDateTime(new Date()));
-        } else {
-            // "Mantener Fecha de Venta" DESACTIVADO: mostrar campo, permitir fechas pasadas
-            $('#div_fecha_venta').show();
-            // Sin restricción de máximo para permitir fechas pasadas
-            dateSellInput.removeAttr('max');
+        $('#div_fecha_venta').show();
+        dateSellInput.removeAttr('max');
 
-            // localStorage persiste entre recargas y cierres de pestaña
+        if (changedate == 1) {
+            // "Mantener Fecha de Venta" ACTIVADO:
+            // Permite al cajero fijar una fecha y mantenerla entre ventas consecutivas
             var storedDateSell = localStorage.getItem(dateSellStorageKey);
             if (storedDateSell) {
                 dateSellInput.val(storedDateSell);
@@ -2934,6 +2928,13 @@
                 dateSellInput.val(nowLocal);
                 localStorage.setItem(dateSellStorageKey, nowLocal);
             }
+        } else {
+            // "Mantener Fecha de Venta" DESACTIVADO:
+            // Siempre inicia con la fecha y hora actual del sistema (hoy).
+            // Limpia cualquier fecha residual en localStorage para no arrastrar fechas pasadas.
+            localStorage.removeItem(dateSellStorageKey);
+            dateSellInput.val(nowLocal);
+            $('input[name="date_sell"]').val(toSqlDateTime(new Date()));
         }
 
         function syncDateSellFromInput() {
@@ -2949,23 +2950,34 @@
                 dateSellInput.val(toDateTimeLocalValue(parsedDate));
             }
 
-            // Persistir en localStorage para que la siguiente venta arranque con esta misma fecha
-            localStorage.setItem(dateSellStorageKey, dateSellInput.val());
+            // Solo persistir en localStorage si "Mantener Fecha de Venta" está activado
+            if (changedate == 1) {
+                localStorage.setItem(dateSellStorageKey, dateSellInput.val());
+            } else {
+                localStorage.removeItem(dateSellStorageKey);
+            }
             $('input[name="date_sell"]').val(toSqlDateTime(parsedDate));
         }
 
-        if (changedate == 1) {
-            // Actualizar la fecha oculta en tiempo real cuando está en modo automático
-            setInterval(function() {
-                var now = new Date();
-                dateSellInput.val(toDateTimeLocalValue(now));
-                $('input[name="date_sell"]').val(toSqlDateTime(now));
-            }, 60000); // actualizar cada minuto
-        } else {
+        syncDateSellFromInput();
+        dateSellInput.on('change', function() {
             syncDateSellFromInput();
-            dateSellInput.on('change', function() {
-                syncDateSellFromInput();
+        });
+
+        if (changedate != 1) {
+            // Cuando "Mantener Fecha de Venta" está desactivado, actualizar en tiempo real
+            // siempre que el usuario no haya modificado la fecha manualmente en este ticket
+            var userEditedDateSell = false;
+            dateSellInput.on('input change', function() {
+                userEditedDateSell = true;
             });
+            setInterval(function() {
+                if (!userEditedDateSell) {
+                    var now = new Date();
+                    dateSellInput.val(toDateTimeLocalValue(now));
+                    $('input[name="date_sell"]').val(toSqlDateTime(now));
+                }
+            }, 60000); // actualizar cada minuto
         }
 
         // $( document ).ready(function() {
