@@ -675,10 +675,39 @@
 
                         <!-- Paso 2: PDF -->
                         <div id="imprimir-step-2" style="display:none;">
-                            <h6 class="mb-3">Factura (PDF)</h6>
+                            <div class="row align-items-center mb-2">
+                                <div class="col-md-6">
+                                    <h6 class="mb-0"><i class="fa fa-file-text-o text-primary"></i> Factura Emitida (SIAT)</h6>
+                                </div>
+                                <div class="col-md-6 text-right">
+                                    <a href="#" id="imprimir-factura-tab-btn" target="_blank" class="btn btn-outline-primary btn-sm"><i class="fa fa-external-link"></i> Abrir en pestaña nueva</a>
+                                </div>
+                            </div>
                             
-                            <div id="imprimir-pdf-container" style="height:55vh; overflow:auto; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 15px;">
-                                <iframe id="imprimir-pdf-frame" src="" style="width:100%;height:100%;border:0;" frameborder="0"></iframe>
+                            <div id="imprimir-pdf-container" style="height:62vh; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 12px; background: #f8f9fa;">
+                                <iframe id="imprimir-pdf-frame" src="about:blank" style="width:100%;height:100%;border:0;" frameborder="0"></iframe>
+                            </div>
+                            
+                            <div class="card p-2 mb-2 bg-light border">
+                                <div class="row align-items-center">
+                                    <div class="col-md-4">
+                                        <strong class="text-success small"><i class="fa fa-whatsapp"></i> Enviar por WhatsApp:</strong>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <div class="input-group input-group-sm">
+                                            <div class="input-group-prepend">
+                                                <span class="input-group-text"><i class="fa fa-phone"></i></span>
+                                            </div>
+                                            <input type="text" class="form-control" id="imprimir_whatsapp_phone" placeholder="Ej: +59171234567">
+                                            <div class="input-group-append">
+                                                <button type="button" class="btn btn-success" id="imprimir-send-whatsapp-btn">
+                                                    <i class="fa fa-whatsapp"></i> Enviar
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="imprimir-whatsapp-status" class="mt-1" style="display:none;"></div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="text-right" style="padding-top: 10px; border-top: 1px solid #dee2e6;">
@@ -1618,87 +1647,29 @@
                 $('#anular-factura-modal').modal('show');
             });
         });
-        // Helper para cargar la vista/PDF de la factura SIAT y sección de WhatsApp
-        window.loadFacturaSiat = function(saleId, verificada, dataFactura) {
-            var url = '{{ url('sales/imprimir_factura') }}/' + saleId;
+        // 1. RE-IMPRIMIR / VER FACTURA (Para ventas YA facturadas: Vigente, Facturada, Contingencia)
+        // NUNCA muestra el formulario de emisión; carga directamente el visor de la factura emitida.
+        $(document).on("click", ".imprimir-factura-modal", function(event) {
+            if (event) event.preventDefault();
             
-            $('#imprimir-pdf-container').html('<div class="text-center py-4"><i class="fa fa-spinner fa-spin fa-3x text-primary"></i><p class="mt-2">Cargando factura...</p></div>');
+            var $btn = $(this).closest('.imprimir-factura-modal');
+            if (!$btn.length) $btn = $(this);
             
-            $.ajax({
-                url: url,
-                type: 'GET',
-                success: function(html) {
-                    $('#imprimir-pdf-container').html(html);
-                    
-                    // Si se pasó información de la factura, mostrar badge/resumen
-                    if (verificada && dataFactura && (dataFactura.cuf || dataFactura.nro_factura)) {
-                        var infoVerificacion = '<div class="alert alert-success mt-2 mb-2 py-2">';
-                        infoVerificacion += '<div class="row align-items-center">';
-                        infoVerificacion += '<div class="col-md-7">';
-                        infoVerificacion += '<i class="fa fa-check-circle text-success mr-1"></i> <strong>Factura SIAT Registrada</strong><br>';
-                        if (dataFactura.nro_factura) infoVerificacion += '<small><strong>Nro. Factura:</strong> ' + dataFactura.nro_factura + '</small> ';
-                        if (dataFactura.cuf) infoVerificacion += '<small class="text-muted text-truncate d-inline-block" style="max-width:320px;" title="' + dataFactura.cuf + '"><strong>CUF:</strong> ' + dataFactura.cuf + '</small>';
-                        infoVerificacion += '</div>';
-                        infoVerificacion += '<div class="col-md-5 text-right">';
-                        if (dataFactura.xml) {
-                            infoVerificacion += '<button type="button" class="btn btn-sm btn-outline-info" id="ver-xml-factura"><i class="fa fa-code"></i> Ver XML</button>';
-                        }
-                        infoVerificacion += '</div>';
-                        infoVerificacion += '</div></div>';
-                        $('#imprimir-pdf-container').prepend(infoVerificacion);
-                    }
-                    
-                    // Sección de envío por WhatsApp
-                    var whatsappPhone = $('#imprimir-factura-modal').data('customer-phone') || '';
-                    var whatsappBtn = '<div class="alert alert-info mt-3" id="whatsapp-section">';
-                    whatsappBtn += '<h6><i class="fa fa-whatsapp"></i> Enviar Factura por WhatsApp</h6>';
-                    whatsappBtn += '<div class="form-group mb-2">';
-                    whatsappBtn += '<label for="whatsapp-phone" class="small mb-1">Teléfono del Cliente (con código de país, ej: +591):</label>';
-                    whatsappBtn += '<div class="input-group">';
-                    whatsappBtn += '<div class="input-group-prepend">';
-                    whatsappBtn += '<span class="input-group-text"><i class="fa fa-phone"></i></span>';
-                    whatsappBtn += '</div>';
-                    whatsappBtn += '<input type="text" class="form-control" id="whatsapp-phone" placeholder="Ej: +59171234567" value="' + whatsappPhone + '">';
-                    whatsappBtn += '</div>';
-                    whatsappBtn += '</div>';
-                    whatsappBtn += '<button type="button" class="btn btn-success btn-block" id="send-whatsapp-btn" data-sale-id="' + saleId + '">';
-                    whatsappBtn += '<i class="fa fa-whatsapp"></i> Enviar Factura por WhatsApp';
-                    whatsappBtn += '</button>';
-                    whatsappBtn += '<div id="whatsapp-result" class="mt-2"></div>';
-                    whatsappBtn += '</div>';
-                    $('#imprimir-pdf-container').append(whatsappBtn);
-                    
-                    $('#imprimir-step-1').hide();
-                    $('#imprimir-step-2').show();
-                },
-                error: function() {
-                    $('#imprimir-pdf-container').html(
-                        '<div class="alert alert-warning">' +
-                        'Error al cargar la factura en el visor. ' +
-                        '<a href="' + url + '" target="_blank" class="btn btn-primary btn-sm ml-2"><i class="fa fa-external-link"></i> Abrir en nueva ventana</a>' +
-                        '</div>'
-                    );
-                    $('#imprimir-step-1').hide();
-                    $('#imprimir-step-2').show();
-                }
-            });
-        };
+            var id = ($btn.attr('data-id') || $btn.data('id') || '').toString().trim();
+            var invoiceUrl = $btn.attr('data-url') || ('{{ url("sales/imprimir_factura") }}/' + id);
+            
+            if (!id && !invoiceUrl) {
+                console.error('No se encontró ID ni URL para imprimir factura');
+                return;
+            }
 
-        // 1. RE-IMPRIMIR FACTURA (Para ventas YA facturadas: Vigente, Facturada, Contingencia)
-        // NUNCA muestra el formulario de emisión; carga y muestra directamente la factura existente.
-        $(document).on("click", "table.sale-list tbody .imprimir-factura-modal", function(event) {
-            event.preventDefault();
-            var id = $(this).data('id').toString();
-            var $tr = $(this).closest('tr');
-            var sale = $tr.data('sale');
-            
-            var cuf = sale ? (sale[31] || '').trim() : '';
-            var nroFactura = sale ? (sale[32] || '').trim() : '';
-            var ref = sale ? (sale[1] || '') : '';
-            var phone = sale ? (sale[10] || '') : '';
+            var $tr = $btn.closest('tr');
+            var sale = ($tr.length && $tr.data('sale')) ? $tr.data('sale') : null;
+            var nroFactura = (sale && sale[32]) ? sale[32].toString().trim() : '';
+            var ref = (sale && sale[1]) ? sale[1].toString().trim() : '';
+            var phone = (sale && sale[10]) ? sale[10].toString().trim() : '';
 
             $('#imprimir_sale_id').val(id);
-            $('#imprimir-pdf-frame').attr('src', '');
             
             // Forzar vista de visor (Paso 2) y ocultar edición/generación (Paso 1)
             $('#imprimir-step-1').hide();
@@ -1708,7 +1679,11 @@
             var titleHtml = '<i class="fa fa-print text-primary mr-1"></i> Imprimir Factura ' + 
                             (nroFactura ? ('#' + nroFactura + ' ') : '') + 
                             (ref ? ('<small class="text-muted">[' + ref + ']</small>') : '');
-            $('#exampleModalLabel').html(titleHtml);
+            $('#imprimir-factura-modal .modal-title').html(titleHtml);
+
+            // Cargar en el iframe y botón de pestaña externa
+            $('#imprimir-pdf-frame').attr('src', invoiceUrl);
+            $('#imprimir-factura-tab-btn').attr('href', invoiceUrl);
 
             // Formatear teléfono para WhatsApp
             var cleanPhone = '';
@@ -1721,12 +1696,12 @@
                     cleanPhone = '+' + cleanPhone;
                 }
             }
+            $('#imprimir_whatsapp_phone').val(cleanPhone);
+            $('#imprimir-whatsapp-status').html('').hide();
             $('#imprimir-factura-modal').data('customer-phone', cleanPhone);
-            $('#imprimir-factura-modal').data('cuf', cuf);
             $('#imprimir-factura-modal').data('sale_id', id);
 
             $('#imprimir-factura-modal').modal('show');
-            loadFacturaSiat(id, true, { cuf: cuf, nro_factura: nroFactura });
         });
 
         // Función común para abrir el modal en modo emisión (Paso 1)
@@ -1821,20 +1796,24 @@
         }
 
         // 2. FACTURAR VENTA (Para Notas de Venta sin factura)
-        $(document).on("click", "table.sale-list tbody .facturar-venta-modal", function(event) {
-            event.preventDefault();
-            var id = $(this).data('id').toString();
-            var customerId = $(this).data('customer-id');
-            var $tr = $(this).closest('tr');
+        $(document).on("click", ".facturar-venta-modal", function(event) {
+            if (event) event.preventDefault();
+            var $btn = $(this).closest('.facturar-venta-modal');
+            if (!$btn.length) $btn = $(this);
+            var id = ($btn.attr('data-id') || $btn.data('id') || '').toString().trim();
+            var customerId = ($btn.attr('data-customer-id') || $btn.data('customer-id') || '').toString().trim();
+            var $tr = $btn.closest('tr');
             abrirFormularioEmisionFactura(id, customerId, false, $tr);
         });
 
         // 3. RE-FACTURAR (Para ventas con factura ANULADA)
-        $(document).on("click", "table.sale-list tbody .refacturar-modal", function(event) {
-            event.preventDefault();
-            var id = $(this).data('id').toString();
-            var customerId = $(this).data('customer-id');
-            var $tr = $(this).closest('tr');
+        $(document).on("click", ".refacturar-modal", function(event) {
+            if (event) event.preventDefault();
+            var $btn = $(this).closest('.refacturar-modal');
+            if (!$btn.length) $btn = $(this);
+            var id = ($btn.attr('data-id') || $btn.data('id') || '').toString().trim();
+            var customerId = ($btn.attr('data-customer-id') || $btn.data('customer-id') || '').toString().trim();
+            var $tr = $btn.closest('tr');
             abrirFormularioEmisionFactura(id, customerId, true, $tr);
         });
 
@@ -1850,17 +1829,6 @@
             var $btn = $(this);
             var originalBtnHtml = $btn.html();
             $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Emitiendo Factura SIAT...');
-
-            $('#imprimir-pdf-container').html(
-                '<div class="alert alert-info text-center py-4">' +
-                '<i class="fa fa-spinner fa-spin fa-3x mb-3 text-primary"></i>' +
-                '<h5>Emitiendo y validando factura en SIAT...</h5>' +
-                '<p class="text-muted">Por favor espere unos segundos mientras se procesa con impuestos nacionales.</p>' +
-                '</div>'
-            );
-            $('#imprimir-step-1').hide();
-            $('#imprimir-step-2').show();
-            $('#imprimir-back-btn').hide();
 
             var formData = {
                 sale_id: saleId,
@@ -1887,33 +1855,24 @@
                 success: function(fin) {
                     $btn.prop('disabled', false).html(originalBtnHtml);
                     if (fin && fin.status) {
-                        setTimeout(function() {
-                            loadFacturaSiat(saleId);
-                            if ($.fn.DataTable.isDataTable('#sale-table')) {
-                                $('#sale-table').DataTable().ajax.reload(null, false);
-                            }
-                        }, 800);
+                        var invoiceUrl = '{{ url("sales/imprimir_factura") }}/' + saleId;
+                        $('#imprimir-pdf-frame').attr('src', invoiceUrl);
+                        $('#imprimir-factura-tab-btn').attr('href', invoiceUrl);
+                        $('#imprimir-step-1').hide();
+                        $('#imprimir-step-2').show();
+                        $('#imprimir-back-btn').hide();
+                        if ($.fn.DataTable.isDataTable('#sale-table')) {
+                            $('#sale-table').DataTable().ajax.reload(null, false);
+                        }
                     } else {
-                        $('#imprimir-pdf-container').html(
-                            '<div class="alert alert-danger py-3">' +
-                            '<h6><i class="fa fa-exclamation-triangle"></i> Error al emitir la factura:</h6>' +
-                            '<p>' + (fin.message || 'Error desconocido del servicio de facturación') + '</p>' +
-                            '<button type="button" id="imprimir-back-btn" class="btn btn-secondary btn-sm mt-2"><i class="fa fa-arrow-left"></i> Volver a revisar datos</button>' +
-                            '</div>'
-                        );
+                        alert('Error al emitir factura: ' + (fin.message || 'Error desconocido del servicio de facturación'));
                     }
                 },
                 error: function(xhr) {
                     $btn.prop('disabled', false).html(originalBtnHtml);
                     var msg = 'Error al contactar con el servicio de facturación.';
                     try { msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : msg; } catch (e) {}
-                    $('#imprimir-pdf-container').html(
-                        '<div class="alert alert-danger py-3">' +
-                        '<h6><i class="fa fa-exclamation-triangle"></i> Error en la petición:</h6>' +
-                        '<p>' + msg + '</p>' +
-                        '<button type="button" id="imprimir-back-btn" class="btn btn-secondary btn-sm mt-2"><i class="fa fa-arrow-left"></i> Volver a revisar datos</button>' +
-                        '</div>'
-                    );
+                    alert('Error: ' + msg);
                 }
             });
         });
@@ -1926,19 +1885,16 @@
 
         // Al cerrar modal limpiar estado
         $('#imprimir-factura-modal').on('hidden.bs.modal', function () {
-            $('#imprimir-pdf-container').html('<iframe id="imprimir-pdf-frame" src="" style="width:100%;height:100%;border:0;" frameborder="0"></iframe>');
+            $('#imprimir-pdf-frame').attr('src', 'about:blank');
             $('#imprimir-step-2').hide();
             $('#imprimir-step-1').show();
-            $(this).removeData('factura-verificada');
-            $(this).removeData('factura-data');
+            $('#imprimir-whatsapp-status').html('').hide();
+            $('#imprimir_whatsapp_phone').val('');
+            $(this).removeData('customer-phone');
             $(this).removeData('cuf');
             $(this).removeData('sale_id');
-            
-            // Limpiar alertas de verificación
             $('#imprimir-step-1-saleinfo .alert').remove();
-            
-            // Restaurar título modal
-            $('#exampleModalLabel').html('Imprimir Factura');
+            $('#imprimir-factura-modal .modal-title').html('Imprimir Factura');
             
             // Restaurar título del modal
             $('#exampleModalLabel').html('Imprimir Factura');

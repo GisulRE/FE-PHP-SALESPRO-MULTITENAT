@@ -447,13 +447,13 @@ class SaleController extends Controller
                         // Factura anulada: ofrecer re-facturar
                         $nestedData['options'] .=
                             '<li>
-                            <button type="button" class="refacturar-modal btn btn-link" data-id = "' . $sale->id . '" data-customer-id = "' . $sale->customer_id . '"><i class="fa fa-refresh"></i> Re-Facturar</button>
+                            <button type="button" class="refacturar-modal btn btn-link" data-id="' . $sale->id . '" data-customer-id="' . $sale->customer_id . '"><i class="fa fa-refresh"></i> Re-Facturar</button>
                         </li>';
                     } else {
                         // Vigente, Contingencia, Masivo: mostrar botón imprimir (solo ver/imprimir existente)
                         $nestedData['options'] .=
                             '<li>
-                            <button type="button" class="imprimir-factura-modal btn btn-link" data-id = "' . $sale->id . '"><i class="fa fa-print"></i> ' . 'Imprimir Factura' . '</button>
+                            <button type="button" class="imprimir-factura-modal btn btn-link" data-id="' . $sale->id . '" data-url="' . url('sales/imprimir_factura/' . $sale->id) . '"><i class="fa fa-print"></i> ' . 'Imprimir Factura' . '</button>
                         </li>';
                     }
 
@@ -461,7 +461,7 @@ class SaleController extends Controller
                         // Vigente: mostrar botón anular
                         $nestedData['options'] .=
                             '<li>
-                                <button type="button" class="anular-factura-modal btn btn-link" data-id = "' . $sale->id . '" data-toggle="modal" data-target="#anular-factura-modal"><i class="fa fa-file-excel-o"></i> ' . __("file.Cancel Invoice") . '</button>
+                                <button type="button" class="anular-factura-modal btn btn-link" data-id="' . $sale->id . '" data-toggle="modal" data-target="#anular-factura-modal"><i class="fa fa-file-excel-o"></i> ' . __("file.Cancel Invoice") . '</button>
                             </li>';
                     }
 
@@ -481,7 +481,7 @@ class SaleController extends Controller
                     // Venta sin factura (Nota de Venta): ofrecer opción para facturar
                     $nestedData['options'] .=
                         '<li>
-                        <button type="button" class="facturar-venta-modal btn btn-link" data-id = "' . $sale->id . '" data-customer-id = "' . $sale->customer_id . '"><i class="fa fa-file-text-o"></i> ' . 'Facturar Venta' . '</button>
+                        <button type="button" class="facturar-venta-modal btn btn-link" data-id="' . $sale->id . '" data-customer-id="' . $sale->customer_id . '"><i class="fa fa-file-text-o"></i> ' . 'Facturar Venta' . '</button>
                     </li>';
 
                     if (in_array("sales-delete", $req_permissions)) {
